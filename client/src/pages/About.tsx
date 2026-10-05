@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 
 export default function About() {
   return (
-    <main className="flex-grow flex items-center justify-center p-4 md:p-8 min-w-[320px]">
+    <main className="grow flex items-center justify-center p-4 md:p-8 min-w-[320px]">
       <motion.article 
         className="max-w-4xl w-full bg-white dark:bg-[#0a0a0a] rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-white/10"
         initial={{ opacity: 0, y: 20 }}
