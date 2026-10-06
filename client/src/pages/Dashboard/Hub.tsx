@@ -1,8 +1,11 @@
 // src/pages/Dashboard/Hub.tsx
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Search, Clock, UserCheck, Activity, Users, Car, Lock, Zap, XCircle, Smartphone, CalendarDays, Target, TrendingUp, Phone, Mail, MessageSquare, ExternalLink, ArrowRight, ArrowLeft } from 'lucide-react';
 import defaultBanner from '../../images/defaultBanner.avif'; 
+import DashboardCard from '../../components/UI/DashboardCard';
+import ProgressCard from '../../components/UI/ProgressCard';
+import StatBox from '../../components/UI/StatBox';
 
 type UserRole = 'bdc' | 'sales' | 'manager';
 type ExpandedCard = 'leads' | 'handoffs' | 'insights' | 'appts' | 'kpi' | 'followups' | null;
@@ -56,17 +59,14 @@ const MOCK_PENDING = [
 export default function Hub({ bannerImg, homeBtnLogo, dealershipName = "Auto Dealership" }: HomeProps) {
   const [role, setRole] = useState<UserRole>('bdc');
   const [expanded, setExpanded] = useState<ExpandedCard>(null);
-  
-  // Drill-down state for the KPI Modal
   const [kpiView, setKpiView] = useState<'overview' | 'sold' | 'pending'>('overview');
-
-  // Store Toggler State
   const [activeStoreIdx, setActiveStoreIdx] = useState(0);
+  
   const activeStore = MOCK_STORES[activeStoreIdx];
-
   const displayBanner = bannerImg || defaultBanner;
+  
+  // Modals use this specific layout wrapper
   const glassClasses = `backdrop-blur-xl bg-white/40 dark:bg-[#0a0f16]/40 border border-white/50 dark:border-white/10 shadow-[0_15px_30px_rgba(0,0,0,0.05),inset_0_1px_8px_rgba(255,255,255,0.6)] dark:shadow-[0_15px_30px_rgba(0,0,0,0.2),inset_0_1px_8px_rgba(255,255,255,0.1)]`;
-
   const kpiValue = role === 'bdc' ? 42 : role === 'sales' ? 65 : 82; 
 
   const handleStoreToggle = () => {
@@ -472,77 +472,5 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = "Auto Dea
         )}
       </AnimatePresence>
     </motion.div>
-  );
-}
-
-function ProgressCard({ title, percentage, trend, onClick, layoutId }: { title: string, percentage: number, trend: string, onClick: () => void, layoutId: string }) {
-  const getColors = (pct: number) => {
-    if (pct <= 25) return { stroke: 'text-red-500', glow: 'drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]' };
-    if (pct <= 50) return { stroke: 'text-orange-500', glow: 'drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]' };
-    if (pct <= 75) return { stroke: 'text-yellow-400', glow: 'drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]' };
-    return { stroke: 'text-emerald-500', glow: 'drop-shadow-[0_0_8px_rgba(16,185,129,0.8)]' };
-  };
-  const colors = getColors(percentage);
-  const radius = 36;
-  const circumference = 2 * Math.PI * radius;
-  const [offset, setOffset] = useState(circumference);
-  
-  useEffect(() => {
-    const timer = setTimeout(() => { setOffset(circumference - (percentage / 100) * circumference); }, 100);
-    return () => clearTimeout(timer);
-  }, [percentage, circumference]);
-
-  const glassClasses = `backdrop-blur-xl bg-white/40 dark:bg-[#0a0f16]/40 border border-white/50 dark:border-white/10 shadow-[0_15px_30px_rgba(0,0,0,0.05),inset_0_1px_8px_rgba(255,255,255,0.6),inset_0_-5px_15px_rgba(0,0,0,0.05)] dark:shadow-[0_15px_30px_rgba(0,0,0,0.2),inset_0_1px_8px_rgba(255,255,255,0.1),inset_0_-5px_15px_rgba(0,0,0,0.2)]`;
-
-  return (
-    <motion.div layoutId={layoutId} onClick={onClick} className={`p-6 rounded-3xl flex flex-col justify-between min-h-40 relative overflow-hidden transition-all outline-none cursor-pointer hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-orange-500 group ${glassClasses}`}>
-      <div className="absolute top-0 left-0 w-full h-[40%] bg-linear-to-b from-white/30 dark:from-white/5 to-transparent pointer-events-none rounded-t-3xl" />
-      <div className="flex justify-between items-start z-10 w-full h-full relative">
-        <div className="flex flex-col justify-between h-full">
-          <h3 className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2 drop-shadow-sm text-gray-500 dark:text-gray-400"><Target size={14}/> {title}</h3>
-          <p className="text-xs font-bold tracking-wider drop-shadow-sm text-gray-500 dark:text-gray-400 mt-auto">{trend} <span className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 text-orange-500">Expand &rarr;</span></p>
-        </div>
-        <div className="relative w-21 h-21 flex items-center justify-center shrink-0">
-          <svg className="w-full h-full -rotate-90">
-             <circle cx="42" cy="42" r={radius} stroke="currentColor" strokeWidth="6" fill="transparent" className="text-gray-200 dark:text-white/10" />
-             <circle cx="42" cy="42" r={radius} stroke="currentColor" strokeWidth="6" fill="transparent" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className={`transition-all duration-1000 ease-out ${colors.stroke} ${colors.glow}`} />
-          </svg>
-          <div className="absolute inset-2 rounded-full backdrop-blur-md bg-white/10 dark:bg-black/10 border border-white/20 dark:border-white/10 flex items-center justify-center shadow-inner"><span className="text-base font-black text-gray-900 dark:text-white drop-shadow-md">{percentage}%</span></div>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function DashboardCard({ title, value, trend, titleColor = 'text-gray-500', icon, dotColor, pingColor, borderGlow, onClick, layoutId }: { title: string, value: string | number, trend: string, titleColor?: string, icon: React.ReactNode, dotColor?: string, pingColor?: string, borderGlow?: string, onClick: () => void, layoutId: string }) {
-  const baseClasses = borderGlow || 'bg-white/40 dark:bg-[#0a0f16]/40 border-white/50 dark:border-white/10';
-  const glassClasses = `backdrop-blur-xl border shadow-[0_15px_30px_rgba(0,0,0,0.05),inset_0_1px_8px_rgba(255,255,255,0.6),inset_0_-5px_15px_rgba(0,0,0,0.05)] dark:shadow-[0_15px_30px_rgba(0,0,0,0.2),inset_0_1px_8px_rgba(255,255,255,0.1),inset_0_-5px_15px_rgba(0,0,0,0.2)]`;
-  const cursorStyle = layoutId === 'none' ? 'cursor-default' : 'cursor-pointer hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-orange-500 group';
-
-  return (
-    <motion.div {...(layoutId !== 'none' && { layoutId })} onClick={layoutId !== 'none' ? onClick : undefined} className={`p-6 rounded-3xl flex flex-col justify-between min-h-40 relative overflow-hidden transition-all outline-none ${glassClasses} ${baseClasses} ${cursorStyle}`}>
-      <div className="absolute top-0 left-0 w-full h-[40%] bg-linear-to-b from-white/30 dark:from-white/5 to-transparent pointer-events-none rounded-t-3xl" />
-      {dotColor && (
-        <div className="absolute top-5 right-5 flex h-2.5 w-2.5 z-10">
-          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${pingColor || dotColor}`}></span>
-          <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${dotColor}`}></span>
-        </div>
-      )}
-      <div>
-        <h3 className={`text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2 z-10 drop-shadow-sm ${titleColor}`}>{icon} {title}</h3>
-        <p className="text-3xl font-black text-gray-900 dark:text-white mb-4 z-10 drop-shadow-md">{value}</p>
-      </div>
-      <p className="text-xs font-bold tracking-wider z-10 flex items-center justify-between drop-shadow-sm text-gray-500 dark:text-gray-400">
-        {trend} {layoutId !== 'none' && <span className="opacity-0 group-hover:opacity-100 transition-opacity text-orange-500">Expand &rarr;</span>}
-      </p>
-    </motion.div>
-  );
-}
-
-function StatBox({ icon, label, value }: { icon: React.ReactNode, label: string, value: string | number }) {
-  return (
-    <div className="flex flex-col items-center justify-center p-6 bg-gray-50 dark:bg-white/5 rounded-2xl min-w-30 shadow-inner border border-gray-200 dark:border-white/5">
-      <div className="mb-2">{icon}</div><p className="text-3xl font-black text-gray-900 dark:text-white">{value}</p><p className="text-xs font-bold uppercase tracking-widest text-gray-500 mt-1">{label}</p>
-    </div>
   );
 }
