@@ -1,7 +1,6 @@
-// src/components/Navigation/Navbar.tsx
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, FileText, User, Settings as SettingsIcon, LogOut } from 'lucide-react';
+import { Home, FileText, User, Settings as SettingsIcon, LogOut, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ThemeToggle from './ThemeToggle';
 import eveoSymbol from '../../images/logo/eveo-symbol.svg';
@@ -13,6 +12,7 @@ export default function Navbar() {
 
   const navLinks = [
     { name: 'Hub', path: '/app/hub', icon: <Home size={20} /> },
+    { name: 'Insights', path: '/app/insights', icon: <Sparkles size={20} /> },
     { name: 'Reports', path: '/app/reports', icon: <FileText size={20} /> },
     { name: 'Account', path: '/app/account', icon: <User size={20} /> },
     { name: 'Settings', path: '/app/settings', icon: <SettingsIcon size={20} /> },
@@ -31,8 +31,13 @@ export default function Navbar() {
 
   const handleLogout = () => {
     setShowLogout(false);
-    // In the future, you'll clear your JWT/Auth state here
-    navigate('/'); 
+    
+    // Clear the local storage session so the public Header resets
+    localStorage.removeItem('eveo_token');
+    localStorage.removeItem('eveo_role');
+    
+    // Redirect to the login screen
+    navigate('/login'); 
   };
 
   return (

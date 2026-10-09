@@ -1,4 +1,3 @@
-// src/pages/Auth/Login.tsx
 import { motion } from 'framer-motion';
 import { NavLink, useNavigate } from 'react-router-dom';
 import eveoSymbol from '../../images/logo/eveo-symbol.svg';
@@ -9,16 +8,19 @@ export default function Login() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     // Simulate authentication for now, then push user to the internal dashboard
-    navigate('/app/hub'); 
+    localStorage.setItem('eveo_token', 'mock_dev_token_12345');
+    localStorage.setItem('eveo_role', 'owner');
+    navigate('/admin/portal'); 
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+    // The header is h-20 (80px). pt-28 (112px) guarantees at least 32px of safe breathing room below the header on mobile.
+    <div className="flex-1 flex items-center justify-center px-4 pt-28 pb-12 md:pt-32 sm:px-6 lg:px-8">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-full max-w-md space-y-8 bg-white dark:bg-[#0a0f16] p-8 sm:p-10 rounded-4xl border border-gray-100 dark:border-white/5 shadow-2xl"
+        className="w-full max-w-md space-y-8 bg-white dark:bg-[#0a0f16] p-8 sm:p-10 rounded-4xl border border-gray-100 dark:border-white/5 shadow-2xl my-auto"
       >
         <div className="flex flex-col items-center">
           <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20 mb-6">

@@ -6,6 +6,7 @@ import Hub from '../pages/Dashboard/Hub';
 import Reports from '../pages/Dashboard/Reports';
 import Account from '../pages/Dashboard/Account';
 import Settings from '../pages/Dashboard/Settings';
+import Insights from '../pages/Dashboard/Insights';
 
 export default function ProtectedRoutes() {
   return (
@@ -22,6 +23,9 @@ export default function ProtectedRoutes() {
         <Route path="account" element={<Account />} />
 
         <Route path="settings" element={<Settings />} />
+
+        <Route path="insights" element={<Insights />} />
+
       </Route>
 
 
