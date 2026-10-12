@@ -1,4 +1,4 @@
-import type { NhtsaVinDecodeResult, VehicleSpecifications } from '../../types';
+import type { NhtsaVinDecodeResult, VehicleSpecifications } from '../types';
 
 const NHTSA_VPIC_BASE = 'https://vpic.nhtsa.dot.gov/api/vehicles';
 

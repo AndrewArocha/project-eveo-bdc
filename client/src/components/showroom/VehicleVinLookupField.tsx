@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, LoaderCircle, Search, X } from 'lucide-react';
 import type { ShowroomVehicleDraft, VehiclePurpose } from '../../types';
-import { decodeVin, normalizeVin, VinLookupError } from '../../services/vehicleLookup/nhtsaVinService';
+import { decodeVin, normalizeVin, VinLookupError } from '../../utils/nhtsaVinService';
 
 interface VehicleVinLookupFieldProps {
   purpose: VehiclePurpose;
