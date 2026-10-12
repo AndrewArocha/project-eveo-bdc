@@ -50,7 +50,7 @@ export default function SwipeableModal({ isOpen, onClose, children, layoutId }: 
             dragConstraints={{ top: 0 }} 
             // High elasticity allows it to follow the finger 1:1 when dragged downwards.
             dragElastic={{ top: 0, bottom: 1 }} 
-            onDragEnd={(event, info) => {
+            onDragEnd={(_event, info) => {
               // Close if the user flicks it down fast (>400 velocity) OR drags it down a significant distance (>150px)
               if (info.offset.y > 150 || info.velocity.y > 400) {
                 onClose();

@@ -1,21 +1,25 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Target, Activity, TrendingUp, Car, Clock, User, CheckCircle2 } from 'lucide-react';
+
 import RevolverOrb from '../../components/reports/RevolverOrb';
 import AppointmentModal from '../../components/reports/AppointmentModal';
 import { NextAppointmentCard, MasterScheduleCard } from '../../components/reports/ScheduleCards';
 import { AgentKPIModal, LeadVisibilityModal, ConversionRatiosModal, SoldVehiclesModal, CustomerDeepDiveModal } from '../../components/reports/OrbModals';
-import { STORES, ALL_REPORTS, type UserRole } from '../../data/mockDatabase';
+
+// 🌟 IMPORTANT: Import STORE_DATA so we can pass dynamic data
+import { STORES, ALL_REPORTS, STORE_DATA } from '../../data/mockDatabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 type ViewState = 'store-selection' | 'dashboard';
 type ExpandedModal = 'next' | 'lead' | 'agent' | 'conv' | 'sold' | 'pending' | null;
 
 export default function Reports() {
-  const [role, setRole] = useState<UserRole>('bdc');
+  const { role } = useAuth();
   const [viewState, setViewState] = useState<ViewState>('store-selection');
   const [activeStoreIndex, setActiveStoreIndex] = useState(1);
   const [selectedStore, setSelectedStore] = useState<typeof STORES[0] | null>(null);
-  
+
   const [expanded, setExpanded] = useState<ExpandedModal>(null);
   const [isApptModalOpen, setIsApptModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -37,12 +41,12 @@ export default function Reports() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape' && viewState === 'dashboard') return handleBack();
-        if (viewState === 'store-selection') {
-            if (e.key === 'ArrowRight') setActiveStoreIndex((prev) => (prev + 1) % STORES.length);
-            if (e.key === 'ArrowLeft') setActiveStoreIndex((prev) => (prev === 0 ? STORES.length - 1 : prev - 1));
-            if (e.key === 'Enter') handleStoreSelect(STORES[activeStoreIndex]);
-        }
+      if (e.key === 'Escape' && viewState === 'dashboard') return handleBack();
+      if (viewState === 'store-selection') {
+        if (e.key === 'ArrowRight') setActiveStoreIndex((prev) => (prev + 1) % STORES.length);
+        if (e.key === 'ArrowLeft') setActiveStoreIndex((prev) => (prev === 0 ? STORES.length - 1 : prev - 1));
+        if (e.key === 'Enter') handleStoreSelect(STORES[activeStoreIndex]);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -50,28 +54,22 @@ export default function Reports() {
 
   const getSortedReports = () => {
     const rMap = new Map(ALL_REPORTS.map(r => [r.id, r]));
-    const order = role === 'bdc' 
+    const order = role === 'bdc'
       ? ['agent', 'lead', 'conv', 'pending', 'sold']
-      : role === 'sales' 
-      ? ['sold', 'pending', 'agent', 'conv', 'lead']
-      : ['conv', 'sold', 'lead', 'agent', 'pending'];
+      : role === 'sales'
+        ? ['sold', 'pending', 'agent', 'conv', 'lead']
+        : ['conv', 'sold', 'lead', 'agent', 'pending'];
     return order.map(id => rMap.get(id)!);
   };
-  
+
   const sortedReports = getSortedReports();
   const isOrbModal = ['agent', 'lead', 'conv', 'sold', 'pending'].includes(expanded || '');
 
+  // 🌟 DYNAMIC DATA FIX: Get the active store's data, or empty arrays if it doesn't exist
+  const activeStoreData = selectedStore ? STORE_DATA[selectedStore.id] : null;
+
   return (
     <div className="relative h-full min-h-screen w-full overflow-hidden flex flex-col font-sans md:pl-28 bg-gray-50 dark:bg-[#05080c]">
-      
-      {/* Developer Role Toggler */}
-      <div className="fixed top-4 right-4 z-50 flex gap-2 bg-white/10 backdrop-blur-md p-1 rounded-xl border border-gray-200 dark:border-white/10">
-        {(['bdc', 'sales', 'manager'] as UserRole[]).map((r) => (
-          <button key={r} onClick={() => { setRole(r); setExpanded(null); }} className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${role === r ? 'bg-orange-500 text-white' : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-white/5'}`}>
-            {r}
-          </button>
-        ))}
-      </div>
 
       <AnimatePresence mode="wait">
         {viewState === 'store-selection' && (
@@ -106,9 +104,9 @@ export default function Reports() {
           </motion.div>
         )}
 
-        {viewState === 'dashboard' && selectedStore && (
+        {viewState === 'dashboard' && selectedStore && activeStoreData && (
           <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} className="w-full h-full pb-32">
-            
+
             <div className="w-full pt-12 flex flex-col items-center justify-center relative z-20">
               <button onClick={handleBack} className="w-20 h-20 rounded-full border border-gray-700 bg-linear-to-b from-gray-800/50 to-black flex items-center justify-center shadow-xl mb-4 hover:scale-105 transition-transform outline-none focus-visible:ring-2 focus-visible:ring-orange-500 group" title="Switch Store">
                 <span className="text-xl font-black text-white tracking-widest drop-shadow-md group-hover:text-orange-500 transition-colors">{selectedStore.logoText}</span>
@@ -117,7 +115,7 @@ export default function Reports() {
             </div>
 
             <div className="px-6 md:px-10 max-w-7xl mx-auto flex flex-col lg:flex-row gap-12 items-center lg:items-start min-h-[60vh] mt-8">
-              
+
               {/* LEFT COLUMN: Orbs */}
               <div className="relative w-full lg:w-1/2 h-125 flex items-center justify-center">
                 <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" style={{ filter: 'drop-shadow(0 0 8px rgba(249,115,22,0.3))' }}>
@@ -134,7 +132,8 @@ export default function Reports() {
 
               {/* RIGHT COLUMN: Action Cards */}
               <div className="w-full lg:w-1/2 flex flex-col gap-6 z-10 pt-8">
-                <NextAppointmentCard onClick={() => setExpanded('next')} />
+                {/* 🌟 Pass the storeId down so it knows where to look for data! */}
+                <NextAppointmentCard storeId={selectedStore.id} onClick={() => setExpanded('next')} />
                 <MasterScheduleCard onClick={() => setIsApptModalOpen(true)} />
               </div>
             </div>
@@ -144,9 +143,9 @@ export default function Reports() {
               {expanded && (
                 <div className="fixed inset-0 z-100 flex items-center justify-center p-4 sm:p-6 md:p-12 overflow-hidden pointer-events-none">
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setExpanded(null)} className="absolute inset-0 bg-black/70 backdrop-blur-md pointer-events-auto" />
-                  
+
                   <motion.div layoutId={isOrbModal ? `orb-${expanded}` : `modal-${expanded}`} className="w-full max-w-4xl h-[85vh] max-h-212.5 flex flex-col pointer-events-auto z-10 overflow-hidden shadow-2xl border border-white/10 bg-[#0a0f16]/95 backdrop-blur-3xl rounded-3xl relative">
-                    
+
                     <div className="relative z-10 flex items-center justify-between p-6 md:p-8 border-b border-white/10">
                       <h2 className="text-2xl font-black text-white flex items-center gap-3">
                         {expanded === 'agent' && <><Target className="text-emerald-500" /> Agent KPIs (Effort Metrics)</>}
@@ -166,8 +165,8 @@ export default function Reports() {
                     {expanded === 'lead' && <LeadVisibilityModal triggerToast={triggerToast} />}
                     {expanded === 'conv' && <ConversionRatiosModal triggerToast={triggerToast} />}
                     {expanded === 'sold' && <SoldVehiclesModal triggerToast={triggerToast} />}
-                    {expanded === 'pending' && <CustomerDeepDiveModal type="pending" triggerToast={triggerToast} />}
-                    {expanded === 'next' && <CustomerDeepDiveModal type="next" triggerToast={triggerToast} />}
+                    {expanded === 'pending' && <CustomerDeepDiveModal storeId={selectedStore.id} type="pending" triggerToast={triggerToast} />}
+                    {expanded === 'next' && <CustomerDeepDiveModal storeId={selectedStore.id} type="next" triggerToast={triggerToast} />}
 
                   </motion.div>
                 </div>
@@ -178,7 +177,14 @@ export default function Reports() {
         )}
       </AnimatePresence>
 
-      <AppointmentModal isOpen={isApptModalOpen} onClose={() => setIsApptModalOpen(false)} />
+      {/* 🌟 Pass the store ID to the AppointmentModal so it creates appointments in the right place! */}
+      {selectedStore && (
+        <AppointmentModal
+          isOpen={isApptModalOpen}
+          onClose={() => setIsApptModalOpen(false)}
+          storeId={selectedStore.id}
+        />
+      )}
 
       {/* Global Toast */}
       <AnimatePresence>

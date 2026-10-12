@@ -1,28 +1,15 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Phone, MessageSquare, User, ArrowLeft, ExternalLink, Smartphone, Mail, Activity, Clock } from 'lucide-react';
-
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Phone, MessageSquare, User, ArrowLeft, ExternalLink, Smartphone, Mail, Activity, Clock, Camera, Globe, MessageCircle } from 'lucide-react';
+import { MOCK_AGENT_STATS, STORE_DATA, CURRENT_USER } from '../../data/mockDatabase';
 import { StatBox, ClickableStatBox, RatioBox } from './ReportStats';
 import ReportActionToolbar from './ReportActionToolbar';
+import { type DealRecord } from '../../types';
+import { getNextAppointment } from '../../utils/appointmentManager';
 
-// --- Shared Types & Mock Data ---
-const CURRENT_USER = 'Sarah J.';
-
-const MOCK_SOLD = [
-  { id: 401, name: 'Esther Howard', vehicle: '2024 Honda Accord', profit: '$2,400', date: 'Oct 2', rep: 'Sarah J.' },
-  { id: 402, name: 'Guy Hawkins', vehicle: '2022 Ford F-150', profit: '$3,100', date: 'Oct 4', rep: 'Michael T.' },
-];
-
-const MOCK_PENDING = [
-  { id: 501, name: 'Cody Fisher', vehicle: '2023 Tesla Model Y', stage: 'Financing', rep: 'Sarah J.' },
-  { id: 502, name: 'Bessie Cooper', vehicle: '2021 Toyota RAV4', stage: 'Negotiation', rep: 'Sarah J.' },
-];
-
-const MOCK_AGENT_STATS = [
-  { rep: 'Sarah J.', calls: 65, sms: 42, emails: 12, showroom: 5 },
-  { rep: 'Erick', calls: 45, sms: 28, emails: 8, showroom: 4 },
-  { rep: 'Michael T.', calls: 32, sms: 14, emails: 3, showroom: 3 }
-];
+// Derive the local store data dynamically
+const MOCK_SOLD = STORE_DATA['njx'].sold;
+const MOCK_PENDING = STORE_DATA['njx'].pending;
 
 interface ModalProps {
   triggerToast: (msg: string) => void;
@@ -194,72 +181,198 @@ export function SoldVehiclesModal({ triggerToast }: ModalProps) {
   );
 }
 
-// 5. Pending Deals & Next Appointment Modal (Shared Profile Logic & Instagram Linking)
-export function CustomerDeepDiveModal({ type, triggerToast }: { type: 'pending' | 'next', triggerToast: (msg: string) => void }) {
-  const [selectedCustomer, setSelectedCustomer] = useState<{ name: string; vehicle: string; stage: string; rep: string } | null>(null);
+// 5. Pending Deals & Next Appointment Modal (Shared Profile Logic & Social Linking)
+export function CustomerDeepDiveModal({ type, storeId, triggerToast }: { type: 'pending' | 'next', storeId?: string, triggerToast: (msg: string) => void }) {
+  const [selectedCustomer, setSelectedCustomer] = useState<DealRecord | null>(null);
+  const [nextApptRecord, setNextApptRecord] = useState<DealRecord | null>(null);
   
-  // Instagram Integration State
-  const [isInstagramLinked, setIsInstagramLinked] = useState(false);
+  const [isSocialLinked, setIsSocialLinked] = useState(false);
+  const STORE_HAS_META_INTEGRATION = true; 
+  
+  type CommMethod = 'none' | 'instagram' | 'facebook' | 'whatsapp' | 'sms';
+  const [activeComms, setActiveComms] = useState<CommMethod>('none');
+  const [messageText, setMessageText] = useState('');
 
-  const handleInstagramClick = (customerName: string) => {
-    if (isInstagramLinked) {
-      triggerToast(`Opening Instagram Direct Messages with ${customerName}...`);
+  // 🌟 FIXED: No more phantom variables!
+  useEffect(() => {
+    if (type !== 'next' || !storeId) return;
+
+    const fetchNextAppointment = () => {
+      const appt = getNextAppointment(storeId);
+      if (appt) {
+        setNextApptRecord({
+          id: appt.id,
+          name: appt.customer,
+          vehicle: appt.vehicle,
+          rep: appt.rep,
+          stage: appt.status,
+          socials: { facebook: appt.customer, whatsapp: '+57 300 123 4567' }
+        });
+      }
+    };
+
+    fetchNextAppointment();
+    window.addEventListener('appointmentsUpdated', fetchNextAppointment);
+    return () => window.removeEventListener('appointmentsUpdated', fetchNextAppointment);
+  }, [type, storeId]);
+
+  const handleSocialClick = (platform: CommMethod) => {
+    if (isSocialLinked) {
+      setActiveComms(activeComms === platform ? 'none' : platform);
     } else {
-      // Simulate linking flow
       triggerToast('Connecting to Meta Business Suite...');
       setTimeout(() => {
-        setIsInstagramLinked(true);
-        triggerToast('Instagram Professional Account successfully linked!');
+        setIsSocialLinked(true);
+        triggerToast('Social channels successfully linked!');
+        setActiveComms(platform);
       }, 2000);
     }
   };
 
-  const renderProfile = (customer: { name: string; vehicle: string; stage?: string; rep: string }) => (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex flex-col bg-[#0a0f16] border border-white/10 rounded-2xl p-6 shadow-sm">
-      <div className="flex justify-between items-start mb-6">
-        <div className="flex items-center gap-4">
-          {type === 'pending' && <button onClick={() => setSelectedCustomer(null)} className="p-2 bg-black border border-white/10 rounded-lg hover:bg-white/10 transition-colors"><ArrowLeft size={16}/></button>}
-          <div>
-            <h1 className="text-3xl font-black text-white mb-1">{customer.name}</h1>
-            <span className={`px-3 py-1 text-xs font-bold uppercase tracking-widest rounded-lg ${type === 'next' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>
-              {type === 'next' ? 'Confirmed Arrival' : customer.stage}
+  const renderProfile = (customer: DealRecord) => {
+    const availableSocials = customer.socials ? Object.entries(customer.socials).filter(([, val]) => val) : [];
+    const hasSocials = STORE_HAS_META_INTEGRATION && availableSocials.length > 0;
+
+    const drawerConfig: Record<string, { border: string; text: string; icon: React.ReactNode; btn: string }> = {
+      instagram: { border: 'border-pink-500/30 bg-pink-500/10', text: 'text-pink-400', icon: <Camera size={12}/>, btn: 'bg-linear-to-r from-purple-600 to-pink-600 text-white border border-pink-500' },
+      facebook: { border: 'border-blue-500/30 bg-blue-500/10', text: 'text-blue-400', icon: <Globe size={12}/>, btn: 'bg-blue-600 hover:bg-blue-700 text-white' },
+      whatsapp: { border: 'border-green-500/30 bg-green-500/10', text: 'text-green-400', icon: <MessageCircle size={12}/>, btn: 'bg-green-500 hover:bg-green-600 text-white' },
+      sms: { border: 'border-blue-500/30 bg-blue-500/10', text: 'text-blue-400', icon: <MessageSquare size={12}/>, btn: 'bg-blue-500 hover:bg-blue-600 text-white' }
+    };
+
+    const activeDrawer = activeComms !== 'none' ? drawerConfig[activeComms] : null;
+
+    return (
+      <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex flex-col bg-[#0a0f16] border border-white/10 rounded-2xl p-6 shadow-sm overflow-hidden relative">
+        <div className="flex justify-between items-start mb-6">
+          <div className="flex items-center gap-4">
+            {type === 'pending' && <button onClick={() => { setSelectedCustomer(null); setActiveComms('none'); }} className="p-2 bg-black border border-white/10 rounded-lg hover:bg-white/10 transition-colors outline-none cursor-pointer"><ArrowLeft size={16}/></button>}
+            <div>
+              <h1 className="text-3xl font-black text-white mb-1">{customer.name}</h1>
+              <span className={`px-3 py-1 text-xs font-bold uppercase tracking-widest rounded-lg ${type === 'next' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                {type === 'next' ? customer.stage : customer.stage}
+              </span>
+            </div>
+          </div>
+          {type === 'next' && (
+            <div className="text-right">
+              <p className="text-3xl font-black text-orange-500">Today</p>
+              <p className="text-sm font-bold text-gray-400 mt-1">Pending Arrival</p>
+            </div>
+          )}
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4 mb-6 relative z-10">
+          <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+            <span className="text-[10px] uppercase tracking-widest text-gray-500 block mb-1">Vehicle of Interest</span>
+            <span className="font-bold text-white text-lg">{customer.vehicle}</span>
+          </div>
+          <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+            <span className="text-[10px] uppercase tracking-widest text-gray-500 block mb-1">
+              {hasSocials ? 'Social Handles' : 'Assigned Rep'}
             </span>
+            <div className="font-bold text-white text-sm flex flex-col gap-1.5 mt-1">
+              {hasSocials ? (
+                availableSocials.map(([p, h]) => (
+                  <span key={p} className="flex items-center gap-1.5 capitalize">
+                    {p === 'instagram' ? <Camera size={12} className="text-pink-400"/> : p === 'facebook' ? <Globe size={12} className="text-blue-400"/> : <MessageCircle size={12} className="text-green-400"/>} 
+                    {h as string}
+                  </span>
+                ))
+              ) : (
+                <span className="text-lg">{customer.rep}</span>
+              )}
+            </div>
           </div>
         </div>
-        {type === 'next' && (
-          <div className="text-right">
-            <p className="text-3xl font-black text-orange-500">2:30 PM</p>
-            <p className="text-sm font-bold text-gray-400 mt-1">Today</p>
-          </div>
-        )}
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="bg-white/5 p-4 rounded-xl border border-white/5"><span className="text-[10px] uppercase tracking-widest text-gray-500 block mb-1">Vehicle of Interest</span><span className="font-bold text-white text-lg">{customer.vehicle}</span></div>
-        <div className="bg-white/5 p-4 rounded-xl border border-white/5"><span className="text-[10px] uppercase tracking-widest text-gray-500 block mb-1">Assigned Rep</span><span className="font-bold text-white text-lg">{customer.rep}</span></div>
-      </div>
-      
-      <div className="flex gap-3">
-        <button onClick={() => triggerToast(`Calling ${customer.name}...`)} className="flex-1 py-3 bg-emerald-500/20 text-emerald-400 font-bold rounded-xl border border-emerald-500/30 flex items-center justify-center gap-2 transition-colors hover:bg-emerald-500/30"><Phone size={16}/> Call Customer</button>
+
+        <AnimatePresence>
+          {activeComms !== 'none' && activeDrawer && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0, marginBottom: 0 }} 
+              animate={{ height: 'auto', opacity: 1, marginBottom: 24 }} 
+              exit={{ height: 0, opacity: 0, marginBottom: 0 }}
+              className="overflow-hidden"
+            >
+              <div className={`p-4 rounded-xl border ${activeDrawer.border}`}>
+                <div className="flex justify-between items-center mb-2">
+                  <span className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 ${activeDrawer.text}`}>
+                    {activeDrawer.icon} Quick {activeComms} Reply
+                  </span>
+                </div>
+                <textarea 
+                  autoFocus
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  placeholder={`Type your message to ${customer.name}...`}
+                  className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white outline-none focus:border-white/30 resize-none h-20 mb-3"
+                />
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setActiveComms('none')} className="px-4 py-2 text-xs font-bold text-gray-400 hover:text-white transition-colors outline-none cursor-pointer">Cancel</button>
+                  <button onClick={() => { triggerToast(`${activeComms} message sent!`); setActiveComms('none'); setMessageText(''); }} className={`px-5 py-2 text-xs font-bold rounded-lg outline-none cursor-pointer shadow-md transition-transform hover:scale-105 ${activeDrawer.btn}`}>
+                    Send Message
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         
-        {/* Dynamic Instagram Button */}
-        <button 
-          onClick={() => handleInstagramClick(customer.name)} 
-          className={`flex-1 py-3 font-bold rounded-xl flex items-center justify-center gap-2 transition-all ${isInstagramLinked ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30 hover:bg-pink-500/30' : 'bg-linear-to-r from-purple-600 to-pink-600 text-white shadow-lg hover:shadow-pink-500/25'}`}
-        >
-          <Smartphone size={16}/> {isInstagramLinked ? 'Instagram DM' : 'Link Instagram Account'}
-        </button>
-        
-        <button onClick={() => triggerToast('Opening CRM profile...')} className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"><ExternalLink size={16}/> CRM</button>
-      </div>
-    </motion.div>
-  );
+        <div className="flex gap-2 sm:gap-3 relative z-10">
+          <button onClick={() => triggerToast(`Calling ${customer.name}...`)} className="flex-1 py-3 bg-emerald-500/20 text-emerald-400 font-bold rounded-xl border border-emerald-500/30 flex items-center justify-center gap-2 transition-colors hover:bg-emerald-500/30 outline-none cursor-pointer">
+            <Phone size={16}/> Call
+          </button>
+          
+          {hasSocials ? (
+            <div className="flex gap-2">
+              {availableSocials.map(([platform]) => {
+                const isActive = activeComms === platform;
+                const isIg = platform === 'instagram';
+                const isFb = platform === 'facebook';
+                
+                const activeClass = isIg ? 'bg-pink-500/40 text-white border-pink-500' : isFb ? 'bg-blue-600 border-blue-500 text-white' : 'bg-green-500 border-green-400 text-white';
+                const idleClass = isIg ? 'bg-pink-500/20 text-pink-400 border-pink-500/30 hover:bg-pink-500/30' : isFb ? 'bg-blue-500/20 text-blue-400 border-blue-500/30 hover:bg-blue-500/30' : 'bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30';
+                
+                return (
+                  <button 
+                    key={platform}
+                    onClick={() => handleSocialClick(platform as CommMethod)}
+                    className={`px-4 py-3 font-bold rounded-xl flex items-center justify-center transition-all outline-none cursor-pointer border ${isSocialLinked ? (isActive ? activeClass : idleClass) : 'bg-linear-to-br from-gray-700 to-gray-800 text-gray-400 border-gray-600 hover:text-white hover:border-gray-500 shadow-sm'}`}
+                    title={isSocialLinked ? `Message on ${platform}` : 'Link Meta Business Suite'}
+                  >
+                    {isIg ? <Camera size={16}/> : isFb ? <Globe size={16}/> : <MessageCircle size={16}/>}
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <button 
+              onClick={() => setActiveComms(activeComms === 'sms' ? 'none' : 'sms')} 
+              className={`flex-1 py-3 font-bold rounded-xl flex items-center justify-center gap-2 transition-all outline-none cursor-pointer ${activeComms === 'sms' ? 'bg-blue-500/40 text-white border border-blue-500' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30'}`}
+            >
+              <MessageSquare size={16}/> SMS
+            </button>
+          )}
+          
+          <button onClick={() => triggerToast('Opening CRM profile...')} className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 outline-none cursor-pointer">
+            <ExternalLink size={16}/> CRM
+          </button>
+        </div>
+      </motion.div>
+    );
+  };
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 p-6 md:p-8 overflow-y-auto custom-scrollbar">
         {type === 'next' ? (
-          renderProfile({ name: 'Alex Mercer', vehicle: '2024 Mazda CX-5', rep: 'Erick' })
+          nextApptRecord ? (
+            renderProfile(nextApptRecord)
+          ) : (
+            <div className="flex items-center justify-center h-full text-gray-500 font-bold">
+              No upcoming appointments to display.
+            </div>
+          )
         ) : (
           selectedCustomer ? renderProfile(selectedCustomer) : (
             <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">

@@ -7,6 +7,8 @@ import Reports from '../pages/Dashboard/Reports';
 import Account from '../pages/Dashboard/Account';
 import Settings from '../pages/Dashboard/Settings';
 import Insights from '../pages/Dashboard/Insights';
+import PayrollCheckout from '../pages/Dashboard/PayrollCheckout';
+import LiveShowroom from '../pages/Dashboard/LiveShowroom';
 
 export default function ProtectedRoutes() {
   return (
@@ -25,6 +27,10 @@ export default function ProtectedRoutes() {
         <Route path="settings" element={<Settings />} />
 
         <Route path="insights" element={<Insights />} />
+
+        <Route path="payroll-checkout" element={<PayrollCheckout />} />
+
+        <Route path="showroom" element={<LiveShowroom />} />
 
       </Route>
 

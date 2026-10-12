@@ -1,27 +1,18 @@
-import { type UserRole, type UserProfile, type Store, type Lead, type Handoff, type Appointment, type KPIItem } from '../types';
+import * as type from '../types';
 export * from '../types';
 
-// --- Default User Generator ---
-export const generateDefaultUser = (role: UserRole, customName?: string): UserProfile => {
+export const generateDefaultUser = (role: type.GlobalRole | type.StoreRole, customName?: string): type.UserProfile => {
   const name = customName || `${role.toUpperCase()} Agent 1`;
   const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
   return { id: `usr_${Date.now()}`, name, role, initials };
 };
 
-export const CURRENT_USER = 'Sarah J.'; // Kept as string for backwards compatibility with your UI
+export const CURRENT_USER = 'Sarah J.'; 
 
-// --- Stores Config ---
-export const STORES: Store[] = [
+export const STORES: type.Store[] = [
   { id: 'njx', name: 'NJ Auto Xchange', logoText: 'NJX', logoUrl: '', bannerUrl: '', themeGradient: 'from-[#1e3a8a]/20 to-[#0f172a]/80' },
   { id: 'dk', name: 'DK Auto Imports', logoText: 'DK', logoUrl: '', bannerUrl: '', themeGradient: 'from-[#7f1d1d]/20 to-[#000000]/80' },
   { id: 'kia', name: 'Northstar Kia', logoText: 'KIA', logoUrl: '', bannerUrl: '', themeGradient: 'from-[#374151]/20 to-[#4c0519]/80' }
-];
-
-// --- Global Shared Stats ---
-export const MOCK_AGENT_STATS = [
-  { rep: 'Sarah J.', calls: 65, sms: 42, emails: 12, showroom: 5 },
-  { rep: 'Erick', calls: 45, sms: 28, emails: 8, showroom: 4 },
-  { rep: 'Michael T.', calls: 32, sms: 14, emails: 3, showroom: 3 }
 ];
 
 export const ALL_REPORTS = [
@@ -44,51 +35,20 @@ export const MOCK_COMPLETED_SHIFTS = [
   { date: 'Oct 1', hours: '9:00 AM - 6:00 PM', status: 'MISSED', overtime: false },
 ];
 
-export const TEAM_MEMBERS = [
-  { name: 'Sarah J.', schedule: 'Sun - Fri', daysOff: 'Off Sat', pendingRequest: true },
-  { name: 'Erick', schedule: 'Tue - Sat', daysOff: 'Off Sun & Mon', pendingRequest: false },
-  { name: 'Michael T.', schedule: 'Wed - Sun', daysOff: 'Off Mon & Tue', pendingRequest: false },
+export const mockIntegrations: type.Integration[] = [
+  { id: 'int_1', type: 'Inventory', provider: 'vAuto Feed', value: 'ftp://feed.homenetinc.com/vauto...', status: 'Active' },
+  { id: 'int_2', type: 'CRM', provider: 'Elead', value: 'sk_live_***********892a', status: 'Active' },
+  { id: 'int_3', type: 'Social', provider: 'Facebook', value: '@PremiumAutoGroup', status: 'Active' },
 ];
 
-// --- THE NEW STORE-INDEXED DATABASE ---
-// We dumped your old flat arrays into the 'njx' store so nothing breaks.
-export const STORE_DATA: Record<string, { leads: Lead[]; handoffs: Handoff[]; appointments: Appointment[]; sold: KPIItem[]; pending: KPIItem[]; }> = {
-  'njx': {
-    leads: [
-      { id: 1, name: 'Sarah Connor', vehicle: '2024 Tesla Model 3', status: 'Contacted', time: '10 mins ago', assignee: 'Alex M.', notes: 'Looking to trade in a 2018 Camry.' },
-      { id: 2, name: 'John Smith', vehicle: '2021 Ford F-150', status: 'New Lead', time: '15 mins ago', assignee: 'Unassigned', notes: 'Requested internet price.' },
-      { id: 3, name: 'Maria Garcia', vehicle: '2023 Honda CR-V', status: 'Appt Set', time: '1 hour ago', assignee: 'Alex M.', notes: 'Coming in tomorrow at 2PM.' },
-    ],
-    handoffs: [
-      { id: 101, name: 'Elena Rostova', vehicle: '2024 Kia Telluride', rep: 'Michael T.', waitTime: '4m', status: 'waiting' }, 
-      { id: 102, name: 'Marcus Johnson', vehicle: '2020 Civic Type R', rep: 'Sarah J.', waitTime: '1m', status: 'waiting' },
-      { id: 103, name: 'David Kim', vehicle: '2025 Genesis GV80', rep: 'Sarah J.', waitTime: '6m', status: 'waiting' }
-    ],
-    appointments: [
-      { id: 201, name: 'Gordon Freeman', vehicle: '2024 Tesla Model Y', time: '1:00 PM', rep: 'Sarah J.', status: 'Pending Confirm', phone: '(555) 123-4567', notes: 'Needs financing options.' },
-      { id: 202, name: 'Alyx Vance', vehicle: '2022 Honda Civic', time: '3:30 PM', rep: 'Michael T.', status: 'Confirmed', phone: '(555) 987-6543', notes: 'First time buyer.' },
-    ],
-    sold: [
-      { id: 401, name: 'Esther Howard', vehicle: '2024 Honda Accord', profit: '$2,400', date: 'Oct 2', rep: 'Sarah J.' },
-      { id: 402, name: 'Guy Hawkins', vehicle: '2022 Ford F-150', profit: '$3,100', date: 'Oct 4', rep: 'Michael T.' },
-    ],
-    pending: [
-      { id: 501, name: 'Cody Fisher', vehicle: '2023 Tesla Model Y', stage: 'Financing', rep: 'Sarah J.' },
-      { id: 502, name: 'Bessie Cooper', vehicle: '2021 Toyota RAV4', stage: 'Negotiation', rep: 'Sarah J.' },
-    ]
-  },
-  'dk': {
-    leads: [], handoffs: [], appointments: [], sold: [], pending: []
-  },
-  'kia': {
-    leads: [], handoffs: [], appointments: [], sold: [], pending: []
-  }
-};
+// 🌟 PLATFORM LEVEL: EVEO Global Agents & Admins
+export const EVEO_GLOBAL_TEAM: type.GlobalUser[] = [
+  { id: 1, name: 'Sofia', role: 'bdc', wage: 2800000, currency: 'COP', schedule: 'Mon - Fri', daysOff: 'Sat & Sun', pendingRequest: true, route: 'Standard ACH' },
+  { id: 2, name: 'Erick', role: 'bdc', wage: 2800000, currency: 'COP', schedule: 'Tue - Sat', daysOff: 'Sun & Mon', pendingRequest: false, route: 'Standard ACH' },
+  { id: 3, name: 'Andres Hernandez', role: 'bdc_manager', wage: 4000000, currency: 'COP', schedule: 'Mon - Sat', daysOff: 'Wed & Sun', pendingRequest: false, route: 'Global Instant (USD → COP)' },
+  { id: 4, name: 'Richard Hammond', role: 'owner', pendingRequest: false, route: 'N/A' },
+  { id: 5, name: 'EVEO Admin', role: 'super_admin', pendingRequest: false, route: 'N/A' }
+];
 
-// --- Backwards Compatibility Exports ---
-// Leave these here until we fully update Hub.tsx and Reports.tsx to use STORE_DATA[activeStore]
-export const MOCK_LEADS = STORE_DATA['njx'].leads;
-export const MOCK_HANDOFFS = STORE_DATA['njx'].handoffs;
-export const MOCK_APPTS = STORE_DATA['njx'].appointments;
-export const MOCK_SOLD = STORE_DATA['njx'].sold;
-export const MOCK_PENDING = STORE_DATA['njx'].pending;
+// 🌟 Export the local store folders
+export * from './stores';

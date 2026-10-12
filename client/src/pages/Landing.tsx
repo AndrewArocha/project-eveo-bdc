@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import { Activity, Shield, Zap, CheckCircle2, PlayCircle, Calendar, X } from 'lucide-react';
 
@@ -11,14 +11,6 @@ import bgBlueSky from '../images/landing/blue-sky-lot.jpeg';
 import bgOffice from '../images/landing/office-desks.jpeg';
 import bgEntrance from '../images/landing/eveo-entrance.jpeg';
 import bgRoster from '../images/landing/agent-roster-view.png';
-
-export default function Landing() {
-  const [showcaseOpen, setShowcaseOpen] = useState(false);
-
-  const fadeUp: Variants = {
-    hidden: { opacity: 0, y: 30 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: 'easeOut' } }
-  };
 
   // Movie Reel Edge Component
   const FilmStripEdge = () => (
@@ -32,6 +24,14 @@ export default function Landing() {
       <span className="text-orange-500/80 font-mono text-[10px] font-bold tracking-widest pr-2">12</span>
     </div>
   );
+
+export default function Landing() {
+  const [showcaseOpen, setShowcaseOpen] = useState(false);
+
+  const fadeUp: Variants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: 'easeOut' } }
+  };
 
   return (
     // FIX: Added overflow-x-hidden here to permanently prevent horizontal drag on mobile

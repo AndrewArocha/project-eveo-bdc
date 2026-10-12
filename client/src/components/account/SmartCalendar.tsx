@@ -1,46 +1,80 @@
-// src/components/ui/SmartCalendar.tsx
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, ChevronLeft, ChevronRight, X, Mail, CheckCircle2, ChevronDown, Palmtree, Edit3, Check } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
+import { type UserRole } from '../../types';
 
 type DayStatus = 'worked' | 'missed' | 'timeoff' | 'upcoming' | 'pending' | 'dayoff' | 'vacation' | 'pending_vacation';
 
-interface SmartCalendarProps {
+export interface SmartCalendarProps {
   agentName: string;
-  role: 'bdc' | 'sales' | 'manager';
+  role: UserRole;
   onClose: () => void;
+  onResolveRequest?: () => void;
 }
 
-export default function SmartCalendar({ agentName, role, onClose }: SmartCalendarProps) {
-  const [currentMonth, setCurrentMonth] = useState(9); // 9 = October
-  const [currentYear, setCurrentYear] = useState(2026);
+export default function SmartCalendar({ agentName, role, onClose, onResolveRequest }: SmartCalendarProps) {
+const today = new Date();
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // Gets 9 for October
+  const [currentYear, setCurrentYear] = useState(today.getFullYear()); // Gets 2026
   const [showMonthPicker, setShowMonthPicker] = useState(false);
 
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   
   const CREATION_DATE = new Date(2026, 9, 1); 
-  const TODAY = new Date(2026, 9, 6); 
-  const REGULAR_DAY_OFF = 6; 
+  const TODAY = new Date(today.getFullYear(), today.getMonth(), today.getDate()); // Real-time today!
+  const REGULAR_DAY_OFF = 6;
 
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const offsetDays = new Date(currentYear, currentMonth, 1).getDay();
 
-  const [calendarState, setCalendarState] = useState<{ [key: string]: DayStatus }>({
-    '2026-9-2': 'worked', '2026-9-4': 'worked', '2026-9-5': 'worked', '2026-9-6': 'worked', 
-    '2026-9-14': 'timeoff', '2026-9-15': 'timeoff', '2026-9-16': 'pending',
-    '2026-9-20': 'vacation', '2026-9-21': 'vacation', '2026-9-22': 'vacation', '2026-9-23': 'vacation'
+  // 🌟 DYNAMIC STATE: Tie it to localStorage using the agentName
+  const dbKey = `eveo_calendar_${agentName}`;
+  const [calendarState, setCalendarState] = useState<{ [key: string]: DayStatus }>(() => {
+    // 1. Try to load from "Database"
+    const saved = localStorage.getItem(dbKey);
+    if (saved) return JSON.parse(saved);
+
+    // 2. If no data exists, generate the seed data ONCE
+    const newState: { [key: string]: DayStatus } = {};
+    const seed = agentName.length || 5; 
+    
+    for (let i = 1; i <= 31; i++) {
+      const dateKey = `${currentYear}-${currentMonth}-${i}`;
+      const thisDate = new Date(currentYear, currentMonth, i);
+      
+      if (thisDate < CREATION_DATE) continue;
+      
+      if (thisDate.getDay() === REGULAR_DAY_OFF) {
+        newState[dateKey] = 'dayoff';
+      } else if (thisDate > TODAY) {
+        if ((agentName === 'Sofia' || agentName === 'Sarah J.') && (i === 14 || i === 15 || i === 16)) {
+          newState[dateKey] = 'pending';
+        }
+      } else {
+        if (i % seed === 0 && i !== 7) newState[dateKey] = 'missed';
+        else newState[dateKey] = 'worked';
+      }
+    }
+
+    if (agentName === 'Michael T.') {
+      newState[`${currentYear}-${currentMonth}-20`] = 'vacation';
+      newState[`${currentYear}-${currentMonth}-21`] = 'vacation';
+      newState[`${currentYear}-${currentMonth}-22`] = 'vacation';
+    }
+
+    // Immediately save the seeded data so it persists
+    localStorage.setItem(dbKey, JSON.stringify(newState));
+    return newState;
   });
 
   const [dialog, setDialog] = useState<{ isOpen: boolean; day: number | null; type: 'request' | 'manager_action' | 'manager_self_timeoff' | 'init_vacation' | null }>({ isOpen: false, day: null, type: null });
   const [showToast, setShowToast] = useState(false);
 
-  // --- Vacation Draw Mode State ---
   const [vacationMode, setVacationMode] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawnDates, setDrawnDates] = useState<string[]>([]);
 
-  // Global mouse up listener to stop drawing even if mouse leaves the calendar
   useEffect(() => {
     const handleMouseUp = () => setIsDrawing(false);
     window.addEventListener('mouseup', handleMouseUp);
@@ -50,29 +84,31 @@ export default function SmartCalendar({ agentName, role, onClose }: SmartCalenda
   const handlePrevMonth = () => { if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(y => y - 1); } else setCurrentMonth(m => m - 1); setShowMonthPicker(false); };
   const handleNextMonth = () => { if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(y => y + 1); } else setCurrentMonth(m => m + 1); setShowMonthPicker(false); };
 
-  // --- Unified Interaction Handler ---
+  // 🌟 NEW: Helper function to save to local state AND localStorage
+  const updateAndSaveCalendar = (newStateUpdates: { [key: string]: DayStatus }) => {
+    const nextState = { ...calendarState, ...newStateUpdates };
+    setCalendarState(nextState);
+    localStorage.setItem(dbKey, JSON.stringify(nextState));
+  };
+
   const handleDayInteraction = (day: number, interactionType: 'click' | 'mousedown' | 'mouseenter') => {
     const thisDate = new Date(currentYear, currentMonth, day);
     if (thisDate < CREATION_DATE) return; 
 
     const dateKey = `${currentYear}-${currentMonth}-${day}`;
     
-    // --- DRAW MODE LOGIC ---
     if (vacationMode) {
       if (thisDate > TODAY) {
         if (interactionType === 'mousedown') {
           setIsDrawing(true);
-          // Toggle off if clicking an already drawn date, otherwise add
           setDrawnDates(prev => prev.includes(dateKey) ? prev.filter(d => d !== dateKey) : [...prev, dateKey]);
         } else if (interactionType === 'mouseenter' && isDrawing) {
-          // Paint brush effect
           setDrawnDates(prev => prev.includes(dateKey) ? prev : [...prev, dateKey]);
         }
       }
       return;
     }
 
-    // --- NORMAL CLICK LOGIC ---
     if (interactionType === 'click') {
       const status = getDayStatus(thisDate, dateKey);
       
@@ -98,13 +134,17 @@ export default function SmartCalendar({ agentName, role, onClose }: SmartCalenda
     const dateKey = `${currentYear}-${currentMonth}-${dialog.day}`;
     
     if (action === 'request') {
-      setCalendarState(prev => ({ ...prev, [dateKey]: 'pending' }));
+      // 🌟 Route updates through the new persistance function
+      updateAndSaveCalendar({ [dateKey]: 'pending' });
       triggerToast();
     } else if (action === 'approve' || action === 'manager_self_timeoff') {
-      setCalendarState(prev => ({ ...prev, [dateKey]: 'timeoff' }));
+      updateAndSaveCalendar({ [dateKey]: 'timeoff' });
+      if (action === 'approve' && onResolveRequest) onResolveRequest(); 
     } else if (action === 'deny') {
-      setCalendarState(prev => ({ ...prev, [dateKey]: 'upcoming' }));
+      updateAndSaveCalendar({ [dateKey]: 'upcoming' });
+      if (onResolveRequest) onResolveRequest();
     }
+    
     setDialog({ isOpen: false, day: null, type: null });
   };
 
@@ -118,7 +158,8 @@ export default function SmartCalendar({ agentName, role, onClose }: SmartCalenda
     const newStates: { [key: string]: DayStatus } = {};
     drawnDates.forEach(dateKey => { newStates[dateKey] = targetStatus; });
 
-    setCalendarState(prev => ({ ...prev, ...newStates }));
+    // 🌟 Route updates through the new persistance function
+    updateAndSaveCalendar(newStates);
     setDrawnDates([]);
     setVacationMode(false);
     
@@ -153,7 +194,6 @@ export default function SmartCalendar({ agentName, role, onClose }: SmartCalenda
     <div className="fixed inset-0 z-100 flex items-center justify-center p-4 overflow-hidden pointer-events-none">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto" />
       
-      {/* Notice the "select-none" class added to prevent text highlighting while dragging */}
       <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} 
         className={`w-full max-w-105 max-h-[90vh] flex flex-col pointer-events-auto z-10 overflow-hidden shadow-2xl bg-[#0a0f16]/60 backdrop-blur-3xl rounded-3xl relative transition-colors duration-300 select-none ${vacationMode ? 'border-2 border-pink-500/50 shadow-[0_0_30px_rgba(236,72,153,0.15)]' : 'border border-white/20'}`}
       >

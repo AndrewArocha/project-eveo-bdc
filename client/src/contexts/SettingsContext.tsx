@@ -23,14 +23,21 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     return saved ? JSON.parse(saved) : defaultSettings;
   });
 
-  useEffect(() => {
+useEffect(() => {
     localStorage.setItem('eveo_settings', JSON.stringify(settings));
     
     // Apply functional classes to the document root based on settings
     const root = document.documentElement;
-    settings.highContrast ? root.classList.add('high-contrast') : root.classList.remove('high-contrast');
-    settings.reducedMotion ? root.classList.add('reduce-motion') : root.classList.remove('reduce-motion');
-    settings.compactMode ? root.classList.add('compact-ui') : root.classList.remove('compact-ui');
+    
+    if (settings.highContrast) root.classList.add('high-contrast');
+    else root.classList.remove('high-contrast');
+    
+    if (settings.reducedMotion) root.classList.add('reduce-motion');
+    else root.classList.remove('reduce-motion');
+    
+    if (settings.compactMode) root.classList.add('compact-ui');
+    else root.classList.remove('compact-ui');
+    
   }, [settings]);
 
   const updateSetting = <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
