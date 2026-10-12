@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 // Backgrounds
 import bgEntrance from '../images/landing/eveo-entrance.jpeg';
-import Andres from '../images/about/andres.jpg';
+import Andres from '../images/about/Andres.jpg';
 import Foundations from '../images/about/foundations.jpg';
 import Hardships from '../images/about/hardships.jpg';
 import Architecting from '../images/about/architecting.jpg';
