@@ -13,7 +13,7 @@ import GlobalLoader from '../../components/UI/GlobalLoader';
 import { useAuth } from '../../contexts/AuthContext';
 import { playCardScroll } from '../../utils/soundEngine';
 import { useInsightsSuite } from '../../hooks/useInsightsSuite';
-import { STORES, CURRENT_USER } from '../../data/mockDatabase';
+import { CURRENT_USER } from '../../data/mockDatabase';
 import { getPersistentStoreData } from '../../services/liveActivity/liveActivityStore';
 import EveoMascot from '../../components/insights/EveoMascot';
 
@@ -31,8 +31,8 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
   const [isSwitchingStore, setIsSwitchingStore] = useState(false);
   const [, setPipelineTick] = useState(0);
 
-  const { getBanner, activeStore, activeStoreId, cycleNextStore } = useStoreAppearance();
-  const activeStoreIdx = Math.max(0, STORES.findIndex((s) => s.id === activeStore.id));
+  const { getBanner, activeStore, activeStoreId, cycleNextStore, stores } = useStoreAppearance();
+  const activeStoreIdx = Math.max(0, stores.findIndex((store) => store.id === activeStore.id));
 
   useEffect(() => {
     const sync = () => setPipelineTick((t) => t + 1);
@@ -40,8 +40,8 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
     return () => window.removeEventListener('eveo:pipeline-updated', sync);
   }, []);
 
-  const rawBanner = getBanner(activeStore.id) || bannerImg || defaultBanner;
-  const displayBanner = rawBanner && rawBanner.trim().length > 0 ? rawBanner : defaultBanner;
+  const rawBanner = getBanner(activeStore.id) || activeStore.bannerUrl || bannerImg || (activeStore.id === 'njx' ? defaultBanner : '');
+  const displayBanner = rawBanner.trim();
 
   const activeStoreData = getPersistentStoreData(activeStore.id);
 
@@ -62,7 +62,7 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
     }
   };
 
-  const nextStoreName = STORES[activeStoreIdx]?.name || 'Dealership';
+  const nextStoreName = stores[(activeStoreIdx + 1) % Math.max(1, stores.length)]?.name || '';
 
   return (
     <motion.div
@@ -137,7 +137,7 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
 
         {(role === 'bdc' || role === 'bdc_manager' || role === 'owner') && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
-            {STORES.map((_, idx) => (
+            {stores.map((_, idx) => (
               <div
                 key={idx}
                 className={`h-1.5 rounded-full transition-all duration-500 ${idx === activeStoreIdx ? 'w-6 bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'w-2 bg-white/30 group-hover:bg-white/50'}`}

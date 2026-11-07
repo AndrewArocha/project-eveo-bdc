@@ -1,5 +1,5 @@
 // src/services/liveActivity/liveActivityStore.ts
-import { STORE_DATA, CURRENT_USER, getVisibleStoreRoster, type StoreData } from '../../data/mockDatabase';
+import { STORE_DATA, getStoreDataOrEmpty, CURRENT_USER, getVisibleStoreRoster, type StoreData } from '../../data/mockDatabase';
 import type { ShowroomMediaAsset } from '../../types';
 import type { ActivityCategory, ActivityPriority, LiveActivityEvent } from '../../components/UI/LiveActivityPulse';
 
@@ -38,7 +38,7 @@ function getPipelineStorageKey(storeId: string): string {
 
 export function getPersistentStoreData(storeId: string): StoreData {
   const key = getPipelineStorageKey(storeId);
-  const fallback = STORE_DATA[storeId] || STORE_DATA['njx'];
+  const fallback = getStoreDataOrEmpty(storeId);
 
   try {
     const raw = localStorage.getItem(key);

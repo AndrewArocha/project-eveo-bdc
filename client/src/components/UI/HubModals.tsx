@@ -6,7 +6,7 @@ import {
   XCircle, Smartphone, CalendarDays, Target, ExternalLink, ArrowRight,
   ArrowLeft, Phone, Sparkles, Plus, LoaderCircle
 } from 'lucide-react';
-import { MOCK_FOLLOWUPS, CURRENT_USER, STORE_DATA, type UserRole, type DealRecord } from '../../data/mockDatabase';
+import { MOCK_FOLLOWUPS, CURRENT_USER, getStoreDataOrEmpty, type UserRole, type DealRecord } from '../../data/mockDatabase';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 import { StatBox } from '../reports/ReportStats';
 import {
@@ -41,7 +41,7 @@ export default function HubModals({ expanded, role, onClose, onOpenShowroom }: H
     return () => window.removeEventListener('eveo:pipeline-updated', sync);
   }, [activeStoreId]);
 
-  const activeStoreData = STORE_DATA[activeStoreId] || STORE_DATA['njx'];
+  const activeStoreData = getStoreDataOrEmpty(activeStoreId);
 
   const storeLeads = activeStoreData.leads || [];
   const storeHandoffs = activeStoreData.handoffs || [];

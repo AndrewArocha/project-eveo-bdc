@@ -8,7 +8,7 @@ interface AuthContextType {
   user: ApiUser | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (input: { name: string; email: string; password: string; dealershipName: string }) => Promise<void>;
+  signUp: (input: { name: string; email: string; password: string; dealershipName: string; storeName: string; website: string; address: string; phone: string; timezone: string; multiStore: boolean }) => Promise<void>;
   signOut: () => void;
 }
 
@@ -64,10 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     acceptSession(session);
   }, [acceptSession]);
 
-  const signUp = useCallback(async (input: { name: string; email: string; password: string; dealershipName: string }) => {
+  const signUp = useCallback(async (input: { name: string; email: string; password: string; dealershipName: string; storeName: string; website: string; address: string; phone: string; timezone: string; multiStore: boolean }) => {
     const session = await apiRequest<SessionResponse>('/auth/signup', {
       method: 'POST',
-      body: JSON.stringify({ ...input, storeName: input.dealershipName }),
+      body: JSON.stringify(input),
     });
     acceptSession(session);
   }, [acceptSession]);

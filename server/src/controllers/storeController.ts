@@ -22,6 +22,7 @@ function toStoreResponse(store: {
   code: string;
   website?: string;
   phone?: string;
+  address?: string;
   timezone: string;
   active: boolean;
   createdAt?: Date;
@@ -33,6 +34,7 @@ function toStoreResponse(store: {
     code: store.code,
     website: store.website ?? '',
     phone: store.phone ?? '',
+    address: store.address ?? '',
     timezone: store.timezone,
     active: store.active,
     createdAt: store.createdAt,
@@ -41,7 +43,6 @@ function toStoreResponse(store: {
 }
 
 export const listOwnStores: RequestHandler = asyncHandler(async (request, response) => {
-  assertOwner(request);
   const stores = await listStoresForDealerAccount(dealerAccountId(request));
   response.json({ data: stores.map(toStoreResponse) });
 });

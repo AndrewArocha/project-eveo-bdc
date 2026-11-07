@@ -43,10 +43,9 @@ import {
 } from '../../components/reports/OrbModals';
 import SwipeableModal from '../../components/UI/SwipeableModal';
 
-import { STORES, CURRENT_USER, getVisibleStoreRoster } from '../../data/mockDatabase';
+import { CURRENT_USER, getVisibleStoreRoster, type Store } from '../../data/mockDatabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
-import defaultBanner from '../../images/defaultBanner.avif';
 import {
   playCardScroll,
   playGalleryClick,
@@ -144,7 +143,7 @@ const REPORT_META: Record<ReportId, ReportStaticMeta> = {
 
 export default function Reports() {
   const { role } = useAuth();
-  const { activeStoreId, setActiveStoreId, getBanner } = useStoreAppearance();
+  const { activeStoreId, setActiveStoreId, getBanner, stores } = useStoreAppearance();
   const [searchParams, setSearchParams] = useSearchParams();
   const [viewState, setViewState] = useState<ViewState>('store-selection');
   const [telemetryTick, setTelemetryTick] = useState(0);
@@ -161,22 +160,21 @@ export default function Reports() {
     roleStr === 'super_admin' || roleStr === 'bdc' || roleStr === 'bdc_manager';
 
   const visibleStores = useMemo(() => {
-    if (canBrowseAllStores) return STORES;
-    const single = STORES.filter((s) => s.id === activeStoreId);
-    return single.length > 0 ? single : [STORES[0]];
-  }, [canBrowseAllStores, activeStoreId]);
+    if (canBrowseAllStores) return stores;
+    return stores.filter((store) => store.id === activeStoreId);
+  }, [canBrowseAllStores, activeStoreId, stores]);
 
   const [storeCarouselIndex, setStoreCarouselIndex] = useState(() =>
     Math.max(0, visibleStores.findIndex((s) => s.id === activeStoreId))
   );
   const [selectedStoreIdx, setSelectedStoreIdx] = useState<number>(-1);
   const [didDrag, setDidDrag] = useState(false);
-  const [openedStore, setOpenedStore] = useState<(typeof STORES)[0] | null>(null);
+  const [openedStore, setOpenedStore] = useState<Store | null>(null);
 
   const highlightedStore =
     openedStore || (selectedStoreIdx !== -1 ? visibleStores[selectedStoreIdx] : null);
   const activeBgBanner = highlightedStore
-    ? getBanner(highlightedStore.id) || highlightedStore.bannerUrl || defaultBanner
+    ? getBanner(highlightedStore.id) || highlightedStore.bannerUrl || ''
     : null;
 
   const [rotationIndex, setRotationIndex] = useState(0);
@@ -211,15 +209,15 @@ export default function Reports() {
     const storeParam = searchParams.get('store');
     const reportIdParam = searchParams.get('reportId');
     if (reportIdParam) {
-      const targetStore =
-        STORES.find((s) => s.id === (storeParam || activeStoreId)) || STORES[0];
+      const targetStore = stores.find((store) => store.id === (storeParam || activeStoreId));
+      if (!targetStore) return;
       setOpenedStore(targetStore);
       setActiveStoreId(targetStore.id);
       setViewState('dashboard');
       setDeepLinkedReportId(reportIdParam);
       setIsArchiveModalOpen(true);
     }
-  }, [searchParams, activeStoreId, setActiveStoreId]);
+  }, [searchParams, activeStoreId, setActiveStoreId, stores]);
 
   const sortedReportIds = useMemo<ReportId[]>(() => {
     if (isManagerOrAbove) {
@@ -258,7 +256,7 @@ export default function Reports() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleOpenStore = useCallback((store: (typeof STORES)[0]) => {
+  const handleOpenStore = useCallback((store: Store) => {
     playModalOpen();
     setOpenedStore(store);
     setActiveStoreId(store.id);

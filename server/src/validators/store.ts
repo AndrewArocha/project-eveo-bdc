@@ -5,7 +5,8 @@ const storeFields = {
   code: z.string().trim().min(2).max(16).regex(/^[a-zA-Z0-9-]+$/).transform((value) => value.toUpperCase()),
   website: z.url().trim().max(2048).optional().or(z.literal('')),
   phone: z.string().trim().max(40).optional(),
-  timezone: z.string().trim().min(1).max(100).optional(),
+  address: z.string().trim().max(300).optional(),
+  timezone: z.string().trim().min(1).max(100),
 };
 
 export const createStoreSchema = z.object({
@@ -13,6 +14,7 @@ export const createStoreSchema = z.object({
   code: storeFields.code,
   website: storeFields.website,
   phone: storeFields.phone,
+  address: storeFields.address,
   timezone: storeFields.timezone,
 });
 
@@ -21,7 +23,8 @@ export const updateStoreSchema = z.object({
   code: storeFields.code.optional(),
   website: storeFields.website,
   phone: storeFields.phone,
-  timezone: storeFields.timezone,
+  address: storeFields.address,
+  timezone: storeFields.timezone.optional(),
 }).refine((value) => Object.values(value).some((item) => item !== undefined), {
   message: 'Provide at least one store field to update.',
 });

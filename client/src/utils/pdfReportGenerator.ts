@@ -1,5 +1,5 @@
 // src/utils/pdfReportGenerator.ts
-import { STORES, STORE_DATA } from '../data/mockDatabase';
+import { STORES, getStoreDataOrEmpty } from '../data/mockDatabase';
 import defaultBanner from '../images/defaultBanner.avif';
 
 export type ReportType = 'agent' | 'lead' | 'conv' | 'sold' | 'pending';
@@ -33,8 +33,9 @@ export function mapReportTypeToArchiveCategory(reportId: ReportType): ArchiveCat
 }
 
 function seedStoreArchive(storeId: string): GeneratedReportRecord[] {
-  const storeObj = STORES.find((s) => s.id === storeId) || STORES[0];
-  const storeName = storeObj?.name || 'NJ Auto Xchange';
+  if (!STORES.some((store) => store.id === storeId)) return [];
+  const storeObj = STORES.find((s) => s.id === storeId)!;
+  const storeName = storeObj.name;
 
   const baseSeeds: Omit<GeneratedReportRecord, 'storeId' | 'storeName'>[] = [
     // KPI Reports (June, July, September, October)
@@ -93,8 +94,9 @@ export function createNewGeneratedReportSnapshot(
   reportType: ReportType
 ): GeneratedReportRecord {
   const existing = getStoreGeneratedReports(storeId);
-  const storeObj = STORES.find((s) => s.id === storeId) || STORES[0];
-  const storeData = STORE_DATA[storeId] || STORE_DATA['njx'];
+  const storeObj = STORES.find((s) => s.id === storeId) || { id: storeId, name: '', logoText: '', logoUrl: '', bannerUrl: '', themeGradient: '' };
+  const storeData = getStoreDataOrEmpty(storeId);
+  const hasDemoData = STORES.some((store) => store.id === storeId);
   const category = mapReportTypeToArchiveCategory(reportType);
 
   const sameCat = existing.filter((r) => r.category === category);
@@ -104,41 +106,43 @@ export function createNewGeneratedReportSnapshot(
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const day = now.getDate() || 30;
 
-  let headlineValue = '97% SLA';
-  let numericMetric = 97;
-  let summary = `Live snapshot generated for ${storeObj.name}: ${storeData.leads.length} active pipeline leads, ${storeData.appointments.length} scheduled visits.`;
+  let headlineValue = hasDemoData ? '97% SLA' : '0';
+  let numericMetric = hasDemoData ? 97 : 0;
+  let summary = hasDemoData
+    ? `Live snapshot generated for ${storeObj.name}: ${storeData.leads.length} active pipeline leads, ${storeData.appointments.length} scheduled visits.`
+    : 'No operational records are available for this store yet.';
   let metricsBreakdown = [
     { label: 'Active Leads', value: String(storeData.leads.length) },
     { label: 'Appts on Deck', value: String(storeData.appointments.length) },
-    { label: 'Delivered MTD', value: '23' },
+    { label: 'Delivered MTD', value: hasDemoData ? '23' : '0' },
   ];
 
   if (category === 'Sold') {
-    numericMetric = 23 + storeData.sold.length;
+    numericMetric = (hasDemoData ? 23 : 0) + storeData.sold.length;
     headlineValue = `${numericMetric} Units`;
-    summary = `Live Sold Roster snapshot: ${numericMetric} delivered units vs 109 ready-for-sale vehicles.`;
+    summary = hasDemoData ? `Live Sold Roster snapshot: ${numericMetric} delivered units vs 109 ready-for-sale vehicles.` : `${numericMetric} delivered units.`;
     metricsBreakdown = [
       { label: 'Delivered Units', value: String(numericMetric) },
       { label: 'Pending F&I', value: String(storeData.pending.length) },
-      { label: 'Inv→Deliv Ratio', value: '21%' },
+      { label: 'Inv→Deliv Ratio', value: hasDemoData ? '21%' : '0%' },
     ];
   } else if (category === 'Lead') {
-    numericMetric = 909 + storeData.leads.length;
+    numericMetric = (hasDemoData ? 909 : 0) + storeData.leads.length;
     headlineValue = `${numericMetric} Leads`;
-    summary = `Live Lead Attribution snapshot: ${numericMetric} MTD leads with <3m average response SLA.`;
+    summary = hasDemoData ? `Live Lead Attribution snapshot: ${numericMetric} MTD leads with <3m average response SLA.` : `${numericMetric} leads.`;
     metricsBreakdown = [
       { label: 'Leads MTD', value: String(numericMetric) },
-      { label: 'Appts MTD', value: '123' },
-      { label: 'Response Clock', value: '2m 48s' },
+      { label: 'Appts MTD', value: hasDemoData ? '123' : '0' },
+      { label: 'Response Clock', value: hasDemoData ? '2m 48s' : '0' },
     ];
   } else if (category === 'Inventory') {
-    numericMetric = 46;
-    headlineValue = `46% Turn`;
-    summary = `Live Funnel & Inventory snapshot: 48% contact rate, 68% show rate, 46% frontline turnover.`;
+    numericMetric = hasDemoData ? 46 : 0;
+    headlineValue = hasDemoData ? '46% Turn' : '0';
+    summary = hasDemoData ? `Live Funnel & Inventory snapshot: 48% contact rate, 68% show rate, 46% frontline turnover.` : 'No inventory records are available for this store yet.';
     metricsBreakdown = [
-      { label: 'Contact Ratio', value: '48%' },
-      { label: 'Show Ratio', value: '68%' },
-      { label: 'Stock Turn', value: '46%' },
+      { label: 'Contact Ratio', value: hasDemoData ? '48%' : '0%' },
+      { label: 'Show Ratio', value: hasDemoData ? '68%' : '0%' },
+      { label: 'Stock Turn', value: hasDemoData ? '46%' : '0%' },
     ];
   }
 
@@ -219,10 +223,10 @@ export function exportPersonalizedReportPDF(
   existingRecord?: GeneratedReportRecord
 ): GeneratedReportRecord {
   const record = existingRecord || createNewGeneratedReportSnapshot(storeId, reportId);
-  const storeObj = STORES.find((s) => s.id === storeId) || STORES[0];
-  const storeData = STORE_DATA[storeId] || STORE_DATA['njx'];
+  const storeObj = STORES.find((s) => s.id === storeId) || { id: storeId, name: '', logoText: '', logoUrl: '', bannerUrl: '', themeGradient: '' };
+  const storeData = getStoreDataOrEmpty(storeId);
 
-  const bannerSrc = storeObj.bannerUrl || storeData.bannerUrl || defaultBanner;
+  const bannerSrc = storeObj.bannerUrl || storeData.bannerUrl || (STORES.some((store) => store.id === storeId) ? defaultBanner : '');
   const logoSrc = storeObj.logoUrl || '';
 
   const html = `<!DOCTYPE html>

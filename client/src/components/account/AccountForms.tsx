@@ -36,7 +36,7 @@ export function ProfileForm() {
   const isOwner = role === 'owner' || role === 'super_admin';
   const isAdmin = role === 'manager' || isOwner;
 
-  const initialBanner = getBanner(activeStoreId) || STORE_DATA[activeStoreId]?.bannerUrl || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=2000';
+  const initialBanner = getBanner(activeStoreId) || STORE_DATA[activeStoreId]?.bannerUrl || '';
 
   const [storeBanner, setStoreBanner] = useState(initialBanner);
   const [workPhone, setWorkPhone] = useState('Ext. 104');

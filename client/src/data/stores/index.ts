@@ -18,6 +18,12 @@ export const STORE_DATA: Record<string, StoreData> = {
   kia: kiaData,
 };
 
+export function getStoreDataOrEmpty(storeId: string): StoreData {
+  const data = STORE_DATA[storeId];
+  if (data) return data;
+  return { staff: [], leads: [], handoffs: [], appointments: [], sold: [], pending: [], bannerUrl: '' };
+}
+
 // Per-Store Daily Reports Registry (persisted in localStorage for daily additions)
 const REPORTS_STORAGE_KEY = 'eveo_store_daily_reports_v1';
 
@@ -102,14 +108,14 @@ const DEFAULT_STORE_REPORTS: Record<string, DailyBdcReportSnapshot[]> = {
 };
 
 export function getStoreDailyReports(storeId: string): DailyBdcReportSnapshot[] {
-  if (typeof window === 'undefined') return DEFAULT_STORE_REPORTS[storeId] || DEFAULT_STORE_REPORTS.njx;
+  if (typeof window === 'undefined') return DEFAULT_STORE_REPORTS[storeId] || [];
   try {
     const saved = localStorage.getItem(`${REPORTS_STORAGE_KEY}_${storeId}`);
     if (saved) return JSON.parse(saved);
   } catch {
     // Fallback to defaults
   }
-  return DEFAULT_STORE_REPORTS[storeId] || DEFAULT_STORE_REPORTS.njx;
+  return DEFAULT_STORE_REPORTS[storeId] || [];
 }
 
 export function saveStoreDailyReport(storeId: string, snapshot: DailyBdcReportSnapshot): DailyBdcReportSnapshot[] {

@@ -21,7 +21,6 @@ import ThemeToggle from './ThemeToggle';
 import eveoSymbol from '../../images/logo/eveo-symbol.svg';
 import { useAuth } from '../../contexts/AuthContext';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
-import { STORES } from '../../data/mockDatabase';
 import { type UserRole } from '../../types';
 import { playGalleryClick } from '../../utils/soundEngine';
 import StoreInventoryModal from '../UI/StoreInventoryModal';
@@ -41,7 +40,7 @@ export default function Navbar() {
   const location = useLocation();
 
   const { role, setRole, signOut } = useAuth();
-  const { activeStoreId, setActiveStoreId } = useStoreAppearance();
+  const { activeStoreId, setActiveStoreId, stores } = useStoreAppearance();
 
   const roleStr = String(role).toLowerCase();
   const isSuperAdmin = import.meta.env.DEV || localStorage.getItem('eveo_dev') === 'true';
@@ -326,7 +325,7 @@ export default function Navbar() {
                       <div className="px-1 text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1.5">
                         <Building2 size={11} className="text-orange-400" /> Switch Active Store
                       </div>
-                      {STORES.map((s) => {
+                      {stores.map((s) => {
                         const isCurrent = s.id === activeStoreId;
                         return (
                           <button

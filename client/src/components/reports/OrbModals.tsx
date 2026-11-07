@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import {
   STORE_DATA,
+  getStoreDataOrEmpty,
   CURRENT_USER,
   STORES,
   EVEO_GLOBAL_TEAM,
@@ -126,9 +127,9 @@ if (typeof window !== 'undefined') {
 }
 
 function buildTelemetryRaw(storeId: string) {
-  const fallbackStore = STORE_DATA[storeId] || STORE_DATA['njx'];
+  const fallbackStore = getStoreDataOrEmpty(storeId);
   const store = getPersistentStoreData(storeId) || fallbackStore;
-  const storeMeta = STORES.find((s) => s.id === storeId) || STORES[0];
+  const storeMeta = STORES.find((s) => s.id === storeId) || { id: storeId, name: '', logoText: '', logoUrl: '', bannerUrl: '', themeGradient: '' };
 
   const leads = store.leads || [];
   const handoffs = store.handoffs || [];
@@ -145,17 +146,17 @@ function buildTelemetryRaw(storeId: string) {
     const repPending = pending.filter((p) => p.rep === member.name).length;
 
     const maybeTarget = (member as { kpiTarget?: number }).kpiTarget;
-    const baseTarget = typeof maybeTarget === 'number' ? maybeTarget : 15;
+    const baseTarget = typeof maybeTarget === 'number' ? maybeTarget : 0;
 
     const calls = repLeads * 8 + repAppts * 5 + baseTarget + idx * 3;
     const sms = repLeads * 5 + repAppts * 4 + Math.round(baseTarget * 0.6);
-    const emails = repLeads * 2 + repAppts * 2 + Math.max(1, repPending);
+    const emails = repLeads * 2 + repAppts * 2 + repPending;
     const showroom = repHandoffs + repAppts + repSold;
 
     return {
       rep: member.name,
       role: String(member.role),
-      liveActivity: getAgentLiveActivity(storeId, member.name, member.liveActivity || 'Active on Floor'),
+    liveActivity: getAgentLiveActivity(storeId, member.name, member.liveActivity || ''),
       calls,
       sms,
       emails,
@@ -192,7 +193,7 @@ function buildTelemetryRaw(storeId: string) {
   const avgWaitMinutes =
     waitMinutesList.length > 0
       ? (waitMinutesList.reduce((a, b) => a + b, 0) / waitMinutesList.length).toFixed(1)
-      : '2.4';
+      : '0';
 
   const sourceBuckets: Record<string, number> = {
     'Website & Price Inquiry': 0,
@@ -241,7 +242,7 @@ function buildTelemetryRaw(storeId: string) {
     parseInt(String(p || '0').replace(/[^0-9]/g, ''), 10) || 0;
   const totalGrossNum = sold.reduce((sum, d) => sum + parseProfit(d.profit), 0);
   const avgGrossNum = sold.length > 0 ? Math.round(totalGrossNum / sold.length) : 0;
-  const topRep = sold[0]?.rep || roster[0]?.name || CURRENT_USER;
+  const topRep = sold[0]?.rep || roster[0]?.name || '';
 
   const allStoreVehicles = [
     ...leads.map((l, i) => ({
@@ -266,7 +267,7 @@ function buildTelemetryRaw(storeId: string) {
       days: 92 + i * 11,
       priceNum: 39200 + i * 3800,
       status: `Pending (${p.stage || 'F&I'})`,
-      rep: p.rep || CURRENT_USER,
+      rep: p.rep || '',
     })),
   ];
 
@@ -292,17 +293,17 @@ function buildTelemetryRaw(storeId: string) {
 
   // Response Time Histogram Buckets (<1m, 1-3m SLA, 3-5m, 5-10m, >15m)
   const responseHistogram = [
-    { bucket: '<1m', count: Math.max(1, confirmedApptsCount + 2), withinSla: true },
-    { bucket: '1–3m (SLA)', count: Math.max(2, contactedLeadsCount + 3), withinSla: true },
-    { bucket: '3–5m', count: Math.max(1, handoffs.length), withinSla: false },
-    { bucket: '5–10m', count: Math.max(1, pending.length), withinSla: false },
+    { bucket: '<1m', count: confirmedApptsCount, withinSla: true },
+    { bucket: '1–3m (SLA)', count: contactedLeadsCount, withinSla: true },
+    { bucket: '3–5m', count: handoffs.length, withinSla: false },
+    { bucket: '5–10m', count: pending.length, withinSla: false },
     { bucket: '>15m', count: waitMinutesList.filter((m) => m >= 6).length, withinSla: false },
   ];
 
   // Quarterly Stacked Lead Growth (Q1 -> Q2 -> Q3 -> Q4 Live)
-  const webBase = Math.max(1, sourceBuckets['Website & Price Inquiry']);
-  const tradeBase = Math.max(1, sourceBuckets['Trade-In Appraisal']);
-  const socialBase = Math.max(1, sourceBuckets['Social & Direct Walk-In']);
+  const webBase = sourceBuckets['Website & Price Inquiry'];
+  const tradeBase = sourceBuckets['Trade-In Appraisal'];
+  const socialBase = sourceBuckets['Social & Direct Walk-In'];
   const quarterlyLeadStacks = [
     { quarter: 'Q1', web: webBase * 2, trade: tradeBase * 2, social: socialBase * 2 },
     { quarter: 'Q2', web: webBase * 3, trade: tradeBase * 2, social: socialBase * 3 },
@@ -872,12 +873,12 @@ function drawPdfCategoryChart(
   if (category === 'inventory') {
     // DONUT / PIE CHART FOR INVENTORY AGING BUCKETS
     const slices = [
-      { label: '<30 Days (Fresh)', val: Math.max(1, t.freshUnder30d), color: '#10b981' },
-      { label: '30–59 Days (Mid)', val: Math.max(1, t.mid30to59d), color: '#3b82f6' },
-      { label: '60–89 Days (Aging)', val: Math.max(1, t.aged60to89d), color: '#f59e0b' },
-      { label: '90+ Days (Critical)', val: Math.max(1, t.agedOver90d), color: '#ef4444' },
+      { label: '<30 Days (Fresh)', val: t.freshUnder30d, color: '#10b981' },
+      { label: '30–59 Days (Mid)', val: t.mid30to59d, color: '#3b82f6' },
+      { label: '60–89 Days (Aging)', val: t.aged60to89d, color: '#f59e0b' },
+      { label: '90+ Days (Critical)', val: t.agedOver90d, color: '#ef4444' },
     ];
-    const total = slices.reduce((s, item) => s + item.val, 0);
+    const total = slices.reduce((s, item) => s + item.val, 0) || 1;
     const cx = x + 220;
     const cy = y + h / 2;
     const radius = 84;
@@ -1015,9 +1016,9 @@ function drawPdfCategoryChart(
     // HORIZONTAL STAGE-TO-STAGE CONVERSION DROP-OFF FUNNEL
     const stages = [
       { label: '1. Inbound Inquiries', pct: 100, count: `${t.totalLeads} Leads`, color: '#3b82f6' },
-      { label: '2. Contacted & Engaged', pct: Math.max(18, t.contactRatioPct), count: `${t.contactedLeadsCount} Engaged`, color: '#0ea5e9' },
-      { label: '3. Appointments Confirmed', pct: Math.max(15, t.apptConfirmRatioPct), count: `${t.confirmedApptsCount} Confirmed`, color: '#f97316' },
-      { label: '4. Final Vehicle Delivery', pct: Math.max(12, Math.round(t.leadToDeliveryPct)), count: `${t.sold.length} Delivered`, color: '#10b981' },
+      { label: '2. Contacted & Engaged', pct: t.contactRatioPct, count: `${t.contactedLeadsCount} Engaged`, color: '#0ea5e9' },
+      { label: '3. Appointments Confirmed', pct: t.apptConfirmRatioPct, count: `${t.confirmedApptsCount} Confirmed`, color: '#f97316' },
+      { label: '4. Final Vehicle Delivery', pct: Math.round(t.leadToDeliveryPct), count: `${t.sold.length} Delivered`, color: '#10b981' },
     ];
     stages.forEach((st, i) => {
       const ry = y + 22 + i * 50;
@@ -1090,11 +1091,11 @@ function drawPdfCategoryChart(
     ctx.font = '800 13px -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.fillText('3. Inventory Mix Pie', rightX + 10, y + 24);
     const slices = [
-      { label: '<30d', val: Math.max(1, t.freshUnder30d), color: '#10b981' },
-      { label: '30-89d', val: Math.max(1, t.mid30to59d + t.aged60to89d), color: '#3b82f6' },
-      { label: '>90d', val: Math.max(1, t.agedOver90d), color: '#ef4444' },
+      { label: '<30d', val: t.freshUnder30d, color: '#10b981' },
+      { label: '30-89d', val: t.mid30to59d + t.aged60to89d, color: '#3b82f6' },
+      { label: '>90d', val: t.agedOver90d, color: '#ef4444' },
     ];
-    const tot = slices.reduce((s, item) => s + item.val, 0);
+    const tot = slices.reduce((s, item) => s + item.val, 0) || 1;
     let ang = -Math.PI / 2;
     const pcx = rightX + 95;
     const pcy = y + h / 2 + 8;

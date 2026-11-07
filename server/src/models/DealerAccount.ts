@@ -6,6 +6,7 @@ const dealerAccountSchema = new Schema(
     ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     status: { type: String, enum: ['pending', 'active', 'suspended'], default: 'pending', required: true },
     timezone: { type: String, default: 'America/New_York', required: true },
+    multiStore: { type: Boolean, default: false, required: true },
   },
   { timestamps: true },
 );

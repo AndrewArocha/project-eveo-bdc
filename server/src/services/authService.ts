@@ -17,6 +17,11 @@ export async function signUp(input: {
   password: string;
   dealershipName: string;
   storeName: string;
+  website?: string;
+  address?: string;
+  phone?: string;
+  timezone: string;
+  multiStore: boolean;
 }) {
   if (!env.jwtSecret || env.jwtSecret.length < 32) {
     throw new AppError(503, 'Set a JWT_SECRET of at least 32 characters before enabling account creation.', 'AUTH_NOT_CONFIGURED');
@@ -47,6 +52,7 @@ export async function signUp(input: {
       businessName: input.dealershipName,
       ownerId: userId,
       status: 'pending',
+      multiStore: input.multiStore,
     });
     accountCreated = true;
 
@@ -55,6 +61,10 @@ export async function signUp(input: {
       dealerAccountId: account.id,
       name: input.storeName,
       code: storeCode,
+      website: input.website ?? '',
+      address: input.address ?? '',
+      phone: input.phone ?? '',
+      timezone: input.timezone,
     });
 
     return issueSession(user);

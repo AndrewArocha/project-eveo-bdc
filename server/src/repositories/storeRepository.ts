@@ -6,7 +6,7 @@ export async function listStoresForDealerAccount(dealerAccountId: string) {
 
 export async function createStoreForDealerAccount(
   dealerAccountId: string,
-  input: { name: string; code: string; website?: string; phone?: string; timezone?: string },
+  input: { name: string; code: string; website?: string; phone?: string; address?: string; timezone: string },
 ) {
   const store = await Store.create({ dealerAccountId, ...input });
   return store.toObject();
@@ -15,7 +15,7 @@ export async function createStoreForDealerAccount(
 export async function updateStoreForDealerAccount(
   dealerAccountId: string,
   storeId: string,
-  input: { name?: string; code?: string; website?: string; phone?: string; timezone?: string },
+  input: { name?: string; code?: string; website?: string; phone?: string; address?: string; timezone?: string },
 ) {
   return Store.findOneAndUpdate(
     { _id: storeId, dealerAccountId },

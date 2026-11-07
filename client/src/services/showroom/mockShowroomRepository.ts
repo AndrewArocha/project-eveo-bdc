@@ -9,7 +9,7 @@ import type {
   ShowroomVisitRecord,
   ShowroomVisitSnapshot,
 } from '../../types/showroom';
-import { STORE_DATA } from '../../data/mockDatabase';
+import { getStoreDataOrEmpty } from '../../data/mockDatabase';
 
 interface PersistedState {
   visits: ShowroomVisitRecord[];
@@ -37,7 +37,7 @@ function getStorageKey(storeId: string): string {
  * so the Hub's "Live Showroom (3)" count matches the actual floor visits!
  */
 function seedFromStoreHandoffs(storeId: string): PersistedState {
-  const storeData = STORE_DATA[storeId] || STORE_DATA['njx'];
+  const storeData = getStoreDataOrEmpty(storeId);
   const handoffs = storeData?.handoffs || [];
   const staff = storeData?.staff || [];
 

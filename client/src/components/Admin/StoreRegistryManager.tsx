@@ -1,12 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Building2, LoaderCircle, Plus, Save } from 'lucide-react';
 import { ApiError, apiRequest, type ApiStore } from '../../services/apiClient';
+import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 
 interface StoreDraft {
   name: string;
   code: string;
   website: string;
   phone: string;
+  address: string;
   timezone: string;
 }
 
@@ -15,41 +17,26 @@ const EMPTY_DRAFT: StoreDraft = {
   code: '',
   website: '',
   phone: '',
-  timezone: 'America/New_York',
+  address: '',
+  timezone: '',
 };
 
 const inputClasses = 'min-h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-gray-500 focus:border-orange-500';
 
 export default function StoreRegistryManager() {
-  const [stores, setStores] = useState<ApiStore[]>([]);
+  const { registeredStores: stores, storesLoading: isLoading, storesError, refreshStores, setActiveStoreId } = useStoreAppearance();
   const [selectedStoreId, setSelectedStoreId] = useState('');
   const [draft, setDraft] = useState<StoreDraft>(EMPTY_DRAFT);
   const [isCreating, setIsCreating] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
 
   useEffect(() => {
-    let active = true;
-    apiRequest<ApiStore[]>('/stores')
-      .then((records) => {
-        if (!active) return;
-        setStores(records);
-        setSelectedStoreId(records[0]?.id ?? '');
-      })
-      .catch((reason: unknown) => {
-        if (!active) return;
-        setError(reason instanceof ApiError ? reason.message : 'Could not load your stores.');
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
-      });
+    if (!selectedStoreId && stores[0]) setSelectedStoreId(stores[0].id);
+  }, [selectedStoreId, stores]);
 
-    return () => {
-      active = false;
-    };
-  }, []);
+  useEffect(() => { if (storesError) setError(storesError); }, [storesError]);
 
   const selectedStore = stores.find((store) => store.id === selectedStoreId) ?? null;
 
@@ -61,6 +48,7 @@ export default function StoreRegistryManager() {
         code: selectedStore.code,
         website: selectedStore.website,
         phone: selectedStore.phone,
+        address: selectedStore.address,
         timezone: selectedStore.timezone,
       });
     } else if (stores.length === 0) {
@@ -84,8 +72,9 @@ export default function StoreRegistryManager() {
         method: 'POST',
         body: JSON.stringify(draft),
       });
-      setStores((current) => [...current, created]);
+      await refreshStores();
       setSelectedStoreId(created.id);
+      setActiveStoreId(created.id);
       setIsCreating(false);
       setFeedback(`${created.name} was added to your store registry.`);
     } catch (reason) {
@@ -106,7 +95,7 @@ export default function StoreRegistryManager() {
         method: 'PATCH',
         body: JSON.stringify(draft),
       });
-      setStores((current) => current.map((store) => store.id === updated.id ? updated : store));
+      await refreshStores();
       setFeedback(`${updated.name} was updated.`);
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : 'Could not update the store.');
@@ -161,6 +150,7 @@ export default function StoreRegistryManager() {
                 onClick={() => {
                   setIsCreating(false);
                   setSelectedStoreId(store.id);
+                  setActiveStoreId(store.id);
                   setError('');
                   setFeedback('');
                 }}
@@ -187,11 +177,15 @@ export default function StoreRegistryManager() {
               </div>
               <div>
                 <label htmlFor="registry-store-website" className="mb-1.5 ml-1 block text-xs font-semibold text-gray-400">Website</label>
-                <input id="registry-store-website" className={inputClasses} type="url" maxLength={2048} value={draft.website} onChange={(event) => updateDraft('website', event.target.value)} placeholder="https://example.com" />
+                <input id="registry-store-website" className={inputClasses} type="url" maxLength={2048} value={draft.website} onChange={(event) => updateDraft('website', event.target.value)} />
               </div>
               <div>
                 <label htmlFor="registry-store-phone" className="mb-1.5 ml-1 block text-xs font-semibold text-gray-400">Phone</label>
                 <input id="registry-store-phone" className={inputClasses} type="tel" maxLength={40} value={draft.phone} onChange={(event) => updateDraft('phone', event.target.value)} />
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="registry-store-address" className="mb-1.5 ml-1 block text-xs font-semibold text-gray-400">Physical address</label>
+                <input id="registry-store-address" className={inputClasses} maxLength={300} value={draft.address} onChange={(event) => updateDraft('address', event.target.value)} />
               </div>
               <div className="sm:col-span-2">
                 <label htmlFor="registry-store-timezone" className="mb-1.5 ml-1 block text-xs font-semibold text-gray-400">Timezone</label>

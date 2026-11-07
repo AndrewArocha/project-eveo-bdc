@@ -24,6 +24,7 @@ export interface ApiStore {
   code: string;
   website: string;
   phone: string;
+  address: string;
   timezone: string;
   active: boolean;
   createdAt?: string;

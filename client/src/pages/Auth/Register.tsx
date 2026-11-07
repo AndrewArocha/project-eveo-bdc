@@ -21,6 +21,12 @@ export default function Register() {
         email: String(form.get('email')).trim(),
         password: String(form.get('password')),
         dealershipName: String(form.get('dealership')).trim(),
+        storeName: String(form.get('storeName')).trim(),
+        website: String(form.get('website')).trim(),
+        address: String(form.get('address')).trim(),
+        phone: String(form.get('phone')).trim(),
+        timezone: String(form.get('timezone')).trim(),
+        multiStore: form.get('multiStore') === 'yes',
       });
       navigate('/app/customers', {
         replace: true,
@@ -41,7 +47,7 @@ export default function Register() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
-        className="w-full max-w-md space-y-6 sm:space-y-8 bg-white dark:bg-[#0a0f16] p-6 sm:p-10 rounded-3xl sm:rounded-4xl border border-gray-100 dark:border-white/5 shadow-2xl my-auto"
+        className="w-full max-w-2xl space-y-6 sm:space-y-8 bg-white dark:bg-[#0a0f16] p-6 sm:p-10 rounded-3xl sm:rounded-4xl border border-gray-100 dark:border-white/5 shadow-2xl my-auto"
       >
         <div className="flex flex-col items-center">
           <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20 mb-4 sm:mb-6">
@@ -61,27 +67,64 @@ export default function Register() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="firstName" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">First name</label>
-              <input id="firstName" name="firstName" type="text" autoComplete="given-name" required className={inputClasses} placeholder="John" />
+              <input id="firstName" name="firstName" type="text" autoComplete="given-name" required className={inputClasses} />
             </div>
             <div>
               <label htmlFor="lastName" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Last name</label>
-              <input id="lastName" name="lastName" type="text" autoComplete="family-name" required className={inputClasses} placeholder="Doe" />
+              <input id="lastName" name="lastName" type="text" autoComplete="family-name" required className={inputClasses} />
             </div>
           </div>
 
           <div>
             <label htmlFor="dealership" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Dealership name</label>
-            <input id="dealership" name="dealership" type="text" autoComplete="organization" required className={inputClasses} placeholder="Premium Auto Group" />
+            <input id="dealership" name="dealership" type="text" autoComplete="organization" required className={inputClasses} />
+          </div>
+
+          <div>
+            <label htmlFor="storeName" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Initial store name</label>
+            <input id="storeName" name="storeName" type="text" autoComplete="organization" required className={inputClasses} />
+          </div>
+
+          <fieldset className="grid gap-3 sm:grid-cols-2">
+            <legend className="mb-2 ml-1 text-xs font-semibold text-gray-700 dark:text-gray-300">Store organization</legend>
+            <label className="flex min-h-12 items-center gap-3 rounded-xl border border-gray-200 px-4 text-sm text-gray-700 dark:border-white/10 dark:text-gray-300">
+              <input type="radio" name="multiStore" value="no" defaultChecked className="accent-orange-500" /> Single store
+            </label>
+            <label className="flex min-h-12 items-center gap-3 rounded-xl border border-gray-200 px-4 text-sm text-gray-700 dark:border-white/10 dark:text-gray-300">
+              <input type="radio" name="multiStore" value="yes" className="accent-orange-500" /> Multiple stores
+            </label>
+          </fieldset>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="website" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Store website</label>
+              <input id="website" name="website" type="url" className={inputClasses} />
+            </div>
+            <div>
+              <label htmlFor="phone" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Store phone</label>
+              <input id="phone" name="phone" type="tel" className={inputClasses} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="address" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Physical address</label>
+              <input id="address" name="address" type="text" autoComplete="street-address" className={inputClasses} />
+            </div>
+            <div>
+              <label htmlFor="timezone" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Store timezone</label>
+              <input id="timezone" name="timezone" type="text" required maxLength={100} className={inputClasses} />
+            </div>
           </div>
 
           <div>
             <label htmlFor="email" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Work email</label>
-            <input id="email" name="email" type="email" autoComplete="email" required className={inputClasses} placeholder="admin@dealership.com" />
+            <input id="email" name="email" type="email" autoComplete="email" required className={inputClasses} />
           </div>
 
           <div>
             <label htmlFor="password" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Password</label>
-            <input id="password" name="password" type="password" autoComplete="new-password" required minLength={12} className={inputClasses} placeholder="At least 12 characters" />
+            <input id="password" name="password" type="password" autoComplete="new-password" required minLength={12} className={inputClasses} />
           </div>
 
           <div className="flex items-start pt-1">
@@ -98,7 +141,7 @@ export default function Register() {
             </div>
           </div>
 
-          <button type="submit" className="w-full min-h-13 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-base sm:text-sm transition-all shadow-lg hover:shadow-orange-500/25 mt-2 cursor-pointer">
+          <button type="submit" disabled={isSubmitting} className="w-full min-h-13 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-base sm:text-sm transition-all shadow-lg hover:shadow-orange-500/25 mt-2 cursor-pointer disabled:opacity-60">
             {isSubmitting ? 'Submitting application…' : 'Submit dealership application'}
           </button>
         </form>

@@ -7,7 +7,7 @@ import {
   MessageSquareText, Radio, ScanBarcode, Send, Sparkles, Trash2,
   UserCheck, Users, Video, X, Zap
 } from 'lucide-react';
-import { CURRENT_USER, STORES, STORE_DATA, getVisibleStoreRoster } from '../../data/mockDatabase';
+import { CURRENT_USER, STORE_DATA, getStoreDataOrEmpty, getVisibleStoreRoster } from '../../data/mockDatabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 import defaultBanner from '../../images/defaultBanner.avif';
@@ -96,12 +96,12 @@ type ExclusiveView = 'portal' | 'showroom' | 'activity' | 'visit';
 
 export default function LiveShowroom() {
   const { role } = useAuth();
-  const { activeStore, getBanner, cycleNextStore } = useStoreAppearance();
+  const { activeStore, getBanner, cycleNextStore, stores } = useStoreAppearance();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const storeId = activeStore.id;
-  const activeStoreIdx = Math.max(0, STORES.findIndex((s) => s.id === storeId));
-  const displayBanner = getBanner(storeId) || defaultBanner;
+  const activeStoreIdx = Math.max(0, stores.findIndex((store) => store.id === storeId));
+  const displayBanner = getBanner(storeId) || activeStore.bannerUrl || (storeId === 'njx' ? defaultBanner : '');
 
   const viewFromUrl = searchParams.get('view') as ExclusiveView | null;
   const visitIdFromUrl = searchParams.get('visitId');
@@ -264,10 +264,10 @@ export default function LiveShowroom() {
     }
     const storeSold = STORE_DATA[storeId]?.sold?.[0];
     return {
-      customerName: storeSold?.name || 'Arthur Morgan',
-      vehicle: storeSold?.vehicle || '2024 Kia Telluride SX',
-      rep: storeSold?.rep || salespeople[0]?.name || 'Sarah J.',
-      time: 'Just now',
+      customerName: storeSold?.name || '',
+      vehicle: storeSold?.vehicle || '',
+      rep: storeSold?.rep || salespeople[0]?.name || '',
+      time: '',
     };
   }, [completedSnapshots, storeId, salespeople]);
 
@@ -343,7 +343,7 @@ export default function LiveShowroom() {
   const selectedOnlineUser = onlineUsersList[onlineCursorIdx % Math.max(1, onlineUsersList.length)] || null;
 
   const storePipelineCustomers = useMemo(() => {
-    const s = STORE_DATA[storeId] || STORE_DATA['njx'];
+    const s = getStoreDataOrEmpty(storeId);
     const names = new Set<string>();
     s.handoffs?.forEach((h) => names.add(h.name));
     s.leads?.forEach((l) => names.add(l.name));
@@ -666,7 +666,7 @@ export default function LiveShowroom() {
 
         {(role === 'bdc' || role === 'bdc_manager' || role === 'owner') && (
           <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
-            {STORES.map((_, idx) => (
+            {stores.map((_, idx) => (
               <div
                 key={idx}
                 className={`h-1.5 rounded-full transition-all duration-500 ${idx === activeStoreIdx
