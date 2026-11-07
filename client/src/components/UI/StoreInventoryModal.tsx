@@ -14,10 +14,33 @@ import {
   type InventoryUnitStatus,
 } from '../../services/inventory/storeInventorySync';
 import type { StoreInventorySummary } from '../../data/stores/njx/inventory';
+import { useAuth } from '../../contexts/AuthContext';
+import { apiInventoryRepository, type ApiInventoryVehicle } from '../../services/inventory/apiInventoryRepository';
 
 interface StoreInventoryModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+function summarizeInventory(storeId: string, vehicles: ApiInventoryVehicle[]): StoreInventorySummary {
+  const now = Date.now();
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const today = new Date().toISOString().slice(0, 10);
+  const units = vehicles.map((vehicle) => ({
+    vin: vehicle.vin,
+    vehicle: vehicle.vehicle,
+    daysInStock: Math.max(0, Math.floor((now - new Date(vehicle.createdAt).getTime()) / 86_400_000)),
+    price: vehicle.price,
+    status: vehicle.status,
+  }));
+  return {
+    storeId,
+    carsReadyForSale: units.filter((unit) => unit.status === 'READY_FOR_SALE').length,
+    carsDeliveredMtd: vehicles.filter((vehicle) => vehicle.status === 'DELIVERED' && vehicle.updatedAt.startsWith(currentMonth)).length,
+    dealsDeliveredToday: vehicles.filter((vehicle) => vehicle.status === 'DELIVERED' && vehicle.updatedAt.startsWith(today)).length,
+    averageRatioBenchmark: 0,
+    units,
+  };
 }
 
 export default function StoreInventoryModal({
@@ -25,9 +48,11 @@ export default function StoreInventoryModal({
   onClose,
 }: StoreInventoryModalProps) {
   const { activeStoreId, activeStore } = useStoreAppearance();
+  const { user } = useAuth();
   const [summary, setSummary] = useState<StoreInventorySummary>(() =>
     getStoreInventory(activeStoreId)
   );
+  const [apiVehicles, setApiVehicles] = useState<ApiInventoryVehicle[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | InventoryUnitStatus>('ALL');
   const [syncStage, setSyncStage] = useState<string | null>(null);
@@ -40,11 +65,27 @@ export default function StoreInventoryModal({
   const [newPrice, setNewPrice] = useState('');
 
   useEffect(() => {
-    const refresh = () => setSummary(getStoreInventory(activeStoreId));
+    let active = true;
+    const refresh = () => {
+      if (user) {
+        void apiInventoryRepository.list(activeStoreId).then((vehicles) => {
+          if (!active) return;
+          setApiVehicles(vehicles);
+          setSummary(summarizeInventory(activeStoreId, vehicles));
+        }).catch((cause: unknown) => {
+          setSyncError(cause instanceof Error ? cause.message : 'Inventory could not be loaded.');
+        });
+      } else {
+        setSummary(getStoreInventory(activeStoreId));
+      }
+    };
     refresh();
     window.addEventListener('eveo:store-inventory-updated', refresh);
-    return () => window.removeEventListener('eveo:store-inventory-updated', refresh);
-  }, [activeStoreId, isOpen]);
+    return () => {
+      active = false;
+      window.removeEventListener('eveo:store-inventory-updated', refresh);
+    };
+  }, [activeStoreId, isOpen, user]);
 
   const handleProgressiveSync = async () => {
     setSyncError(null);
@@ -53,7 +94,7 @@ export default function StoreInventoryModal({
         setSyncStage(stage);
         setSyncPct(pct);
         setSummary({ ...nextSummary });
-      });
+      }, activeStore.websiteUrl);
       window.setTimeout(() => setSyncStage(null), 1400);
     } catch (error) {
       setSyncStage(null);
@@ -62,10 +103,24 @@ export default function StoreInventoryModal({
     }
   };
 
-  const handleAddUnit = (e: React.FormEvent) => {
+  const handleAddUnit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVin.trim() || !newVehicle.trim()) return;
-    const priceNum = parseInt(newPrice.replace(/[^0-9]/g, ''), 10) || 29900;
+    const priceNum = parseInt(newPrice.replace(/[^0-9]/g, ''), 10) || 0;
+    if (user) {
+      try {
+        const created = await apiInventoryRepository.create({ storeId: activeStoreId, vin: newVin.trim(), vehicle: newVehicle.trim(), price: priceNum });
+        if (created.duplicate) setSyncError(`VIN ${created.vin} is already registered in this dealer account.`);
+        else setSyncError(null);
+        const vehicles = await apiInventoryRepository.list(activeStoreId);
+        setApiVehicles(vehicles);
+        setSummary(summarizeInventory(activeStoreId, vehicles));
+        if (created.duplicate) return;
+      } catch (cause) {
+        setSyncError(cause instanceof Error ? cause.message : 'Inventory vehicle could not be saved.');
+        return;
+      }
+    } else {
     const next: StoreInventorySummary = {
       ...summary,
       carsReadyForSale: summary.carsReadyForSale + 1,
@@ -82,10 +137,37 @@ export default function StoreInventoryModal({
     };
     saveStoreInventory(activeStoreId, next);
     setSummary(next);
+    }
     setNewVin('');
     setNewVehicle('');
     setNewPrice('');
     setIsAddingUnit(false);
+  };
+
+  const changeVehicleStatus = async (vin: string, status: InventoryUnitStatus) => {
+    if (!user) {
+      updateStoreVehicleStatus(activeStoreId, vin, status);
+      return;
+    }
+    const record = apiVehicles.find((vehicle) => vehicle.vin === vin);
+    if (!record) return;
+    try {
+      await apiInventoryRepository.update(record._id, { status });
+      const vehicles = await apiInventoryRepository.list(activeStoreId);
+      setApiVehicles(vehicles);
+      setSummary(summarizeInventory(activeStoreId, vehicles));
+    } catch (cause) {
+      setSyncError(cause instanceof Error ? cause.message : 'Vehicle status could not be updated.');
+    }
+  };
+
+  const resolveDiscrepancy = async (recordId: string, discrepancyId: string, resolution: 'accepted_source' | 'kept_current') => {
+    try {
+      await apiInventoryRepository.resolveDiscrepancy(recordId, discrepancyId, { resolution });
+      setApiVehicles(await apiInventoryRepository.list(activeStoreId));
+    } catch (cause) {
+      setSyncError(cause instanceof Error ? cause.message : 'Inventory discrepancy could not be resolved.');
+    }
   };
 
   const filteredUnits = summary.units.filter((u) => {
@@ -94,7 +176,7 @@ export default function StoreInventoryModal({
     return u.vehicle.toLowerCase().includes(q) || u.vin.toLowerCase().includes(q);
   });
 
-  const websiteUrl = getStoreWebsiteInventoryUrl(activeStoreId);
+  const websiteUrl = getStoreWebsiteInventoryUrl(activeStoreId, activeStore.websiteUrl);
 
   return (
     <SwipeableModal isOpen={isOpen} onClose={onClose} maxWidthClass="md:max-w-5xl">
@@ -298,12 +380,27 @@ export default function StoreInventoryModal({
                 </span>
               </div>
 
+              {apiVehicles.find((record) => record.vin === unit.vin)?.discrepancies.filter((item) => item.status === 'open').map((item) => {
+                const record = apiVehicles.find((candidate) => candidate.vin === unit.vin);
+                if (!record) return null;
+                return (
+                  <div key={item._id} className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+                    <p className="text-xs font-bold text-amber-200">Source conflict · {item.field}</p>
+                    <p className="mt-1 text-[11px] text-gray-300">Current: {String(item.currentValue ?? '')} · Observed: {String(item.observedValue ?? '')} ({item.source})</p>
+                    <div className="mt-2 flex gap-2">
+                      <button type="button" onClick={() => void resolveDiscrepancy(record._id, item._id, 'accepted_source')} className="rounded-lg bg-emerald-500/15 px-3 py-1.5 text-[10px] font-bold text-emerald-200">Accept source</button>
+                      <button type="button" onClick={() => void resolveDiscrepancy(record._id, item._id, 'kept_current')} className="rounded-lg bg-white/10 px-3 py-1.5 text-[10px] font-bold text-gray-200">Keep current</button>
+                    </div>
+                  </div>
+                );
+              })}
+
               <div className="flex items-center gap-1.5 pt-2 border-t border-white/8">
                 {(['READY_FOR_SALE', 'PENDING', 'DELIVERED'] as const).map((st) => (
                   <button
                     key={st}
                     type="button"
-                    onClick={() => updateStoreVehicleStatus(activeStoreId, unit.vin, st)}
+                    onClick={() => void changeVehicleStatus(unit.vin, st)}
                     className={`flex-1 py-1.5 rounded-xl text-[10px] font-bold uppercase border cursor-pointer transition-all ${
                       unit.status === st
                         ? st === 'DELIVERED'

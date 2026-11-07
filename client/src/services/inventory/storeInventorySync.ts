@@ -23,7 +23,8 @@ export function isStoreWebsiteInventorySyncAvailable(): boolean {
   return INVENTORY_SYNC_ENABLED && INVENTORY_API_BASE_URL.length > 0;
 }
 
-export function getStoreWebsiteInventoryUrl(storeId: string): string {
+export function getStoreWebsiteInventoryUrl(storeId: string, configuredWebsite = ''): string {
+  if (configuredWebsite.trim()) return normalizeInventorySourceUrl(configuredWebsite);
   try {
     const customUrl = localStorage.getItem(`eveo_store_website_${storeId}`);
     if (customUrl?.trim()) return normalizeInventorySourceUrl(customUrl);
@@ -196,12 +197,13 @@ export function checkAndAlertIfVehicleSold(
  */
 export async function syncStoreWebsiteInventoryProgressively(
   storeId: string,
-  onProgress?: (stage: string, pct: number, summary: StoreInventorySummary) => void
+  onProgress?: (stage: string, pct: number, summary: StoreInventorySummary) => void,
+  configuredWebsite = '',
 ): Promise<StoreInventorySummary> {
   const storeMeta = STORES.find((store) => store.id === storeId);
   if (!storeMeta) throw new Error(`Store ${storeId} is not registered in EVEO.`);
 
-  const sourceUrl = getStoreWebsiteInventoryUrl(storeId);
+  const sourceUrl = getStoreWebsiteInventoryUrl(storeId, configuredWebsite);
   if (!sourceUrl) {
     throw new Error(`No valid inventory source URL is configured for ${storeMeta.name}.`);
   }

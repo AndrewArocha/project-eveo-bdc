@@ -13,7 +13,11 @@ const customerSchema = new Schema(
   { timestamps: true },
 );
 
-customerSchema.index({ ownerId: 1, email: 1 });
+customerSchema.index({ dealerAccountId: 1, email: 1 }, {
+  unique: true,
+  partialFilterExpression: { email: { $type: 'string', $gt: '' } },
+});
+customerSchema.index({ dealerAccountId: 1, createdAt: -1 });
 
 export type ICustomer = InferSchemaType<typeof customerSchema>;
 export const Customer = model('Customer', customerSchema);

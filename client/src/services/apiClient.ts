@@ -11,11 +11,13 @@ export interface ApiUser {
 
 export interface CustomerRecord {
   _id: string;
+  storeId?: string | null;
   name: string;
   email: string;
   phone: string;
   notes: string;
   createdAt: string;
+  duplicate?: boolean;
 }
 
 export interface ApiStore {

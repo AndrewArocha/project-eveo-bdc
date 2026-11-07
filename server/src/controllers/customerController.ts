@@ -2,7 +2,7 @@ import type { RequestHandler } from 'express';
 import {
   createCustomer,
   deleteCustomer,
-  getCustomerByOwner,
+  getCustomerByAccount,
   listCustomers,
   updateCustomer,
 } from '../repositories/customerRepository.js';
@@ -17,26 +17,28 @@ function customerId(request: Request): string {
 }
 
 export const listOwnCustomers: RequestHandler = asyncHandler(async (request, response) => {
-  const customers = await listCustomers(request.auth!.userId);
+  const storeId = typeof request.query.storeId === 'string' ? request.query.storeId : undefined;
+  const search = typeof request.query.search === 'string' ? request.query.search : undefined;
+  const customers = await listCustomers(request.auth!.dealerAccountId, { storeId, search });
   response.json({ data: customers });
 });
 
 export const createOwnCustomer: RequestHandler = asyncHandler(async (request, response) => {
-  const customer = await createCustomer(request.body, request.auth!.userId, request.auth!.dealerAccountId);
-  response.status(201).json({ data: customer });
+  const result = await createCustomer(request.body, request.auth!.userId, request.auth!.dealerAccountId);
+  response.status(result.created ? 201 : 200).json({ data: { ...result.customer.toObject(), duplicate: !result.created } });
 });
 
 export const getOwnCustomer: RequestHandler = asyncHandler(async (request, response) => {
-  const customer = await getCustomerByOwner(customerId(request), request.auth!.userId);
+  const customer = await getCustomerByAccount(customerId(request), request.auth!.dealerAccountId);
   response.json({ data: customer });
 });
 
 export const updateOwnCustomer: RequestHandler = asyncHandler(async (request, response) => {
-  const customer = await updateCustomer(customerId(request), request.auth!.userId, request.body);
+  const customer = await updateCustomer(customerId(request), request.auth!.dealerAccountId, request.body);
   response.json({ data: customer });
 });
 
 export const deleteOwnCustomer: RequestHandler = asyncHandler(async (request, response) => {
-  await deleteCustomer(customerId(request), request.auth!.userId);
+  await deleteCustomer(customerId(request), request.auth!.dealerAccountId);
   response.status(204).end();
 });
