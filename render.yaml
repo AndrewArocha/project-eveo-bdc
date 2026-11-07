@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: eveo-api
+    runtime: node
+    plan: free
+    region: ohio
+    healthCheckPath: /api/health
+    buildCommand: npm ci --prefix server && npm run build --prefix server
+    startCommand: npm start --prefix server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: CLIENT_ORIGIN
+        value: https://project-eveo-bdc-stage-ha-ndrew-dev.vercel.app
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
