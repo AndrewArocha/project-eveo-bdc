@@ -98,18 +98,18 @@ export default function Register() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="website" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Store website</label>
-              <input id="website" name="website" type="url" className={inputClasses} />
+              <input id="website" name="website" type="url" required className={inputClasses} />
             </div>
             <div>
               <label htmlFor="phone" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Store phone</label>
-              <input id="phone" name="phone" type="tel" className={inputClasses} />
+              <input id="phone" name="phone" type="tel" required minLength={7} maxLength={40} className={inputClasses} />
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="address" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Physical address</label>
-              <input id="address" name="address" type="text" autoComplete="street-address" className={inputClasses} />
+              <input id="address" name="address" type="text" autoComplete="street-address" required minLength={5} maxLength={300} className={inputClasses} />
             </div>
             <div>
               <label htmlFor="timezone" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Store timezone</label>
