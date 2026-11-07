@@ -1,17 +1,21 @@
 // src/routes/ProtectedRoutes.tsx
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedLayout from '../components/Layout/ProtectedLayout';
 
-import Hub from '../pages/Dashboard/Hub';
-import Reports from '../pages/Dashboard/Reports';
-import Account from '../pages/Dashboard/Account';
-import Settings from '../pages/Dashboard/Settings';
-import Insights from '../pages/Dashboard/Insights';
-import PayrollCheckout from '../pages/Dashboard/PayrollCheckout';
-import LiveShowroom from '../pages/Dashboard/LiveShowroom';
+const Hub = lazy(() => import('../pages/Dashboard/Hub'));
+const Reports = lazy(() => import('../pages/Dashboard/Reports'));
+const Account = lazy(() => import('../pages/Dashboard/Account'));
+const Settings = lazy(() => import('../pages/Dashboard/Settings'));
+const Insights = lazy(() => import('../pages/Dashboard/Insights'));
+const PayrollCheckout = lazy(() => import('../pages/Dashboard/PayrollCheckout'));
+const LiveShowroom = lazy(() => import('../pages/Dashboard/LiveShowroom'));
+const ShowroomVisitDomain = lazy(() => import('../pages/Dashboard/ShowroomVisitDomain'));
+const Customers = lazy(() => import('../pages/Dashboard/Customers'));
 
 export default function ProtectedRoutes() {
   return (
+    <Suspense fallback={<div className="min-h-full grid place-items-center text-sm text-gray-500" role="status">Loading workspace…</div>}>
     <Routes>
       <Route element={<ProtectedLayout />}>
         {/* Redirect base /app directly to /app/hub */}
@@ -24,6 +28,8 @@ export default function ProtectedRoutes() {
 
         <Route path="account" element={<Account />} />
 
+        <Route path="customers" element={<Customers />} />
+
         <Route path="settings" element={<Settings />} />
 
         <Route path="insights" element={<Insights />} />
@@ -32,9 +38,12 @@ export default function ProtectedRoutes() {
 
         <Route path="showroom" element={<LiveShowroom />} />
 
+        <Route path="showroom/visit/:visitId" element={<ShowroomVisitDomain />} />
+
       </Route>
 
 
     </Routes>
+    </Suspense>
   );
 }

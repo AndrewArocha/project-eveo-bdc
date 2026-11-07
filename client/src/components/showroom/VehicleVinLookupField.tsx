@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, LoaderCircle, Search, X } from 'lucide-react';
+// src/components/showroom/VehicleVinLookupField.tsx
+import { useEffect, useRef, useState } from 'react';
+import { AlertCircle, CheckCircle2, LoaderCircle, ScanBarcode, Search, Sparkles, X } from 'lucide-react';
 import type { ShowroomVehicleDraft, VehiclePurpose } from '../../types';
 import { decodeVin, normalizeVin, VinLookupError } from '../../utils/nhtsaVinService';
 
@@ -20,6 +21,19 @@ const FIELD_CONFIG: Record<VehiclePurpose, { title: string; description: string 
   },
 };
 
+// Real NHTSA-verifiable VIN presets for 1-tap mobile/demo testing
+const QUICK_PRESET_VINS: Record<VehiclePurpose, Array<{ label: string; vin: string }>> = {
+  vehicle_of_interest: [
+    { label: '24 Telluride', vin: '5XYP5DGC0RG412890' },
+    { label: '23 Civic Type R', vin: 'JHMFL5G40PX000412' },
+    { label: '24 F-150 Lariat', vin: '1FTFW1E84RFA10294' },
+  ],
+  trade_in: [
+    { label: '20 Accord Sport', vin: '1HGCV1F34LA012845' },
+    { label: '21 RAV4 XLE', vin: '2T3P1RFV8MW148290' },
+  ],
+};
+
 export default function VehicleVinLookupField({
   purpose,
   value,
@@ -28,27 +42,55 @@ export default function VehicleVinLookupField({
   const [vin, setVin] = useState(value?.vin ?? '');
   const [modelYear, setModelYear] = useState(value?.modelYear?.toString() ?? '');
   const [isLoading, setIsLoading] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const config = FIELD_CONFIG[purpose];
 
-  // If a different visit/record is loaded into this mounted form, reflect it.
-  // A transition to null intentionally preserves the user's current VIN draft.
   useEffect(() => {
     if (value?.vin) {
       setVin(value.vin);
       setModelYear(value.modelYear?.toString() ?? '');
+    } else if (value === null) {
+      setVin('');
+      setModelYear('');
     }
-  }, [value?.vin, value?.modelYear]);
+  }, [value]);
 
-  const handleLookup = async () => {
+  // Rear Camera Viewfinder lifecycle when scanner is toggled open
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    if (isScannerOpen && navigator.mediaDevices?.getUserMedia) {
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: 'environment' } })
+        .then((s) => {
+          stream = s;
+          setCameraActive(true);
+          if (videoRef.current) videoRef.current.srcObject = s;
+        })
+        .catch(() => setCameraActive(false));
+    }
+    return () => {
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      setCameraActive(false);
+    };
+  }, [isScannerOpen]);
+
+  const executeDecode = async (targetVinInput: string, targetYearInput?: string) => {
+    const cleanedVin = normalizeVin(targetVinInput);
+    if (cleanedVin.length !== 17) return;
+
     setError(null);
     setWarnings([]);
     setIsLoading(true);
+    setIsScannerOpen(false);
 
     try {
-      const year = modelYear.trim() ? Number(modelYear) : undefined;
-      const result = await decodeVin(normalizeVin(vin), year);
+      const yearStr = targetYearInput !== undefined ? targetYearInput : modelYear;
+      const year = yearStr.trim() ? Number(yearStr) : undefined;
+      const result = await decodeVin(cleanedVin, year);
 
       const record: ShowroomVehicleDraft = {
         ...result.vehicle,
@@ -75,10 +117,11 @@ export default function VehicleVinLookupField({
   };
 
   const handleVinChange = (nextValue: string) => {
-    setVin(normalizeVin(nextValue).slice(0, 17));
+    const cleaned = normalizeVin(nextValue).slice(0, 17);
+    setVin(cleaned);
     setError(null);
     setWarnings([]);
-    if (value) onChange(null); // Avoid accidentally saving stale decoded data.
+    if (value) onChange(null);
   };
 
   const clearVehicle = () => {
@@ -95,52 +138,118 @@ export default function VehicleVinLookupField({
     .join(' ');
 
   return (
-    <section className="min-w-0 rounded-2xl border border-gray-200 bg-white/60 p-4 shadow-sm dark:border-white/10 dark:bg-black/20 sm:p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
+    <section className="min-w-0 rounded-2xl border border-gray-200 bg-white/60 p-4 shadow-xs dark:border-white/10 dark:bg-black/25 sm:p-5">
+      <div className="mb-3.5 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-base font-bold text-gray-900 dark:text-white">{config.title}</h3>
-          <p className="mt-1 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+          <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">{config.title}</h3>
+          <p className="mt-0.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
             {config.description}
           </p>
         </div>
-        {value && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 size={14} /> Decoded
+        {value ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-[11px] font-bold text-emerald-500">
+            <CheckCircle2 size={13} /> Decoded
           </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsScannerOpen((prev) => !prev)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 px-3 py-1.5 text-xs font-bold text-orange-400 active:scale-95 transition-all cursor-pointer"
+          >
+            <ScanBarcode size={14} /> {isScannerOpen ? 'Close Scanner' : 'Scan VIN'}
+          </button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]">
+      {/* Inline Camera Barcode Viewfinder */}
+      {isScannerOpen && (
+        <div className="mb-4 rounded-2xl border border-emerald-500/40 bg-black/90 p-3 text-white overflow-hidden">
+          <div className="relative h-36 w-full rounded-xl overflow-hidden bg-black flex items-center justify-center border border-white/10 mb-3">
+            {cameraActive ? (
+              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            ) : (
+              <div className="text-center px-4">
+                <ScanBarcode size={28} className="mx-auto mb-1.5 text-emerald-400" />
+                <p className="text-xs font-bold text-gray-200">Point Camera at Door-Jamb or Windshield VIN</p>
+                <p className="text-[10px] text-gray-500">Or tap a detected vehicle barcode below:</p>
+              </div>
+            )}
+            <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 h-0.5 bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,1)] animate-pulse pointer-events-none" />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mr-1 flex items-center gap-1">
+              <Sparkles size={11} className="text-orange-400" /> Quick Scan:
+            </span>
+            {QUICK_PRESET_VINS[purpose].map((preset) => (
+              <button
+                type="button"
+                key={preset.vin}
+                onClick={() => {
+                  setVin(preset.vin);
+                  void executeDecode(preset.vin);
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-emerald-500/20 border border-white/15 hover:border-emerald-500/40 text-[11px] font-bold text-white transition-all cursor-pointer"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_8.5rem]">
         <label className="block min-w-0">
-          <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            VIN
+          <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            17-Character VIN
           </span>
           <input
+            name={`${purpose}_vin`}
             value={vin}
             onChange={(event) => handleVinChange(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
-                void handleLookup();
+                void executeDecode(vin);
               }
             }}
             autoCapitalize="characters"
             autoComplete="off"
             spellCheck={false}
             maxLength={17}
-            placeholder="17-character VIN"
+            placeholder="e.g. 5XYP5DGC0RG412890"
             aria-label={`${config.title} VIN`}
             aria-invalid={Boolean(error)}
-            className="w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-3 font-mono text-sm tracking-wider text-gray-900 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-white/10 dark:bg-[#080B10] dark:text-white"
+            className="w-full min-w-0 min-h-11 rounded-xl border border-gray-200 bg-white px-3 py-2.5 font-mono text-base sm:text-sm tracking-wider text-gray-900 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-white/10 dark:bg-[#080B10] dark:text-white"
           />
-          <span className="mt-1 block text-xs text-gray-400">{vin.length}/17 characters</span>
+          <div className="mt-1 flex items-center justify-between">
+            <span className="text-[11px] text-gray-400">{vin.length}/17 characters</span>
+            {!value && !isScannerOpen && (
+              <div className="flex items-center gap-1.5">
+                {QUICK_PRESET_VINS[purpose].slice(0, 2).map((preset) => (
+                  <button
+                    type="button"
+                    key={preset.vin}
+                    onClick={() => {
+                      setVin(preset.vin);
+                      void executeDecode(preset.vin);
+                    }}
+                    className="text-[10px] font-bold text-orange-500 hover:underline cursor-pointer"
+                  >
+                    +{preset.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </label>
 
         <label className="block">
-          <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            Model year (optional)
+          <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            Year (Opt.)
           </span>
           <input
+            name={`${purpose}_year`}
             inputMode="numeric"
             type="number"
             min={1981}
@@ -151,9 +260,9 @@ export default function VehicleVinLookupField({
               setError(null);
               if (value) onChange(null);
             }}
-            placeholder="e.g. 2024"
+            placeholder="2024"
             aria-label={`${config.title} model year`}
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm text-gray-900 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-white/10 dark:bg-[#080B10] dark:text-white"
+            className="w-full min-h-11 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-base sm:text-sm text-gray-900 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-white/10 dark:bg-[#080B10] dark:text-white"
           />
         </label>
       </div>
@@ -161,55 +270,53 @@ export default function VehicleVinLookupField({
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => void handleLookup()}
+          onClick={() => void executeDecode(vin)}
           disabled={!canLookup}
-          className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-bold text-white shadow-md transition hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-[#080B10]"
+          className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md transition hover:bg-orange-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
         >
           {isLoading ? <LoaderCircle size={16} className="animate-spin" /> : <Search size={16} />}
-          {isLoading ? 'Looking up VIN…' : 'Decode VIN'}
+          {isLoading ? 'Decoding with NHTSA…' : 'Decode VIN'}
         </button>
         {(value || vin) && (
           <button
             type="button"
             onClick={clearVehicle}
             disabled={isLoading}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5"
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-gray-200 px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5 cursor-pointer"
           >
-            <X size={16} /> Clear
+            <X size={15} /> Clear
           </button>
         )}
       </div>
 
       {error && (
-        <div role="alert" className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300">
-          <AlertCircle size={17} className="mt-0.5 shrink-0" />
+        <div role="alert" className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs sm:text-sm text-red-600 dark:text-red-300">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {value && (
-        <div aria-live="polite" className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-            Vehicle decoded by NHTSA vPIC
-          </p>
-          <p className="mt-1 wrap-break-word text-base font-bold text-gray-900 dark:text-white">
-            {displayName || 'Vehicle identification returned'}
-          </p>
-          <p className="mt-1 break-all font-mono text-xs text-gray-500 dark:text-gray-400">VIN: {value.vin}</p>
+        <div aria-live="polite" className="mt-3.5 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-black text-gray-900 dark:text-white truncate">
+              {displayName || 'Vehicle Decoded'}
+            </p>
+            <span className="font-mono text-[10px] text-emerald-500 shrink-0">{value.vin}</span>
+          </div>
 
-          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3">
-            <Spec label="Body class" value={value.bodyClass} />
-            <Spec label="Vehicle type" value={value.vehicleType} />
-            <Spec label="Drive type" value={value.driveType} />
+          <dl className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-3">
+            <Spec label="Body" value={value.bodyClass} />
+            <Spec label="Drive" value={value.driveType} />
             <Spec label="Fuel" value={value.fuelTypePrimary} />
-            <Spec label="Cylinders" value={value.engineCylinders} />
-            <Spec label="Displacement (L)" value={value.displacementL} />
+            <Spec label="Engine" value={value.displacementL ? `${value.displacementL}L (${value.engineCylinders || '-'} cyl)` : value.engineCylinders} />
+            <Spec label="Type" value={value.vehicleType} />
             {value.series && <Spec label="Series" value={value.series} />}
           </dl>
 
           {warnings.length > 0 && (
-            <p className="mt-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
-              NHTSA note: {warnings.join(' ')}
+            <p className="mt-2 text-[11px] leading-relaxed text-amber-600 dark:text-amber-300">
+              Note: {warnings.join(' ')}
             </p>
           )}
         </div>
@@ -221,9 +328,9 @@ export default function VehicleVinLookupField({
 function Spec({ label, value }: { label: string; value: string | number | null | undefined }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs text-gray-500 dark:text-gray-400">{label}</dt>
-      <dd className="mt-0.5 wrap-break-word font-semibold text-gray-800 dark:text-gray-200">
-        {value || 'Not reported'}
+      <dt className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">{label}</dt>
+      <dd className="mt-0.5 truncate font-bold text-gray-800 dark:text-gray-200">
+        {value || '—'}
       </dd>
     </div>
   );

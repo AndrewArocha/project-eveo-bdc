@@ -10,40 +10,42 @@ export interface Appointment {
   vehicle: string;
   rep: string;
   status: ApptStatus;
+  name?: string;
 }
 
 // 1. Get today's dynamic date string (e.g., "2026-9-12")
 export const getTodayDateKey = (): string => {
   const today = new Date();
-  // Using getMonth() which is 0-indexed, so we add 1, but for consistency with your 
-  // earlier code that used 9 for October, we'll keep it 0-indexed:
   return `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
 };
 
 // 2. Fetch all appointments for a specific store and date
 export const getAppointmentsByDate = (storeId: string, dateKey: string): Appointment[] => {
   const dbKey = `eveo_appointments_${storeId}`;
-  const savedDb = localStorage.getItem(dbKey);
-  
-  if (savedDb) {
-    const db = JSON.parse(savedDb);
-    if (db[dateKey]) {
-       return db[dateKey];
+  const saved = localStorage.getItem(dbKey);
+
+if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed[dateKey] && parsed[dateKey].length > 0) {
+        return parsed[dateKey];
+      }
+    } catch (e) {
+      console.error('Failed to parse appointments from localStorage', e);
     }
   }
 
-  // Fallback: If no localStorage data exists, pull the static data from njx.ts so the UI isn't empty
-  if (storeId === 'njx' && STORE_DATA['njx'] && STORE_DATA['njx'].appointments) {
-     const fallbackAppts = STORE_DATA['njx'].appointments.map((appt) => ({
-        id: appt.id.toString(),
-        time: appt.time,
-        customer: appt.name || 'Unknown',
-        vehicle: appt.vehicle,
-        rep: appt.rep,
-        status: (appt.status.toUpperCase() === 'PENDING CONFIRM' ? 'PENDING CONFIRM' : 'CONFIRMED') as ApptStatus
-     }));
-     
-     return fallbackAppts;
+  // Dynamic Multi-Tenant Fallback: Pull from whichever storeId is active (njx, dk, kia)!
+  const storeAppts = STORE_DATA[storeId]?.appointments;
+  if (storeAppts && storeAppts.length > 0) {
+    return storeAppts.map((appt) => ({
+      id: appt.id.toString(),
+      time: appt.time,
+      customer: appt.customer || appt.name || 'Unknown Customer',
+      vehicle: appt.vehicle,
+      rep: appt.rep,
+      status: (appt.status.toUpperCase() === 'PENDING CONFIRM' ? 'PENDING CONFIRM' : 'CONFIRMED') as ApptStatus,
+    }));
   }
 
   return [];
@@ -53,8 +55,8 @@ export const getAppointmentsByDate = (storeId: string, dateKey: string): Appoint
 export const getNextAppointment = (storeId: string): Appointment | null => {
   const todayKey = getTodayDateKey();
   const todaysAppts = getAppointmentsByDate(storeId, todayKey);
-  
-  const validAppts = todaysAppts.filter(a => 
+
+  const validAppts = todaysAppts.filter(a =>
     a.status === 'CONFIRMED' || a.status === 'PENDING CONFIRM'
   );
 
@@ -65,12 +67,9 @@ export const getNextAppointment = (storeId: string): Appointment | null => {
 
 export const saveAppointments = (storeId: string, dateKey: string, appointments: Appointment[]) => {
   const dbKey = `eveo_appointments_${storeId}`;
-  const savedDb = localStorage.getItem(dbKey);
-  const db = savedDb ? JSON.parse(savedDb) : {};
-  
+  const saved = localStorage.getItem(dbKey);
+  const db = saved ? JSON.parse(saved) : {};
   db[dateKey] = appointments;
   localStorage.setItem(dbKey, JSON.stringify(db));
-  
-  // Instantly trigger UI updates across the app!
   window.dispatchEvent(new Event('appointmentsUpdated'));
 };

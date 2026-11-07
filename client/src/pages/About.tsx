@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import InteractiveJourney from '../components/UI/InteractiveJourney';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 
 // Backgrounds
 import bgEntrance from '../images/landing/eveo-entrance.jpeg';
@@ -10,7 +10,7 @@ import Foundations from '../images/about/foundations.jpg';
 import Hardships from '../images/about/hardships.jpg';
 import Architecting from '../images/about/architecting.jpg';
 import Pipeline from '../images/about/pipeline.png';
-import Development from '../images/about/fullStack.jpg';  
+import Development from '../images/about/fullStack.jpg';
 import Scaling from '../images/about/scaling.jpg';
 import Startup from '../images/about/earlystart.jpg';
 import Scripting from '../images/about/scripting.jpg';
@@ -42,7 +42,7 @@ export default function About() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
-  
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     setMousePos({ x: e.clientX, y: e.clientY });
     const { innerWidth, innerHeight } = window;
@@ -54,91 +54,112 @@ export default function About() {
   const crystalY = useTransform(useSpring(mouseY, { stiffness: 100, damping: 20 }), [-1, 1], [-15, 15]);
 
   return (
-    <div className="w-full flex-1 flex flex-col bg-[#05080c] text-white relative overflow-hidden">
+    <div className="w-full flex-1 flex flex-col bg-[#05080c] text-white relative overflow-hidden select-none">
       <AnimatePresence mode="wait">
-        
+
         {!selectedPath ? (
-          <motion.div 
+          <motion.div
             key="selection"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.5 }}
             onMouseMove={handleMouseMove}
-            className="flex flex-col md:flex-row w-full flex-1 min-h-[calc(100vh-80px)] relative overflow-hidden md:cursor-none"
+            className="flex flex-col md:flex-row w-full flex-1 min-h-[calc(100dvh-5rem)] pt-20 md:pt-0 relative overflow-hidden md:cursor-none"
           >
-            {/* Ambient Mouse Tracker (Hidden on mobile) */}
-            <motion.div 
+            {/* Ambient Mouse Tracker (Desktop Only) */}
+            <motion.div
               className="hidden md:flex fixed top-0 left-0 pointer-events-none z-30 items-center justify-center -translate-x-1/2 -translate-y-1/2"
               style={{ x: mousePos.x, y: mousePos.y }}
             >
-               <div className="w-8 h-8 rounded-full border border-white/30 bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.15)] flex items-center justify-center backdrop-blur-sm">
-                 <div className="w-1.5 h-1.5 bg-white rounded-full" />
-               </div>
+              <div className="w-8 h-8 rounded-full border border-white/30 bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.15)] flex items-center justify-center backdrop-blur-xs">
+                <div className="w-1.5 h-1.5 bg-white rounded-full" />
+              </div>
             </motion.div>
 
-            {/* Left Side: About EVEO */}
-            <div className="flex-1 relative overflow-hidden group flex items-center justify-center">
-              {/* FIX: Mobile naturally sits at 40% opacity in full color, completely ignoring hover states */}
-              <img src={bgEntrance} className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-out md:grayscale ${hoveredPath === 'eveo' ? 'md:scale-105 md:opacity-60' : 'scale-100 opacity-40 md:opacity-20'}`} />
-              <div className={`absolute inset-0 bg-linear-to-t from-[#05080c] via-[#05080c]/60 to-[#05080c] transition-opacity duration-700 ${hoveredPath === 'eveo' ? 'md:opacity-30' : 'opacity-60 md:opacity-100'}`} />
-              
-              <div 
-                className="relative z-20 w-full md:w-[85%] h-full flex flex-col items-center justify-center cursor-pointer md:cursor-none"
-                // FIX: Strict pointerType check completely disables sticky touch-hovers on mobile
+            {/* Top / Left Side: About EVEO */}
+            <div className="flex-1 relative overflow-hidden group flex items-center justify-center min-h-[42dvh] md:min-h-0">
+              <img
+                src={bgEntrance}
+                alt="EVEO Corporate Office Entrance"
+                className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-out md:grayscale ${hoveredPath === 'eveo' ? 'md:scale-105 md:opacity-60' : 'scale-100 opacity-45 md:opacity-20'}`}
+              />
+              <div className={`absolute inset-0 bg-linear-to-t from-[#05080c] via-[#05080c]/55 to-[#05080c]/90 transition-opacity duration-700 ${hoveredPath === 'eveo' ? 'md:opacity-30' : 'opacity-65 md:opacity-100'}`} />
+
+              <button
+                type="button"
+                className="relative z-20 w-full md:w-[85%] h-full px-6 py-8 flex flex-col items-center justify-center cursor-pointer md:cursor-none outline-none active:scale-[0.98] transition-transform"
                 onPointerEnter={(e) => e.pointerType === 'mouse' && setHoveredPath('eveo')}
                 onPointerLeave={(e) => e.pointerType === 'mouse' && setHoveredPath(null)}
                 onClick={() => setSelectedPath('eveo')}
               >
                 <div className="text-center transition-transform duration-700 ease-out md:group-hover:-translate-y-4 pointer-events-none">
-                  <span className={`text-orange-500 font-mono text-xs font-bold tracking-widest uppercase mb-4 block transition-opacity duration-300 ${hoveredPath === 'eveo' ? 'md:opacity-100' : 'opacity-100 md:opacity-0'}`}>Company History</span>
-                  <h2 className={`text-4xl md:text-5xl font-black drop-shadow-2xl transition-all duration-500 tracking-tight ${hoveredPath === 'eveo' ? 'md:text-white md:scale-110' : 'text-white md:text-gray-700'}`}>ABOUT THE COMPANY</h2>
+                  <span className={`text-orange-500 font-mono text-[11px] sm:text-xs font-bold tracking-widest uppercase mb-2 sm:mb-4 block transition-opacity duration-300 ${hoveredPath === 'eveo' ? 'md:opacity-100' : 'opacity-100 md:opacity-0'}`}>
+                    Company History
+                  </span>
+                  <h2 className={`text-3xl sm:text-4xl md:text-5xl font-black drop-shadow-2xl transition-all duration-500 tracking-tight ${hoveredPath === 'eveo' ? 'md:text-white md:scale-110' : 'text-white md:text-gray-700'}`}>
+                    ABOUT THE COMPANY
+                  </h2>
+                  <span className="mt-3 inline-flex md:hidden items-center gap-1.5 px-3.5 py-1 rounded-full bg-white/10 border border-white/15 backdrop-blur-md text-[11px] font-semibold text-gray-200">
+                    <Sparkles size={12} className="text-orange-400" /> Tap to explore timeline
+                  </span>
                 </div>
-              </div>
+              </button>
             </div>
 
-            {/* Right Side: About Andres */}
-            <div className="flex-1 relative overflow-hidden group flex items-center justify-center">
-              <img src={Andres} className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-out md:grayscale ${hoveredPath === 'andres' ? 'md:scale-105 md:opacity-60' : 'scale-100 opacity-40 md:opacity-20'}`} />
-              <div className={`absolute inset-0 bg-linear-to-t from-[#05080c] via-[#05080c]/60 to-[#05080c] transition-opacity duration-700 ${hoveredPath === 'andres' ? 'md:opacity-30' : 'opacity-60 md:opacity-100'}`} />
-              
-              <div 
-                className="relative z-20 w-full md:w-[85%] h-full flex flex-col items-center justify-center cursor-pointer md:cursor-none"
-                // FIX: Strict pointerType check completely disables sticky touch-hovers on mobile
+            {/* Bottom / Right Side: About Andres */}
+            <div className="flex-1 relative overflow-hidden group flex items-center justify-center min-h-[42dvh] md:min-h-0">
+              <img
+                src={Andres}
+                alt="Andres Hernandez - Manager and Full-Stack Developer"
+                className={`absolute inset-0 w-full h-full object-cover object-top transition-all duration-1000 ease-out md:grayscale ${hoveredPath === 'andres' ? 'md:scale-105 md:opacity-60' : 'scale-100 opacity-45 md:opacity-20'}`}
+              />
+              <div className={`absolute inset-0 bg-linear-to-t from-[#05080c] via-[#05080c]/55 to-[#05080c]/90 transition-opacity duration-700 ${hoveredPath === 'andres' ? 'md:opacity-30' : 'opacity-65 md:opacity-100'}`} />
+
+              <button
+                type="button"
+                className="relative z-20 w-full md:w-[85%] h-full px-6 py-8 flex flex-col items-center justify-center cursor-pointer md:cursor-none outline-none active:scale-[0.98] transition-transform"
                 onPointerEnter={(e) => e.pointerType === 'mouse' && setHoveredPath('andres')}
                 onPointerLeave={(e) => e.pointerType === 'mouse' && setHoveredPath(null)}
                 onClick={() => setSelectedPath('andres')}
               >
                 <div className="text-center transition-transform duration-700 ease-out md:group-hover:-translate-y-4 pointer-events-none">
-                  <span className={`text-orange-500 font-mono text-xs font-bold tracking-widest uppercase mb-4 block transition-opacity duration-300 ${hoveredPath === 'andres' ? 'md:opacity-100' : 'opacity-100 md:opacity-0'}`}>Manager / Developer</span>
-                  <h2 className={`text-4xl md:text-5xl font-black drop-shadow-2xl transition-all duration-500 tracking-tight ${hoveredPath === 'andres' ? 'md:text-white md:scale-110' : 'text-white md:text-gray-700'}`}>ABOUT THE AUTHOR</h2>
+                  <span className={`text-orange-500 font-mono text-[11px] sm:text-xs font-bold tracking-widest uppercase mb-2 sm:mb-4 block transition-opacity duration-300 ${hoveredPath === 'andres' ? 'md:opacity-100' : 'opacity-100 md:opacity-0'}`}>
+                    Manager / Developer
+                  </span>
+                  <h2 className={`text-3xl sm:text-4xl md:text-5xl font-black drop-shadow-2xl transition-all duration-500 tracking-tight ${hoveredPath === 'andres' ? 'md:text-white md:scale-110' : 'text-white md:text-gray-700'}`}>
+                    ABOUT THE AUTHOR
+                  </h2>
+                  <span className="mt-3 inline-flex md:hidden items-center gap-1.5 px-3.5 py-1 rounded-full bg-white/10 border border-white/15 backdrop-blur-md text-[11px] font-semibold text-gray-200">
+                    <Sparkles size={12} className="text-orange-400" /> Tap to explore timeline
+                  </span>
                 </div>
-              </div>
+              </button>
             </div>
 
             {/* THE RESPONSIVE CENTRAL SELECTOR */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none flex items-center justify-center w-full h-full md:max-w-sm">
-              
+            <div className="absolute top-[calc(50%+2.5rem)] md:top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none flex items-center justify-center w-full h-full md:max-w-sm">
+
               {/* Desktop Vertical Separators */}
               <div className="hidden md:block absolute top-0 bottom-[calc(50%+3.5rem)] left-1/2 -translate-x-1/2 w-0.5 bg-linear-to-b from-transparent via-white/50 to-white/10 shadow-[0_0_15px_rgba(255,255,255,0.4)] backdrop-blur-md" />
               <div className="hidden md:block absolute top-[calc(50%+3.5rem)] bottom-0 left-1/2 -translate-x-1/2 w-0.5 bg-linear-to-t from-transparent via-white/50 to-white/10 shadow-[0_0_15px_rgba(255,255,255,0.4)] backdrop-blur-md" />
-              
+
               {/* Mobile Horizontal Separators */}
-              <div className="md:hidden absolute left-0 right-[calc(50%+3.5rem)] top-1/2 -translate-y-1/2 h-0.5 bg-linear-to-r from-transparent via-white/50 to-white/10 shadow-[0_0_15px_rgba(255,255,255,0.4)] backdrop-blur-md" />
-              <div className="md:hidden absolute left-[calc(50%+3.5rem)] right-0 top-1/2 -translate-y-1/2 h-0.5 bg-linear-to-l from-transparent via-white/50 to-white/10 shadow-[0_0_15px_rgba(255,255,255,0.4)] backdrop-blur-md" />
+              <div className="md:hidden absolute left-0 right-[calc(50%+2.75rem)] top-1/2 -translate-y-1/2 h-0.5 bg-linear-to-r from-transparent via-white/50 to-white/10 shadow-[0_0_15px_rgba(255,255,255,0.4)] backdrop-blur-md" />
+              <div className="md:hidden absolute left-[calc(50%+2.75rem)] right-0 top-1/2 -translate-y-1/2 h-0.5 bg-linear-to-l from-transparent via-white/50 to-white/10 shadow-[0_0_15px_rgba(255,255,255,0.4)] backdrop-blur-md" />
 
               {/* The Liquid Glassy Orb */}
-              <div className="relative w-28 h-28 rounded-full bg-[#0a0f16]/60 backdrop-blur-2xl border border-white/20 shadow-[0_0_40px_rgba(249,115,22,0.3),inset_0_0_20px_rgba(255,255,255,0.1)] flex items-center justify-center">
-                
-                <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
-                   <circle cx="50" cy="50" r="48" stroke="#f97316" strokeWidth="2" fill="transparent" className="drop-shadow-[0_0_8px_rgba(249,115,22,1)]" />
+              <div className="relative w-20 h-20 md:w-28 md:h-28 rounded-full bg-[#0a0f16]/75 backdrop-blur-2xl border border-white/20 shadow-[0_0_40px_rgba(249,115,22,0.3),inset_0_0_20px_rgba(255,255,255,0.1)] flex items-center justify-center">
+
+                <svg aria-hidden="true" className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="48" stroke="#f97316" strokeWidth="2" fill="transparent" className="drop-shadow-[0_0_8px_rgba(249,115,22,1)]" />
                 </svg>
 
-                <motion.div 
-                  style={{ x: crystalX, y: crystalY }} 
+                <motion.div
+                  style={{ x: crystalX, y: crystalY }}
                   className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
                 >
-                  <div className="w-4 h-4 bg-white rotate-45 shadow-[0_0_20px_rgba(255,255,255,1)]" />
-                  
-                  {/* Desktop Arrows (Hidden on Mobile)[cite: 26, 27] */}
+                  <div className="w-3.5 h-3.5 md:w-4 md:h-4 bg-white rotate-45 shadow-[0_0_20px_rgba(255,255,255,1)]" />
+
+                  {/* Desktop Arrows (Hidden on Mobile) */}
                   <div className="hidden md:block">
                     <div className={`absolute top-1/2 -translate-y-1/2 transition-all duration-500 ${hoveredPath === 'eveo' ? 'opacity-100 -left-14' : 'opacity-0 -left-6'}`}>
                       <ChevronLeft size={36} className="text-orange-400 drop-shadow-[0_0_15px_rgba(249,115,22,1)]" />
@@ -153,15 +174,14 @@ export default function About() {
             </div>
           </motion.div>
         ) : (
-          <InteractiveJourney 
+          <InteractiveJourney
             key="journey"
-            data={selectedPath === 'eveo' ? eveoJourney : andresJourney} 
-            title={selectedPath} 
-            // FIX: Guaranteed reset of any sticky hover states when the journey is closed
+            data={selectedPath === 'eveo' ? eveoJourney : andresJourney}
+            title={selectedPath}
             onClose={() => {
               setSelectedPath(null);
               setHoveredPath(null);
-            }} 
+            }}
           />
         )}
       </AnimatePresence>

@@ -1,64 +1,48 @@
-# Eveo BDC
+# EVEO BDC
 
-A comprehensive full-stack SaaS platform engineered to modernize operational management, lead tracking, and floor coordination for automotive Business Development Centers (BDCs) and dealership showrooms.
+EVEO is a dealership operations platform with a React client and an independently runnable TypeScript API. The API uses MongoDB/Mongoose, bcrypt password hashing, and JWT sessions. New dealership registrations create a pending application; account activation and billing are separate steps.
 
-Built to solve real-world dealership workflow challenges, Eveo BDC bridges the communication gap between internet lead agents, floor sales representatives, and executive management through real-time event tracking and role-specific workspaces.
+## Requirements
 
-## 🚀 Core Features
+- Node.js 20 or later
+- npm 10 or later
+- A MongoDB Atlas connection string for persistent API operations
 
-* **Role-Based Workspaces:** Dynamically rendered dashboards tailored to specific operational roles (BDC Agent, Sales Representative, General Manager, Dealership Owner), featuring calculated KPIs and actionable metric cards.
-* **Live Showroom Event Feed:** A real-time timeline tracking customer visits from the initial greeting to the final BDC handoff, complete with status indicators, media uploads, and salesperson assignment.
-* **NHTSA vPIC API Integration:** Live, automated VIN decoding for precise vehicle specifications (vehicles of interest and customer trade-ins) directly within the showroom check-in flow.
-* **Interactive Hub Architecture:** A highly fluid UI featuring drag-to-close swipeable modals and bottom sheets powered by Framer Motion, optimized for both desktop command centers and mobile showroom tablets.
-* **Payroll & Disbursements Engine:** Managerial interface for calculating contractor commissions, tracking base accrued pay, and processing zero-out ledger transactions.
-* **Master Schedule & Roster Management:** Interactive smart calendars tied to real-time system dates for managing time-off requests, shift assignments, and daily coverage.
-* **Mock State Persistence:** A custom `localStorage` repository adapter simulating backend latency and cross-component state synchronization, ensuring a seamless offline development and demo experience prior to backend hookup.
+## Install and run
 
-## 🛠 Tech Stack
+From the repository root:
 
-**Frontend Architecture**
-* **Framework:** React 18 / Vite
-* **Language:** Strict TypeScript
-* **Styling:** Tailwind CSS v4 
-* **Animation:** Framer Motion
-* **Icons:** Lucide React
-* **Routing:** React Router DOM
-
-**Backend Architecture (Phase 2)**
-* **Runtime:** Node.js
-* **Framework:** Express
-* **Database:** MongoDB / Mongoose
-
-**Third-Party Integrations**
-* **Automotive:** NHTSA vPIC API
-* **(Upcoming)AI Processing:** OpenAI API 🔜
-
-
-## 🏗 Architecture & Workflow
-
-This project operates on a decoupled client/server architecture. The frontend is fully modularized with a strict separation of concerns between UI components, context providers, and data fetching services. 
-
-Development adheres to a strict Pull Request-driven Git workflow, enforced by aggressive ESLint rules and TypeScript strict mode configurations to ensure a pristine, zero-error continuous integration environment.
-
-## 💻 Local Development
-
-**1. Clone the repository and navigate to the client directory:**
 ```bash
-git clone [https://github.com/AndrewArocha/project-eveo-bdc.git](https://github.com/AndrewArocha/project-eveo-bdc.git)
-cd project-eveo-bdc/client
+npm run install:all
 ```
 
-**2. Install dependencies:**
+Copy `server/.env.example` to `server/.env`, set `MONGODB_URI`, and replace `JWT_SECRET` with a random secret of at least 32 characters. The development client uses `/api` and the Vite proxy, so its API origin is configured by the existing Vite setup. For a separate deployment, set `VITE_API_URL` to the public API base URL and configure `CLIENT_ORIGIN` on the server.
+
 ```bash
-npm install
+npm run dev:server
+npm run dev:client
 ```
 
-**3. Start the Vite development server:**
-```bash
-npm run dev
-```
+Or run both processes together with `npm run dev`. The client listens on port 3000 and the API listens on port 3001 by default. `GET /api/health` remains available when MongoDB is not configured; data routes return 503 until a database connection is ready.
 
-**4. Run the linter to ensure strict compliance:**
+## API
+
+- `POST /api/auth/signup` creates a user, a pending DealerAccount, and its first Store.
+- `POST /api/auth/signin` verifies the password and returns a short-lived JWT.
+- `GET /api/users/me` returns the signed-in user's safe profile.
+- `GET|POST /api/customers` lists or creates records owned by the signed-in user.
+- `GET|PATCH|DELETE /api/customers/:id` reads or changes only records owned by that user.
+- `GET /api/health` reports API liveness without depending on the database.
+
+All routes except registration, sign-in, and health require `Authorization: Bearer <token>`. Customer request bodies are validated before database operations. The API does not return password hashes.
+
+## Quality commands
+
 ```bash
+npm run build
 npm run lint
 ```
+
+## Current implementation scope
+
+The authentication and owner-scoped customer workflow establish the first persistent full-stack slice. The EVEO product roadmap also calls for integrations, operational workflows, reports, deterministic E.V.E. tools, billing, production deployment, and external service credentials; these are separate milestones and are not represented as live integrations by the current demo data.

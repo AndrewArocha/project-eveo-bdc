@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Clock, User, Car, Plus, Save } from 'lucide-react';
 // 🌟 FIXED: Added the missing import
 import { saveAppointments } from '../../utils/appointmentManager';
+import { SleekPillButton } from '../UI/SleekButtons';
 
 interface AppointmentModalProps {
   isOpen: boolean;
@@ -202,9 +203,14 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
                     <p className="text-xs text-gray-400 mt-1">{todaysAppointments.length} Appointment{todaysAppointments.length !== 1 && 's'} Found</p>
                   </div>
 
-                  <button onClick={() => setIsAddingMode(!isAddingMode)} className="bg-orange-500 hover:bg-orange-600 text-white flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-colors shadow-md outline-none cursor-pointer">
-                    {isAddingMode ? <X size={16} /> : <Plus size={16} />} {isAddingMode ? 'Cancel' : 'Add Appt'}
-                  </button>
+                  <SleekPillButton
+                    tone={isAddingMode ? 'neutral' : 'orange'}
+                    icon={isAddingMode ? <X size={13} /> : <Plus size={13} />}
+                    onClick={() => setIsAddingMode(!isAddingMode)}
+                  >
+                    {isAddingMode ? 'Cancel' : 'New Appt'}
+                  </SleekPillButton>
+
                 </div>
 
                 <div className="flex-1 flex flex-col min-h-0 p-6 pt-6 overflow-hidden">

@@ -1,13 +1,24 @@
-import type { AppendShowroomEventInput, AssignShowroomVisitInput, CreateShowroomVisitInput, ShowroomEvent, ShowroomEventType, ShowroomRepository, ShowroomVisitRecord, ShowroomVisitSnapshot, } from '../../types/showroom';
+// src/services/showroom/mockShowroomRepository.ts
+import type {
+  AppendShowroomEventInput,
+  AssignShowroomVisitInput,
+  CreateShowroomVisitInput,
+  ShowroomEvent,
+  ShowroomEventType,
+  ShowroomRepository,
+  ShowroomVisitRecord,
+  ShowroomVisitSnapshot,
+} from '../../types/showroom';
+import { STORE_DATA } from '../../data/mockDatabase';
 
 interface PersistedState {
   visits: ShowroomVisitRecord[];
   events: ShowroomEvent[];
 }
 
-const STORAGE_PREFIX = 'eveo_showroom_v1_';
+const STORAGE_PREFIX = 'eveo_showroom_v2_';
 const CHANGE_EVENT = 'eveo:showroom-updated';
-const MOCK_LATENCY_MS = 180;
+const MOCK_LATENCY_MS = 120;
 
 const wait = (ms = MOCK_LATENCY_MS) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
@@ -17,25 +28,119 @@ function createId(prefix: string): string {
     : `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
-function emptyState(): PersistedState {
-  return { visits: [], events: [] };
-}
-
 function getStorageKey(storeId: string): string {
   return `${STORAGE_PREFIX}${storeId}`;
+}
+
+/**
+ * Seeds the showroom floor directly from STORE_DATA[storeId].handoffs
+ * so the Hub's "Live Showroom (3)" count matches the actual floor visits!
+ */
+function seedFromStoreHandoffs(storeId: string): PersistedState {
+  const storeData = STORE_DATA[storeId] || STORE_DATA['njx'];
+  const handoffs = storeData?.handoffs || [];
+  const staff = storeData?.staff || [];
+
+  const visits: ShowroomVisitRecord[] = [];
+  const events: ShowroomEvent[] = [];
+
+  handoffs.forEach((h, idx) => {
+    const visitId = `seed_visit_${storeId}_${h.id}`;
+    const matchedRep = staff.find((s) => s.name === h.rep) || staff[0];
+    const repId = matchedRep ? String(matchedRep.id) : `rep_${idx}`;
+    const repName = h.rep || matchedRep?.name || 'Sales Team';
+
+    const minsAgo = parseInt(h.waitTime, 10) || (idx + 1) * 2;
+    const createdDate = new Date(Date.now() - minsAgo * 60 * 1000).toISOString();
+
+    // Parse "2024 Kia Telluride" into vehicle draft
+    const parts = (h.vehicle || '').split(' ');
+    const parsedYear = Number.parseInt(parts[0], 10);
+    const modelYear = Number.isFinite(parsedYear) ? parsedYear : 2024;
+    const make = parts[1] || 'Kia';
+    const model = parts.slice(2).join(' ') || 'Telluride';
+
+    const visit: ShowroomVisitRecord = {
+      id: visitId,
+      storeId,
+      customerName: h.name,
+      customerPhone: '(732) 555-019' + idx,
+      notes: `Walk-in interested in ${h.vehicle}. Current wait time: ${h.waitTime}.`,
+      assignedRepId: repId,
+      assignedRepName: repName,
+      checkedInById: 'bdc_desk',
+      checkedInByName: 'BDC Reception',
+      status: minsAgo >= 4 ? 'handoff_requested' : 'active',
+      vehicleOfInterest: {
+        vin: `5XYP5DGC0RG41289${idx}`,
+        modelYear,
+        make,
+        model,
+        trim: null,
+        series: null,
+        bodyClass: 'SUV / Crossover',
+        vehicleType: 'Passenger Car',
+        driveType: 'AWD',
+        fuelTypePrimary: 'Gasoline',
+        engineCylinders: '6',
+        displacementL: '3.8',
+        purpose: 'vehicle_of_interest',
+        source: 'nhtsa-vpic',
+        decodedAt: createdDate,
+      },
+      tradeIn: null,
+      createdAt: createdDate,
+      updatedAt: createdDate,
+    };
+
+    visits.push(visit);
+
+    events.push({
+      id: `seed_evt_greet_${visitId}`,
+      visitId,
+      storeId,
+      type: 'customer_greeted',
+      actorId: repId,
+      actorName: repName,
+      occurredAt: createdDate,
+      message: `Customer greeted in lobby for ${h.vehicle}.`,
+    });
+
+    if (minsAgo >= 4) {
+      events.push({
+        id: `seed_evt_handoff_${visitId}`,
+        visitId,
+        storeId,
+        type: 'handoff_requested',
+        actorId: repId,
+        actorName: repName,
+        occurredAt: createdDate,
+        message: `Waiting ${h.waitTime} — flagged for immediate floor takeover.`,
+      });
+    }
+  });
+
+  const seeded = { visits, events };
+  try {
+    localStorage.setItem(getStorageKey(storeId), JSON.stringify(seeded));
+  } catch {
+    // Ignore quota errors on initial seed
+  }
+  return seeded;
 }
 
 function readState(storeId: string): PersistedState {
   try {
     const stored = localStorage.getItem(getStorageKey(storeId));
-    if (!stored) return emptyState();
+    if (!stored) return seedFromStoreHandoffs(storeId);
     const parsed = JSON.parse(stored) as Partial<PersistedState>;
+    if (!Array.isArray(parsed.visits)) return seedFromStoreHandoffs(storeId);
     return {
-      visits: Array.isArray(parsed.visits) ? parsed.visits : [],
+      visits: parsed.visits,
       events: Array.isArray(parsed.events) ? parsed.events : [],
     };
   } catch {
-    return emptyState();
+    return seedFromStoreHandoffs(storeId);
   }
 }
 
@@ -47,7 +152,7 @@ function writeState(storeId: string, state: PersistedState): void {
       error instanceof Error
         ? `Could not persist the showroom demo data: ${error.message}`
         : 'Could not persist the showroom demo data.',
-        { cause: error }
+      { cause: error }
     );
   }
   window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: { storeId } }));
@@ -67,7 +172,6 @@ function snapshotFor(state: PersistedState, visit: ShowroomVisitRecord): Showroo
 function applyEventStatus(visit: ShowroomVisitRecord, type: ShowroomEventType): ShowroomVisitRecord['status'] {
   if (type === 'handoff_requested') return 'handoff_requested';
   if (type === 'visit_completed') return 'completed';
-  // Keep the visit in the BDC queue until BDC explicitly logs activity.
   if (type === 'bdc_contact_logged' && visit.status === 'handoff_requested') return 'active';
   return visit.status;
 }
@@ -115,7 +219,6 @@ export const mockShowroomRepository: ShowroomRepository = {
       updatedAt: now,
     };
 
-    // The first timeline event is always created with the visit, never as a separate UI-only step.
     const greetedEvent: ShowroomEvent = {
       id: createId('evt'),
       visitId: visit.id,

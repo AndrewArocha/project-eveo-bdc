@@ -1,44 +1,102 @@
+// src/types/index.ts
+
 // --- PLATFORM LEVEL (Global EVEO HQ Users) ---
 export type GlobalRole = 'bdc' | 'bdc_manager' | 'super_admin' | 'owner';
+
+// --- TENANT LEVEL (Local Store Staff) ---
+export type StoreRole = 'manager' | 'sales';
+
+export type UserRole = GlobalRole | StoreRole;
+
+export type DayStatus =
+  | 'worked'
+  | 'missed'
+  | 'timeoff'
+  | 'upcoming'
+  | 'pending'
+  | 'dayoff'
+  | 'vacation'
+  | 'pending_vacation';
+
+/** Unified record for every calendar day AND the Completed Shifts history list */
+export interface ShiftDayRecord {
+  dateKey: string;       // e.g. "2026-9-5" (Year-MonthIndex-Day)
+  displayDate: string;   // e.g. "Oct 5"
+  status: DayStatus;
+  batchId?: string;      // Shared ID when multiple days off / vacation are requested together
+  shiftHours: string;    // e.g. "9:00 AM - 6:00 PM (8h)"
+  kpiScore: string;      // e.g. "96% Daily Goal"
+  kpiDetail: string;     // e.g. "240 Outbound Touches • 4 Appts Confirmed"
+  note: string;          // Detailed shift log or absence reason
+  overtime?: boolean;
+}
+
+/** Real-time Google Sheets-style workspace presence indicator */
+export interface LivePresenceState {
+  userId: string | number;
+  name: string;
+  initials: string;
+  role: UserRole;
+  storeId: string;
+  module: 'Hub' | 'Live Showroom' | 'Lead Pipeline' | 'Schedule' | 'Reports';
+  actionText: string;    // e.g. "Greeting customer in Showroom"
+  colorRing: string;     // e.g. "ring-emerald-400 bg-emerald-500"
+  lastActive: string;
+}
 
 export interface GlobalUser {
   id: string | number;
   name: string;
+  initials?: string;
   role: GlobalRole;
+   email?: string;
   wage?: number;
   currency?: string;
   schedule?: string;
   daysOff?: string;
   pendingRequest?: boolean;
   route?: string;
+  /** Stores this user is assigned to. If length > 1, BDC/Owner can switch stores! */
+  assignedStoreIds?: string[];
+  /** If true (e.g. Store Owner), hidden from standard agent/manager shift rosters */
+  isExecutiveHidden?: boolean;
+  liveActivity?: string;
 }
-
-export type UserRole = GlobalRole | StoreRole;
-
-export interface UserProfile {
-  id: string;
-  name: string;
-  role: GlobalRole | StoreRole; // Can be either depending on who logs in
-  initials: string;
-  avatarUrl?: string;
-  defaultStoreId?: string;
-}
-
-// --- TENANT LEVEL (Local Store Staff) ---
-export type StoreRole = 'manager' | 'sales';
 
 export interface StoreStaff {
   id: string | number;
   name: string;
-  role: StoreRole;
+  initials?: string;
+  role: StoreRole | 'bdc'; // Supports in-house BDC agents tied to a single store
+  email?: string;
+  wage?: number;
+  currency?: string;
   kpiTarget?: number;
   schedule?: string;
+  daysOff?: string;
+  pendingRequest?: boolean;
+  route?: string;
+  assignedStoreIds?: string[];
+  isExecutiveHidden?: boolean;
+  liveActivity?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  role: GlobalRole | StoreRole;
+  initials: string;
+  avatarUrl?: string;
+  defaultStoreId?: string;
+  assignedStoreIds?: string[];
 }
 
 // --- Store & Asset Types ---
 export interface Store {
   id: string;
   name: string;
+  websiteUrl?: string;
+  phone?: string;
   logoText: string;
   logo?: string;
   bgImage?: string;
@@ -48,7 +106,7 @@ export interface Store {
 }
 
 export interface StoreData {
-  staff: StoreStaff[];     // 🌟 NEW: Local sales agents and GMs
+  staff: StoreStaff[];
   leads: Lead[];
   handoffs: Handoff[];
   appointments: Appointment[];
@@ -110,7 +168,6 @@ export interface DealRecord {
   profit?: string;
   date?: string;
   instagramHandle?: string;
-
   socials?: {
     instagram?: string;
     facebook?: string;
@@ -128,6 +185,5 @@ export interface UserSettings {
   uiVolume: number;
 }
 
-// 🌟 Re-export everything from your new split type files!
 export * from './showroom';
 export * from './vehicle';

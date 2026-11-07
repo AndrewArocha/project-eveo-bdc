@@ -1,17 +1,16 @@
-import react, { reactCompilerPreset } from '@vitejs/plugin-react'
-import babel from '@rolldown/plugin-babel'
-import { defineConfig } from 'vite'
-import tailwindcss from '@tailwindcss/vite'
+import react, { reactCompilerPreset } from '@vitejs/plugin-react';
+import babel from '@rolldown/plugin-babel';
+import { defineConfig } from 'vite';
+import tailwindcss from '@tailwindcss/vite';
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-    babel({ presets: [reactCompilerPreset()] })
-  ],
+  plugins: [react(), tailwindcss(), babel({ presets: [reactCompilerPreset()] })],
   server: {
-    port:3000,
-    strictPort:true,
-  }
-})
+    port: 3000,
+    strictPort: true,
+    proxy: {
+      '/api': 'http://localhost:3001',
+    },
+  },
+});

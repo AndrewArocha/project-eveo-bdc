@@ -1,8 +1,12 @@
+// src/services/showroomMedia/mockShowroomMediaStore.ts
 import type { ShowroomMediaAsset } from '../../types';
 
 const DATABASE_NAME = 'eveo-showroom-media-demo';
 const STORE_NAME = 'assets';
-const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+const MAX_VIDEO_SIZE_BYTES = 25 * 1024 * 1024;
+const MAX_IMAGE_INPUT_BYTES = 50 * 1024 * 1024; // Accept up to 50MB raw 4K/8K camera photos and downscale them!
+const MAX_IMAGE_DIMENSION = 1600;
+const WEBP_QUALITY = 0.82;
 
 function createId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -29,21 +33,99 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-/** Demo adapter only. Replace with your authenticated backend/object-storage upload. */
+/**
+ * Downscales massive 4K/12MP+ mobile camera photos to a crisp 1600px WebP blob
+ * off the main thread so the app never hangs or exhausts IndexedDB/memory.
+ */
+async function compressImageFile(file: File): Promise<{ blob: Blob; fileName: string; mimeType: string }> {
+  // Skip tiny images or SVGs/GIFs
+  if (file.size <= 350 * 1024 || file.type === 'image/svg+xml' || file.type === 'image/gif') {
+    return { blob: file, fileName: file.name, mimeType: file.type || 'image/jpeg' };
+  }
+
+  let objectUrl: string | null = null;
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      objectUrl = URL.createObjectURL(file);
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error('Could not decode image for compression.'));
+      el.src = objectUrl;
+    });
+
+    let { naturalWidth: width, naturalHeight: height } = img;
+    if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+      const ratio = Math.min(MAX_IMAGE_DIMENSION / width, MAX_IMAGE_DIMENSION / height);
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return { blob: file, fileName: file.name, mimeType: file.type };
+    }
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const compressedBlob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((b) => resolve(b), 'image/webp', WEBP_QUALITY)
+    );
+
+    if (!compressedBlob || compressedBlob.size >= file.size) {
+      return { blob: file, fileName: file.name, mimeType: file.type };
+    }
+
+    const baseName = file.name.replace(/\.[^.]+$/, '');
+    return {
+      blob: compressedBlob,
+      fileName: `${baseName}.webp`,
+      mimeType: 'image/webp',
+    };
+  } catch {
+    // Graceful fallback if browser blocks canvas decoding
+    return { blob: file, fileName: file.name, mimeType: file.type || 'image/jpeg' };
+  } finally {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  }
+}
+
+/** Demo adapter with automatic 4K photo optimization. Replace with backend S3/GCS upload in Phase 2. */
 export async function saveMockShowroomMedia(file: File): Promise<ShowroomMediaAsset> {
-  if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+  const isImage = file.type.startsWith('image/');
+  const isVideo = file.type.startsWith('video/');
+
+  if (!isImage && !isVideo) {
     throw new Error('Upload an image or video file.');
   }
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    throw new Error('For the local demo, media must be 25 MB or smaller.');
+  if (isVideo && file.size > MAX_VIDEO_SIZE_BYTES) {
+    throw new Error('For the local demo, videos must be 25 MB or smaller.');
+  }
+  if (isImage && file.size > MAX_IMAGE_INPUT_BYTES) {
+    throw new Error('Image file exceeds the 50 MB maximum limit.');
+  }
+
+  let targetBlob: Blob = file;
+  let targetFileName = file.name;
+  let targetMime = file.type || 'application/octet-stream';
+
+  if (isImage) {
+    const compressed = await compressImageFile(file);
+    targetBlob = compressed.blob;
+    targetFileName = compressed.fileName;
+    targetMime = compressed.mimeType;
   }
 
   const asset: ShowroomMediaAsset = {
     id: createId(),
-    fileName: file.name,
-    mimeType: file.type || 'application/octet-stream',
-    sizeBytes: file.size,
-    kind: file.type.startsWith('video/') ? 'video' : 'image',
+    fileName: targetFileName,
+    mimeType: targetMime,
+    sizeBytes: targetBlob.size,
+    kind: isVideo ? 'video' : 'image',
     uploadedAt: new Date().toISOString(),
   };
 
@@ -51,7 +133,7 @@ export async function saveMockShowroomMedia(file: File): Promise<ShowroomMediaAs
   try {
     await new Promise<void>((resolve, reject) => {
       const transaction = database.transaction(STORE_NAME, 'readwrite');
-      transaction.objectStore(STORE_NAME).put(file, asset.id);
+      transaction.objectStore(STORE_NAME).put(targetBlob, asset.id);
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error ?? new Error('Could not save media.'));
       transaction.onabort = () => reject(transaction.error ?? new Error('Media save was cancelled.'));
