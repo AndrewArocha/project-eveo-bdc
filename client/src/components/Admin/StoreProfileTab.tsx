@@ -48,23 +48,6 @@ function generateMockBrandLogo(domainInput: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-const SyncSkeleton = () => (
-  <div className="animate-pulse space-y-4 mt-4 p-4 border border-white/10 rounded-2xl bg-black/30">
-    <div className="flex items-center gap-4">
-      <div className="w-10 h-10 rounded-full bg-white/10 shrink-0" />
-      <div className="flex-1 space-y-2">
-        <div className="h-2 bg-white/10 rounded w-1/3" />
-        <div className="h-2 bg-white/10 rounded w-1/4" />
-      </div>
-      <div className="w-16 h-6 rounded bg-white/10 shrink-0" />
-    </div>
-    <div className="space-y-2 pt-2">
-      <div className="h-2 bg-white/10 rounded w-full" />
-      <div className="h-2 bg-white/10 rounded w-5/6" />
-    </div>
-  </div>
-);
-
 interface StoreProfileTabProps {
   integrations: Integration[];
   setIntegrations: React.Dispatch<React.SetStateAction<Integration[]>>;
@@ -75,11 +58,10 @@ export default function StoreProfileTab({ integrations, setIntegrations, setIsIn
   // Unified Mock Store Profile State
   const [profile, setProfile] = useState<StoreProfileData>(INITIAL_STORE_PROFILE);
   const [isFetchingLogo, setIsFetchingLogo] = useState(false);
-  const [isSavedToast, setIsSavedToast] = useState(false);
+  const [isPreviewUpdated, setIsPreviewUpdated] = useState(false);
 
-  // Sync Simulation State
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncData, setSyncData] = useState<{ timestamp: string; inventoryCount: number; leadsCount: number } | null>(null);
+  // Keep the preview honest until a live integration endpoint is configured.
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   // Google S2 Favicon API & Duckduckgo unavatar loader w/ fallback svg
 const handleFetchBrandLogo = () => {
@@ -130,25 +112,12 @@ const handleFetchBrandLogo = () => {
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSavedToast(true);
-    setTimeout(() => setIsSavedToast(false), 2500);
+    setIsPreviewUpdated(true);
+    setTimeout(() => setIsPreviewUpdated(false), 2500);
   };
 
-  const handleSync = async () => {
-    setIsSyncing(true);
-    setSyncData(null);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setSyncData({
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        inventoryCount: Math.floor(Math.random() * (450 - 300 + 1)) + 300,
-        leadsCount: Math.floor(Math.random() * (24 - 5 + 1)) + 5
-      });
-    } catch (error) {
-      console.error("Sync failed", error);
-    } finally {
-      setIsSyncing(false);
-    }
+  const handleSync = () => {
+    setSyncMessage('No live inventory or lead sync connector is configured for this store. No data was changed.');
   };
 
   const getIntegrationIcon = (type: string) => {
@@ -175,9 +144,9 @@ const handleFetchBrandLogo = () => {
               <p className="text-xs text-gray-400 mt-0.5">Configure brand assets and active data pipelines.</p>
             </div>
           </div>
-          {isSavedToast && (
+          {isPreviewUpdated && (
             <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5">
-              <CheckCircle2 size={14} /> Saved
+              <CheckCircle2 size={14} /> Preview updated
             </span>
           )}
         </div>
@@ -322,7 +291,7 @@ const handleFetchBrandLogo = () => {
                         <div className="flex flex-wrap items-center gap-2 mb-0.5">
                           <h5 className="text-sm font-bold text-white truncate">{integration.provider}</h5>
                           <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase tracking-wider border border-emerald-500/20 flex items-center gap-1 shrink-0">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Active
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Configured locally
                           </span>
                         </div>
                         <p className="text-xs text-gray-400 font-mono truncate">{integration.value}</p>
@@ -354,22 +323,19 @@ const handleFetchBrandLogo = () => {
               <button
                 type="button"
                 onClick={() => void handleSync()}
-                disabled={isSyncing || integrations.length === 0}
+                disabled={integrations.length === 0}
                 className="w-full sm:w-auto min-h-12 flex items-center justify-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 active:scale-[0.98] text-white text-sm font-bold rounded-xl transition-all border border-white/10 outline-none disabled:opacity-50 cursor-pointer"
               >
-                <RefreshCw size={16} className={isSyncing ? "animate-spin text-orange-500" : ""} />
-                {isSyncing ? "Fetching Data Sources..." : "Force Global Sync"}
+                <Database size={16} />
+                Check Sync Availability
               </button>
-              {isSyncing && <SyncSkeleton />}
-              {!isSyncing && syncData && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              {syncMessage && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-start gap-3">
-                    <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={18} />
+                    <Database className="text-amber-400 shrink-0 mt-0.5" size={18} />
                     <div>
-                      <h5 className="text-sm font-bold text-emerald-500">Sync Successful at {syncData.timestamp}</h5>
-                      <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                        Successfully fetched <strong className="text-white">{syncData.inventoryCount} active units</strong> and <strong className="text-white">{syncData.leadsCount} new leads</strong>. Database updated.
-                      </p>
+                      <h5 className="text-sm font-bold text-amber-400">Live sync unavailable</h5>
+                      <p className="text-xs text-gray-400 mt-1 leading-relaxed">{syncMessage}</p>
                     </div>
                   </div>
                 </motion.div>
@@ -382,7 +348,7 @@ const handleFetchBrandLogo = () => {
               type="submit"
               className="w-full sm:w-auto min-h-13 px-8 py-3.5 bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white text-sm font-black rounded-xl transition-all shadow-[0_8px_20px_rgba(249,115,22,0.35)] outline-none cursor-pointer"
             >
-              Save Configurations
+              Preview Configuration
             </button>
           </div>
         </form>

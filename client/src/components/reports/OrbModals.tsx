@@ -2122,8 +2122,6 @@ export function CustomerDeepDiveModal({
 
   const [selectedCustomer, setSelectedCustomer] = useState<DealRecord | null>(null);
   const [nextApptRecord, setNextApptRecord] = useState<DealRecord | null>(null);
-  const [isSocialLinked, setIsSocialLinked] = useState(false);
-  const STORE_HAS_META_INTEGRATION = true;
 
   type CommMethod = 'none' | 'instagram' | 'facebook' | 'whatsapp' | 'sms';
   const [activeComms, setActiveComms] = useState<CommMethod>('none');
@@ -2157,16 +2155,7 @@ export function CustomerDeepDiveModal({
   }, [type, effectiveStoreId]);
 
   const handleSocialClick = (platform: CommMethod) => {
-    if (isSocialLinked) {
-      setActiveComms(activeComms === platform ? 'none' : platform);
-    } else {
-      triggerToast('Connecting to Meta Business Suite...');
-      setTimeout(() => {
-        setIsSocialLinked(true);
-        triggerToast('Social channels successfully linked!');
-        setActiveComms(platform);
-      }, 1500);
-    }
+    setActiveComms(activeComms === platform ? 'none' : platform);
   };
 
   const handleGenerate = () => {
@@ -2190,7 +2179,7 @@ export function CustomerDeepDiveModal({
     const availableSocials = customer.socials
       ? Object.entries(customer.socials).filter(([, val]) => val)
       : [];
-    const hasSocials = STORE_HAS_META_INTEGRATION && availableSocials.length > 0;
+    const hasSocials = availableSocials.length > 0;
 
     return (
       <motion.div
@@ -2259,18 +2248,11 @@ export function CustomerDeepDiveModal({
                   <button
                     type="button"
                     onClick={() => {
-                      setAgentLiveActivity(
-                        effectiveStoreId,
-                        CURRENT_USER,
-                        `Messaged ${customer.name} (${customer.vehicle})`
-                      );
-                      triggerToast(`${activeComms} message sent!`);
-                      setActiveComms('none');
-                      setMessageText('');
+                      triggerToast(`${activeComms} is not connected. Message not sent.`);
                     }}
                     className="px-3 py-1 text-[11px] font-bold rounded-lg bg-blue-500 text-white cursor-pointer"
                   >
-                    Send
+                    Send unavailable
                   </button>
                 </div>
               </div>
@@ -2282,16 +2264,11 @@ export function CustomerDeepDiveModal({
           <button
             type="button"
             onClick={() => {
-              setAgentLiveActivity(
-                effectiveStoreId,
-                CURRENT_USER,
-                `Calling ${customer.name} • ${customer.vehicle}`
-              );
-              triggerToast(`Calling ${customer.name}...`);
+              triggerToast('Calling is unavailable until a telephony provider is connected.');
             }}
             className="flex-1 min-h-8 py-1.5 bg-emerald-500/20 text-emerald-400 font-bold rounded-xl border border-emerald-500/30 flex items-center justify-center gap-1.5 text-xs cursor-pointer"
           >
-            <Phone size={12} /> Call
+            <Phone size={12} /> Call unavailable
           </button>
           {hasSocials &&
             availableSocials.map(([platform]) => (
