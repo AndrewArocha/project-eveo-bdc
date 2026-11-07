@@ -30,11 +30,14 @@ Or run both processes together with `npm run dev`. The client listens on port 30
 - `POST /api/auth/signup` creates a user, a pending DealerAccount, and its first Store.
 - `POST /api/auth/signin` verifies the password and returns a short-lived JWT.
 - `GET /api/users/me` returns the signed-in user's safe profile.
+- `GET /api/stores` lists stores belonging to the signed-in owner's dealer account.
+- `POST /api/stores` creates a store under the signed-in owner's dealer account.
+- `PATCH /api/stores/:id` updates only a store owned by that dealer account.
 - `GET|POST /api/customers` lists or creates records owned by the signed-in user.
 - `GET|PATCH|DELETE /api/customers/:id` reads or changes only records owned by that user.
 - `GET /api/health` reports API liveness without depending on the database.
 
-All routes except registration, sign-in, and health require `Authorization: Bearer <token>`. Customer request bodies are validated before database operations. The API does not return password hashes.
+All routes except registration, sign-in, and health require `Authorization: Bearer <token>`. Store management is owner-only and tenant-scoped; client-supplied dealer account IDs are ignored. Customer and store request bodies are validated before database operations. The API does not return password hashes.
 
 ## Quality commands
 
