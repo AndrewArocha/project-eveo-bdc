@@ -6,6 +6,7 @@ import { CreditCard, Users, Settings, Copy, Trash2, CheckCircle2, ExternalLink, 
 import { mockIntegrations, type Integration } from '../../data/mockDatabase';
 
 import StoreProfileTab from '../../components/Admin/StoreProfileTab';
+import StoreRegistryManager from '../../components/Admin/StoreRegistryManager';
 import IntegrationWizardModal from '../../components/Admin/IntegrationWizardModal';
 
 type Tab = 'billing' | 'team' | 'settings';
@@ -213,11 +214,14 @@ export default function AdminPortal() {
 
             {/* --- TAB: STORE PROFILE --- */}
             {activeTab === 'settings' && (
-              <StoreProfileTab
-                integrations={integrations}
-                setIntegrations={setIntegrations}
-                setIsIntegrationModalOpen={setIsIntegrationModalOpen}
-              />
+              <>
+                <StoreRegistryManager />
+                <StoreProfileTab
+                  integrations={integrations}
+                  setIntegrations={setIntegrations}
+                  setIsIntegrationModalOpen={setIsIntegrationModalOpen}
+                />
+              </>
             )}
 
           </AnimatePresence>

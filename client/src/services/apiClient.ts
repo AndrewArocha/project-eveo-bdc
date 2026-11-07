@@ -18,6 +18,18 @@ export interface CustomerRecord {
   createdAt: string;
 }
 
+export interface ApiStore {
+  id: string;
+  name: string;
+  code: string;
+  website: string;
+  phone: string;
+  timezone: string;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 interface ApiEnvelope<T> {
   data: T;
 }
