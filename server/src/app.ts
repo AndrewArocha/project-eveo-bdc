@@ -1,3 +1,7 @@
+import dns from 'dns';
+
+dns.setServers(['8.8.8.8', '1.1.4.4']);
+
 import cors from 'cors';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
