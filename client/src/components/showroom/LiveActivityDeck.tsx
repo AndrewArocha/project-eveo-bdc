@@ -34,6 +34,7 @@ interface LiveActivityDeckProps {
   onSwitchToShowroom: () => void;
   onOpenNewActivity: () => void;
   onOpenVinScanner: () => void;
+  allowComments?: boolean;
 }
 
 export default function LiveActivityDeck({
@@ -45,6 +46,7 @@ export default function LiveActivityDeck({
   onSwitchToShowroom,
   onOpenNewActivity,
   onOpenVinScanner,
+  allowComments = true,
 }: LiveActivityDeckProps) {
   const [centralHeroIdx, setCentralHeroIdx] = useState(0);
   const [isHeroHovered, setIsHeroHovered] = useState(false);
@@ -257,17 +259,19 @@ export default function LiveActivityDeck({
                   >
                     Next &rarr;
                   </SleekPillButton>
-                  <SleekPillButton
-                    tone="orange"
-                    icon={<MessageSquare size={11} />}
-                    onClick={() => setShowCommentInput((prev) => !prev)}
-                  >
-                    {currentHeroPost.comments?.length || 'Note'}
-                  </SleekPillButton>
+                  {allowComments && (
+                    <SleekPillButton
+                      tone="orange"
+                      icon={<MessageSquare size={11} />}
+                      onClick={() => setShowCommentInput((prev) => !prev)}
+                    >
+                      {currentHeroPost.comments?.length || 'Note'}
+                    </SleekPillButton>
+                  )}
                 </div>
               </div>
 
-              {showCommentInput && (
+              {allowComments && showCommentInput && (
                 <div onClick={(e) => e.stopPropagation()} className="relative z-10 mt-3 pt-2.5 border-t border-white/10 space-y-2">
                   <form onSubmit={handleAddHeroComment} className="flex gap-2">
                     <input

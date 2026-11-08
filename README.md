@@ -44,6 +44,10 @@ Or run both processes together with `npm run dev`. The client listens on port 30
 - `GET /api/leads?storeId=...` lists leads for an owned store; `POST /api/leads` creates a lead linked only to a customer and inventory vehicle in that same store.
 - `GET /api/appointments?storeId=...` lists a store's appointments; `POST /api/appointments` validates its customer, lead, and inventory links against that store.
 - `PATCH /api/appointments/:id/status?storeId=...` updates an appointment in the selected owned store. Cancelled appointments are terminal.
+- `GET /api/showroom?storeId=...` lists visits; `POST /api/showroom` checks in a customer. A visit and its initial event are persisted in MongoDB, with customer, lead, appointment, employee and store links checked against the same dealer account.
+- `GET /api/showroom/:id?storeId=...`, `POST /api/showroom/:id/events?storeId=...` and `PATCH /api/showroom/:id/assignment?storeId=...` load visits, append timeline events and reassign an active visit. Closed visits cannot be changed.
+- `GET /api/activity?storeId=...` lists attributed activities; `POST /api/activity` records a staff-authored note for an owned store. Showroom check-ins, timeline events and assignments also generate linked activity records automatically.
+- `POST /api/signup` and `POST /api/signin` are concise aliases for the `/api/auth/...` registration and sign-in routes used by the assessment checklist.
 - `GET /api/health` reports API liveness without depending on the database.
 
 All routes except registration, sign-in, and health require `Authorization: Bearer <token>`. Store creation and updates are owner-only; customer and inventory reads and writes are tenant-scoped. Client-supplied dealer account IDs are ignored. Request bodies are validated before database operations. The API does not return password hashes.
@@ -57,6 +61,6 @@ npm run lint
 
 ## Current implementation scope
 
-Authentication, registration, store provisioning, customer and inventory records, plus initial lead and appointment operations establish the first persistent full-stack workflows. The client API repositories are available for these operations; existing feature screens still contain mock-backed flows pending the planned migration. Authorized inventory imports, LiveActivity, KPI reporting, deterministic E.V.E. tools, billing, and external integrations remain follow-up milestones.
+Authentication, registration, store provisioning, customer and inventory records, plus initial lead, appointment, showroom and activity operations establish the persistent full-stack workflows. Authenticated showroom sessions use the tenant-scoped API; unauthenticated sessions retain the local demonstration adapter. Authenticated media uploads remain disabled until an authorized object-storage integration is configured. KPI reporting, deterministic E.V.E. tools, billing, and external integrations remain follow-up milestones.
 
 Active store selection now reads authenticated stores from the API and demo stores from the canonical domain repository. Phase 1 store metadata and data remain available through a compatibility adapter while those screens migrate to persistent records.

@@ -61,7 +61,7 @@ export default function ShowroomVisitDomain() {
   const { visitId } = useParams<{ visitId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { activeStoreId, activeStoreDomainId, activeStore, stores, storesLoading, setActiveStoreId } = useStoreAppearance();
 
   const requestedStoreId = searchParams.get('storeId') || activeStoreId;
@@ -69,8 +69,8 @@ export default function ShowroomVisitDomain() {
     store.id === requestedStoreId || store.domainId === requestedStoreId || store.legacyDataKey === requestedStoreId,
   );
   const storeId = resolvedStore?.domainId || activeStoreDomainId;
-  const actorName = localStorage.getItem('eveo_user_name') || CURRENT_USER;
-  const actorId = localStorage.getItem('eveo_user_id') || `user_${role}`;
+  const actorName = user?.name || localStorage.getItem('eveo_user_name') || CURRENT_USER;
+  const actorId = user?.id || localStorage.getItem('eveo_user_id') || `user_${role}`;
 
   const [snapshot, setSnapshot] = useState<ShowroomVisitSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,6 +81,7 @@ export default function ShowroomVisitDomain() {
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState<'interest' | 'trade' | null>(null);
   const [vehicleDraft, setVehicleDraft] = useState<ShowroomVehicleDraft | null>(null);
   const [soldAlertMsg, setSoldAlertMsg] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -121,9 +122,10 @@ export default function ShowroomVisitDomain() {
     type: ShowroomEventType,
     message: string,
     extras: Partial<AppendShowroomEventInput> = {}
-  ) => {
-    if (!snapshot || !visitId) return;
+  ): Promise<boolean> => {
+    if (!snapshot || !visitId) return false;
     setBusyAction(type);
+    setMutationError(null);
     try {
       const updated = await showroomRepository.appendEvent(storeId, visitId, {
         type,
@@ -149,6 +151,10 @@ export default function ShowroomVisitDomain() {
       if (type === 'visit_completed') {
         setTimeout(() => navigate(`/app/showroom?view=showroom`), 500);
       }
+      return true;
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : 'Could not update this showroom visit.');
+      return false;
     } finally {
       setBusyAction(null);
     }
@@ -156,18 +162,21 @@ export default function ShowroomVisitDomain() {
 
   const handleClaimVisit = async () => {
     if (!snapshot || !visitId) return;
-    const staff = getStoreDataOrEmpty(storeId).staff;
+    const staff = user ? [] : getStoreDataOrEmpty(storeId).staff;
     const rep = staff.find((s) => s.name === actorName);
     setBusyAction('visit_claimed');
+    setMutationError(null);
     try {
       const updated = await showroomRepository.assignVisit(storeId, visitId, {
-        assignedRepId: rep ? String(rep.id) : actorId,
+        assignedRepId: user?.id || (rep ? String(rep.id) : actorId),
         assignedRepName: actorName,
         actorId,
         actorName,
       });
       setSnapshot(updated);
       playSocialMediaChime();
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : 'Could not claim this visit.');
     } finally {
       setBusyAction(null);
     }
@@ -276,6 +285,10 @@ export default function ShowroomVisitDomain() {
     }
 
     if (stagedFile) {
+      if (user) {
+        setMutationError('Secure photo storage is not configured for authenticated showroom visits yet.');
+        return;
+      }
       setBusyAction(stepConfig.submitType);
       try {
         const asset = await saveMockShowroomMedia(stagedFile);
@@ -291,8 +304,7 @@ export default function ShowroomVisitDomain() {
       return;
     }
 
-    await appendVisitEvent(stepConfig.submitType, noteText.trim());
-    setNoteText('');
+    if (await appendVisitEvent(stepConfig.submitType, noteText.trim())) setNoteText('');
   };
 
   return (
@@ -329,6 +341,9 @@ export default function ShowroomVisitDomain() {
           </div>
         </div>
       </div>
+      {mutationError && (
+        <p role="alert" className="mt-2 rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">{mutationError}</p>
+      )}
 
       {/* 2. Locked 5-Step Progress Indicator */}
       <div className="grid grid-cols-5 gap-1.5 my-2.5 shrink-0">

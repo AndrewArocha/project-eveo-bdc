@@ -26,9 +26,11 @@ import ShowroomVehicleDetails from '../../components/showroom/ShowroomVehicleDet
 import LiveShowroomDeck, { type FloorAppointmentBubble } from '../../components/showroom/LiveShowroomDeck';
 import LiveActivityDeck from '../../components/showroom/LiveActivityDeck';
 import { showroomRepository } from '../../services/showroom';
+import { apiLiveActivityRepository } from '../../services/liveActivity/apiLiveActivityRepository';
+import { apiOperationalRepository } from '../../services/operational/apiOperationalRepository';
 import { getMockShowroomMedia, saveMockShowroomMedia } from '../../services/showroomMedia/mockShowroomMediaStore';
 import { decodeVin } from '../../utils/nhtsaVinService';
-import { getAppointmentsByDate, getTodayDateKey } from '../../utils/appointmentManager';
+import { getAppointmentsByDate, getTodayDateKey, type Appointment } from '../../utils/appointmentManager';
 import {
   listLiveFeed,
   publishLiveActivity,
@@ -73,7 +75,8 @@ const glassCardClasses = `
 const inputClasses =
   'min-h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-base sm:text-sm text-white outline-none transition placeholder:text-gray-500 focus:border-orange-500';
 
-function createActor(role: string) {
+function createActor(role: string, authenticatedUser: { id: string; name: string } | null) {
+  if (authenticatedUser) return { actorId: authenticatedUser.id, actorName: authenticatedUser.name };
   const actorName = localStorage.getItem('eveo_user_name') || CURRENT_USER;
   const actorId = localStorage.getItem('eveo_user_id') || `demo-${role}-${actorName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   return { actorId, actorName };
@@ -93,9 +96,10 @@ function vehicleTitle(vehicle: ShowroomVehicleSelection['vehicleOfInterest']): s
 }
 
 type ExclusiveView = 'portal' | 'showroom' | 'activity' | 'visit';
+type StoreAppointment = Appointment & { appointmentId?: string; customerId?: string; leadId?: string; customerPhone?: string };
 
 export default function LiveShowroom() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { activeStore, activeStoreId, activeStoreDomainId, getBanner, cycleNextStore, stores, setActiveStoreId } = useStoreAppearance();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -121,18 +125,19 @@ export default function LiveShowroom() {
 
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(visitIdFromUrl);
   const [isSwitchingStore, setIsSwitchingStore] = useState(false);
-  const actor = useMemo(() => createActor(role), [role]);
+  const actor = useMemo(() => createActor(role, user), [role, user]);
 
   const salespeople = useMemo(() => {
+    if (user) return [{ id: user.id, name: user.name, role: 'sales' as const }];
     const staff = getStoreDataOrEmpty(storeId).staff;
     return staff.filter((person) => person.role === 'sales' || person.role === 'manager');
-  }, [storeId]);
+  }, [storeId, user]);
 
   const roster = useMemo(() => getVisibleStoreRoster(storeId), [storeId]);
 
   // --- STATE ---
   const [snapshots, setSnapshots] = useState<ShowroomVisitSnapshot[]>([]);
-  const [storeAppts, setStoreAppts] = useState(() => getAppointmentsByDate(storeId, getTodayDateKey()));
+  const [storeAppts, setStoreAppts] = useState<StoreAppointment[]>(() => user ? [] : getAppointmentsByDate(storeId, getTodayDateKey()));
   const [strikesLog, setStrikesLog] = useState<Record<string, string>>({});
   const [isLobbyModalOpen, setIsLobbyModalOpen] = useState(false);
 
@@ -155,7 +160,7 @@ export default function LiveShowroom() {
   const mediaInputRef = useRef<HTMLInputElement>(null);
 
   // Live Activity Feed State
-  const [feedPosts, setFeedPosts] = useState<LiveFeedPost[]>(() => listLiveFeed(storeId));
+  const [feedPosts, setFeedPosts] = useState<LiveFeedPost[]>(() => user ? [] : listLiveFeed(storeId));
   const [onlineCursorIdx, setOnlineCursorIdx] = useState(0);
 
   // Smart Actionable "Log Live Activity" Modal State
@@ -168,6 +173,29 @@ export default function LiveShowroom() {
   const [postMediaFile, setPostMediaFile] = useState<File | null>(null);
   const [isPostingActivity, setIsPostingActivity] = useState(false);
   const postMediaInputRef = useRef<HTMLInputElement>(null);
+
+  const refreshActivity = useCallback(async () => {
+    try {
+      setFeedPosts(user ? await apiLiveActivityRepository.list(storeId) : listLiveFeed(storeId));
+    } catch {
+      if (!user) setFeedPosts(listLiveFeed(storeId));
+    }
+  }, [storeId, user]);
+
+  const recordActivity = async (input: Parameters<typeof publishLiveActivity>[1]) => {
+    if (user) {
+      const created = await apiLiveActivityRepository.create({
+        storeId,
+        category: 'account',
+        title: 'Staff note added',
+        description: `${input.title}${input.detail ? ` — ${input.detail}` : ''}`,
+      });
+      setFeedPosts((current) => [created, ...current.filter((post) => post.id !== created.id)]);
+      return;
+    }
+    publishLiveActivity(storeId, input);
+    setFeedPosts(listLiveFeed(storeId));
+  };
 
   useEffect(() => {
     if (!stagedMediaFile) {
@@ -183,29 +211,54 @@ export default function LiveShowroom() {
   useEffect(() => {
     const onAvatar = () => {
       setAvatarTick((t) => t + 1);
-      setFeedPosts(listLiveFeed(storeId));
+      if (!user) setFeedPosts(listLiveFeed(storeId));
     };
     window.addEventListener('avatarUpdated', onAvatar);
     return () => window.removeEventListener('avatarUpdated', onAvatar);
-  }, [storeId]);
+  }, [storeId, user]);
 
   useEffect(() => {
-    const syncAppts = () => setStoreAppts(getAppointmentsByDate(storeId, getTodayDateKey()));
-    syncAppts();
-    setFeedPosts(listLiveFeed(storeId));
+    const syncAppts = async () => {
+      if (!user) {
+        setStoreAppts(getAppointmentsByDate(storeId, getTodayDateKey()));
+        return;
+      }
+      try {
+        const records = await apiOperationalRepository.listAppointments(storeId);
+        const today = new Date();
+        setStoreAppts(records.filter((item) => item.scheduledAt && new Date(item.scheduledAt).toDateString() === today.toDateString() && item.status !== 'cancelled')
+          .map((item) => ({
+            id: item._id, time: new Date(item.scheduledAt!).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+            customer: item.customerNameSnapshot, vehicle: item.vehicleSnapshot || 'Vehicle not specified', rep: user.name,
+            status: item.status === 'arrived' || item.status === 'showed' ? 'ARRIVED' : item.status === 'no_show' ? 'NO SHOW' : 'CONFIRMED',
+            appointmentId: item._id, customerId: item.customerId || undefined, leadId: item.leadId || undefined, customerPhone: item.phoneSnapshot,
+          })));
+      } catch {
+        setStoreAppts([]);
+      }
+    };
+    void syncAppts();
+    if (!user) setFeedPosts(listLiveFeed(storeId));
     window.addEventListener('appointmentsUpdated', syncAppts);
-    return () => window.removeEventListener('appointmentsUpdated', syncAppts);
-  }, [storeId]);
+    const timer = user ? window.setInterval(() => { void syncAppts(); }, 5000) : undefined;
+    return () => {
+      window.removeEventListener('appointmentsUpdated', syncAppts);
+      if (timer !== undefined) window.clearInterval(timer);
+    };
+  }, [storeId, user]);
 
   useEffect(() => {
-    const syncFeed = () => setFeedPosts(listLiveFeed(storeId));
+    const syncFeed = () => { void refreshActivity(); };
     window.addEventListener('eveo:live-feed-updated', syncFeed);
     window.addEventListener('storage', syncFeed);
+    void refreshActivity();
+    const timer = user ? window.setInterval(() => { void refreshActivity(); }, 5000) : undefined;
     return () => {
       window.removeEventListener('eveo:live-feed-updated', syncFeed);
       window.removeEventListener('storage', syncFeed);
+      if (timer !== undefined) window.clearInterval(timer);
     };
-  }, [storeId]);
+  }, [storeId, user, refreshActivity]);
 
   const refresh = useCallback(async () => {
     try {
@@ -302,6 +355,10 @@ export default function LiveShowroom() {
       if (bubbles.some((b) => b.customerName === cName) || strikesLog[`appt_${appt.id}`]) return;
       bubbles.push({
         id: `appt_${appt.id}`,
+        appointmentId: appt.appointmentId,
+        customerId: appt.customerId,
+        leadId: appt.leadId,
+        customerPhone: appt.customerPhone,
         customerName: cName,
         vehicle: appt.vehicle,
         rep: appt.rep,
@@ -375,6 +432,10 @@ export default function LiveShowroom() {
     const repObj = salespeople.find((s) => s.name === bubble.rep) || salespeople[0];
     const created = await showroomRepository.createVisit(storeId, {
       customerName: bubble.customerName,
+      customerPhone: bubble.customerPhone,
+      customerId: bubble.customerId,
+      leadId: bubble.leadId,
+      appointmentId: bubble.appointmentId,
       notes: `Checked in from Master Schedule (${bubble.vehicle}).`,
       assignedRepId: repObj ? String(repObj.id) : actor.actorId,
       assignedRepName: bubble.rep || actor.actorName,
@@ -388,13 +449,15 @@ export default function LiveShowroom() {
 
   const handleMarkOverdueStrike = (bubble: FloorAppointmentBubble) => {
     setStrikesLog((prev) => ({ ...prev, [bubble.id]: bubble.rep }));
-    publishLiveActivity(storeId, {
-      agentName: 'EVEO AI',
-      isAiAgent: true,
+    void recordActivity({
+      agentName: user?.name || 'EVEO AI',
+      isAiAgent: !user,
       priority: 1,
-      category: 'ai_high_intent',
-      title: `SLA Strike Logged • ${bubble.rep}`,
-      detail: `Appointment for ${bubble.customerName} (${bubble.vehicle}) exceeded 15m overdue window without check-in.`,
+      category: user ? 'showroom' : 'ai_high_intent',
+      title: user ? `Manager review requested • ${bubble.customerName}` : `SLA Strike Logged • ${bubble.rep}`,
+      detail: user
+        ? `A manager flagged this appointment for review. ${bubble.vehicle}`
+        : `Appointment for ${bubble.customerName} (${bubble.vehicle}) exceeded 15m overdue window without check-in.`,
     });
   };
 
@@ -423,7 +486,7 @@ export default function LiveShowroom() {
 
       setSnapshots((current) => [created, ...current.filter((item) => item.visit.id !== created.visit.id)]);
 
-      publishLiveActivity(storeId, {
+      if (!user) publishLiveActivity(storeId, {
         agentName: selectedRep.name,
         role: 'sales',
         priority: 1,
@@ -464,7 +527,7 @@ export default function LiveShowroom() {
       });
       setSnapshots((current) => current.map((item) => (item.visit.id === updated.visit.id ? updated : item)));
 
-      publishLiveActivity(storeId, {
+      if (!user) publishLiveActivity(storeId, {
         agentName: actor.actorName,
         role,
         priority: type === 'note_added' && !extras.media ? 2 : 1,
@@ -540,6 +603,7 @@ export default function LiveShowroom() {
     try {
       let mediaAsset = undefined;
       if (postMediaFile) {
+        if (user) throw new Error('Secure photo storage is not configured for authenticated showroom visits yet.');
         mediaAsset = await saveMockShowroomMedia(postMediaFile);
       }
 
@@ -547,7 +611,7 @@ export default function LiveShowroom() {
       const decodedTitle = vehicleTitle(composerVehicleDraft);
 
       if (composerType === 'deal_desked') {
-        publishLiveActivity(storeId, {
+        await recordActivity({
           agentName: actor.actorName,
           role,
           priority: 1,
@@ -559,7 +623,7 @@ export default function LiveShowroom() {
           media: mediaAsset,
         });
       } else if (composerType === 'new_inventory') {
-        publishLiveActivity(storeId, {
+        await recordActivity({
           agentName: actor.actorName,
           role,
           priority: 1,
@@ -570,7 +634,7 @@ export default function LiveShowroom() {
           media: mediaAsset,
         });
       } else if (composerType === 'vip_appt') {
-        publishLiveActivity(storeId, {
+        await recordActivity({
           agentName: actor.actorName,
           role,
           priority: 1,
@@ -580,7 +644,7 @@ export default function LiveShowroom() {
           media: mediaAsset,
         });
       } else {
-        publishLiveActivity(storeId, {
+        await recordActivity({
           agentName: actor.actorName,
           role,
           priority: 1,
@@ -594,6 +658,8 @@ export default function LiveShowroom() {
       setPostMediaFile(null);
       setComposerVehicleDraft(null);
       setIsComposerOpen(false);
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : 'Could not record this activity.');
     } finally {
       setIsPostingActivity(false);
     }
@@ -803,6 +869,7 @@ export default function LiveShowroom() {
               onSwitchToShowroom={() => switchView('showroom')}
               onOpenNewActivity={() => setIsComposerOpen(true)}
               onOpenVinScanner={() => setIsVinScannerOpen(true)}
+              allowComments={!user}
             />
           )}
 

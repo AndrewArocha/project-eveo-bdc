@@ -56,6 +56,10 @@ export interface ShowroomVisitSnapshot {
 export interface CreateShowroomVisitInput {
   customerName: string;
   customerPhone?: string;
+  /** Link an existing canonical customer instead of resolving by phone. */
+  customerId?: string;
+  leadId?: string;
+  appointmentId?: string;
   notes?: string;
   assignedRepId: string;
   assignedRepName: string;

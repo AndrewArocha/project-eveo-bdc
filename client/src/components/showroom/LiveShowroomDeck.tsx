@@ -18,6 +18,10 @@ export type LeadSourceBrand = 'CarFax' | 'CarGurus' | 'TrueCar' | 'AutoTrader' |
 
 export interface FloorAppointmentBubble {
   id: string;
+  appointmentId?: string;
+  customerId?: string;
+  leadId?: string;
+  customerPhone?: string;
   visitId?: string;
   customerName: string;
   vehicle: string;
