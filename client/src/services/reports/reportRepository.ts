@@ -10,7 +10,7 @@ export interface KpiSourceRecord {
 export interface StoreKpiMetric {
   key: string;
   label: string;
-  unit: 'count' | 'percentage';
+  unit: 'count' | 'percentage' | 'currency';
   value: number | null;
   numerator?: number;
   denominator?: number;

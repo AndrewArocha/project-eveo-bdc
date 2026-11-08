@@ -6,6 +6,7 @@ import { ReportSnapshot } from '../models/ReportSnapshot.js';
 import { ShowroomVisit } from '../models/ShowroomVisit.js';
 import { Store } from '../models/Store.js';
 import { User } from '../models/User.js';
+import { Deal } from '../models/Deal.js';
 import { AppError } from '../utils/AppError.js';
 
 export const KPI_DEFINITION_VERSION = 1;
@@ -16,7 +17,7 @@ type SourceRecord = { id: string; label: string; occurredAt: Date; status?: stri
 type Metric = {
   key: string;
   label: string;
-  unit: 'count' | 'percentage';
+  unit: 'count' | 'percentage' | 'currency';
   value: number | null;
   numerator?: number;
   denominator?: number;
@@ -80,7 +81,7 @@ export async function calculateStoreKpis(dealerAccountId: string, period: Report
   const range = { $gte: period.startAt, $lt: period.endAt };
   const appointmentEligible = ['arrived', 'showed', 'sold', 'no_show'];
   const appointmentShown = ['arrived', 'showed', 'sold'];
-  const [leadCount, leads, appointmentCount, appointmentsCreated, eligibleAppointmentCount, shownAppointmentCount, eligibleAppointments, showroomCount, showrooms, activityCount, activity] = await Promise.all([
+  const [leadCount, leads, appointmentCount, appointmentsCreated, eligibleAppointmentCount, shownAppointmentCount, eligibleAppointments, showroomCount, showrooms, activityCount, activity, dealsSold, dealsDelivered, gross] = await Promise.all([
     Lead.countDocuments({ dealerAccountId, storeId: period.storeId, createdAt: range }),
     Lead.find({ dealerAccountId, storeId: period.storeId, createdAt: range }).select('_id customerNameSnapshot createdAt status').sort({ createdAt: -1 }).limit(SOURCE_LIMIT).lean(),
     Appointment.countDocuments({ dealerAccountId, storeId: period.storeId, createdAt: range }),
@@ -92,6 +93,9 @@ export async function calculateStoreKpis(dealerAccountId: string, period: Report
     ShowroomVisit.find({ dealerAccountId, storeId: period.storeId, createdAt: range }).select('_id customerNameSnapshot createdAt status').sort({ createdAt: -1 }).limit(SOURCE_LIMIT).lean(),
     ActivityEvent.countDocuments({ dealerAccountId, storeId: period.storeId, occurredAt: range }),
     ActivityEvent.find({ dealerAccountId, storeId: period.storeId, occurredAt: range }).select('_id title occurredAt category').sort({ occurredAt: -1 }).limit(SOURCE_LIMIT).lean(),
+    Deal.countDocuments({ dealerAccountId, storeId: period.storeId, soldAt: range, status: { $in: ['sold', 'delivered'] } }),
+    Deal.countDocuments({ dealerAccountId, storeId: period.storeId, deliveredAt: range, status: 'delivered' }),
+    Deal.aggregate([{ $match: { dealerAccountId: new Types.ObjectId(dealerAccountId), storeId: new Types.ObjectId(period.storeId), soldAt: range, status: { $in: ['sold', 'delivered'] } } }, { $group: { _id: null, total: { $sum: { $add: [{ $ifNull: ['$frontGross', 0] }, { $ifNull: ['$backGross', 0] }] } } } }]),
   ]);
 
   const appointmentRateRecords: SourceRecord[] = eligibleAppointments.map((record) => ({
@@ -114,6 +118,9 @@ export async function calculateStoreKpis(dealerAccountId: string, period: Report
     },
     countMetric('showroom_visits_created', 'Showroom visits', 'Count of showroom visits created during the selected period.', 'Visit creation time is used; a visit may still be active or may later be completed.', showroomCount, sourceRecords(showrooms, (visit) => visit.customerNameSnapshot)),
     countMetric('operational_activity', 'Recorded activities', 'Count of activity events recorded during the selected period.', 'Includes operational events currently captured by EVEO; external calls, SMS, and email are not yet ingested.', activityCount, activityRecords),
+    countMetric('deals_sold', 'Deals sold', 'Count of deals that reached sold or delivered status during the period.', 'Uses the deal sold timestamp; cancelled and reversed deals are excluded.', dealsSold, []),
+    countMetric('deals_delivered', 'Deals delivered', 'Count of delivered deals during the period.', 'Delivery timestamp is separate from sold date.', dealsDelivered, []),
+    { key: 'realized_gross', label: 'Recorded gross', unit: 'currency', value: Math.round((gross[0]?.total ?? 0) * 100) / 100, formula: 'Sum of front and back gross for sold deals.', measurementNote: 'Only populated gross fields are included; this is not accounting revenue.', sourceCount: dealsSold, sourceRecords: [], sourcesTruncated: dealsSold > 0 },
   ];
 
   let employeeMetrics: EmployeeMetric[] | undefined;

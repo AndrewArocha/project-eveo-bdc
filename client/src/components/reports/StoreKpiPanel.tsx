@@ -52,7 +52,9 @@ function buildPeriod(storeId: string, startDate: string, endDate: string, timeZo
 
 function metricValue(metric: StoreKpiMetric) {
   if (metric.value === null) return 'No eligible appointments';
-  return metric.unit === 'percentage' ? `${metric.value.toFixed(1)}%` : new Intl.NumberFormat().format(metric.value);
+  if (metric.unit === 'percentage') return `${metric.value.toFixed(1)}%`;
+  if (metric.unit === 'currency') return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(metric.value);
+  return new Intl.NumberFormat().format(metric.value);
 }
 
 export default function StoreKpiPanel({ storeId, role }: Props) {
