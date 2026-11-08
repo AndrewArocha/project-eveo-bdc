@@ -40,14 +40,24 @@ export async function createInventoryVehicle(
   await assertStoreBelongsToAccount(input.storeId, dealerAccountId);
   const vin = input.vin.toUpperCase();
   const existing = await InventoryVehicle.findOne({ dealerAccountId, vin });
-  if (existing) return { vehicle: existing, created: false };
+  if (existing) {
+    if (existing.storeId.toString() !== input.storeId) {
+      throw new AppError(409, 'This VIN is already registered at another store in your dealership account.', 'VIN_EXISTS_IN_ANOTHER_STORE');
+    }
+    return { vehicle: existing, created: false };
+  }
   try {
     const vehicle = await InventoryVehicle.create({ ...input, vin, dealerAccountId });
     return { vehicle, created: true };
   } catch (error) {
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === 11000) {
       const duplicate = await InventoryVehicle.findOne({ dealerAccountId, vin });
-      if (duplicate) return { vehicle: duplicate, created: false };
+      if (duplicate) {
+        if (duplicate.storeId.toString() !== input.storeId) {
+          throw new AppError(409, 'This VIN is already registered at another store in your dealership account.', 'VIN_EXISTS_IN_ANOTHER_STORE');
+        }
+        return { vehicle: duplicate, created: false };
+      }
     }
     throw error;
   }

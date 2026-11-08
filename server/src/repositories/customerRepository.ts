@@ -1,5 +1,7 @@
-import { Types } from 'mongoose';
-import { Customer } from '../models/Customer.js';
+import { Types, type HydratedDocument } from 'mongoose';
+import { Appointment } from '../models/Appointment.js';
+import { Customer, type ICustomer } from '../models/Customer.js';
+import { Lead } from '../models/Lead.js';
 import { Store } from '../models/Store.js';
 import { AppError } from '../utils/AppError.js';
 
@@ -34,20 +36,25 @@ export async function createCustomer(
 ) {
   await assertStoreBelongsToAccount(input.storeId, dealerAccountId);
   const email = typeof input.email === 'string' ? input.email.trim().toLowerCase() : '';
+  const mergeMissingDetails = async (existing: HydratedDocument<ICustomer> | null) => {
+    if (!existing) return null;
+    let changed = false;
+    for (const field of ['phone', 'notes', 'storeId'] as const) {
+      const current = existing.get(field);
+      const incoming = input[field];
+      if ((current === '' || current === null || current === undefined) && incoming !== undefined && incoming !== '') {
+        existing.set(field, incoming);
+        changed = true;
+      }
+    }
+    if (changed) await existing.save();
+    return existing;
+  };
+
   if (email) {
     const existing = await Customer.findOne({ dealerAccountId, email });
     if (existing) {
-      let changed = false;
-      for (const field of ['phone', 'notes', 'storeId'] as const) {
-        const current = existing.get(field);
-        const incoming = input[field];
-        if ((current === '' || current === null || current === undefined) && incoming !== undefined && incoming !== '') {
-          existing.set(field, incoming);
-          changed = true;
-        }
-      }
-      if (changed) await existing.save();
-      return { customer: existing, created: false };
+      return { customer: (await mergeMissingDetails(existing))!, created: false };
     }
   }
   try {
@@ -56,7 +63,7 @@ export async function createCustomer(
   } catch (error) {
     if (email && typeof error === 'object' && error !== null && 'code' in error && error.code === 11000) {
       const existing = await Customer.findOne({ dealerAccountId, email });
-      if (existing) return { customer: existing, created: false };
+      if (existing) return { customer: (await mergeMissingDetails(existing))!, created: false };
     }
     throw error;
   }
@@ -72,6 +79,15 @@ export async function getCustomerByAccount(id: string, dealerAccountId: string) 
 export async function updateCustomer(id: string, dealerAccountId: string, input: Record<string, unknown>) {
   if (input.storeId !== undefined) await assertStoreBelongsToAccount(input.storeId, dealerAccountId);
   const customer = await getCustomerByAccount(id, dealerAccountId);
+  if (input.storeId !== undefined && String(customer.storeId ?? '') !== String(input.storeId ?? '')) {
+    const [hasLeads, hasAppointments] = await Promise.all([
+      Lead.exists({ dealerAccountId, customerId: customer._id }),
+      Appointment.exists({ dealerAccountId, customerId: customer._id }),
+    ]);
+    if (hasLeads || hasAppointments) {
+      throw new AppError(409, 'A customer with linked leads or appointments cannot be moved to another store.', 'CUSTOMER_HAS_ACTIVITY');
+    }
+  }
   if (typeof input.email === 'string' && input.email.trim()) {
     const duplicate = await Customer.exists({ _id: { $ne: customer._id }, dealerAccountId, email: input.email.trim().toLowerCase() });
     if (duplicate) throw new AppError(409, 'A customer with this email already exists in your dealership account.', 'DUPLICATE_CUSTOMER');
@@ -90,5 +106,12 @@ export async function updateCustomer(id: string, dealerAccountId: string, input:
 
 export async function deleteCustomer(id: string, dealerAccountId: string) {
   const customer = await getCustomerByAccount(id, dealerAccountId);
+  const [hasLeads, hasAppointments] = await Promise.all([
+    Lead.exists({ dealerAccountId, customerId: customer._id }),
+    Appointment.exists({ dealerAccountId, customerId: customer._id }),
+  ]);
+  if (hasLeads || hasAppointments) {
+    throw new AppError(409, 'A customer with linked leads or appointments cannot be deleted.', 'CUSTOMER_HAS_ACTIVITY');
+  }
   await customer.deleteOne();
 }
