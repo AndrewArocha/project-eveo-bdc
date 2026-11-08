@@ -1,5 +1,5 @@
 // src/components/UI/HubModals.tsx
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import { motion } from 'framer-motion';
 import {
   X, Search, Clock, UserCheck, Activity, Users, Car, Lock, Zap,
@@ -7,13 +7,18 @@ import {
   ArrowLeft, Phone, Sparkles, Plus, LoaderCircle
 } from 'lucide-react';
 import { MOCK_FOLLOWUPS, CURRENT_USER, getStoreDataOrEmpty, type UserRole, type DealRecord } from '../../data/mockDatabase';
+import type { StoreData } from '../../types';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { StatBox } from '../reports/ReportStats';
-import {
-  hydrateStorePipeline,
-  createStoreLeadAsync,
-  confirmStoreAppointmentAsync,
-} from '../../services/liveActivity/liveActivityStore';
+import { hydrateStorePipeline, createStoreLeadAsync, confirmStoreAppointmentAsync, getPersistentStoreData } from '../../services/liveActivity/liveActivityStore';
+import { apiOperationalRepository } from '../../services/operational/apiOperationalRepository';
+import { showroomRepository } from '../../services/showroom';
+import { teamRepository } from '../../services/team/teamRepository';
+
+function emptyStoreData(): StoreData {
+  return { staff: [], leads: [], handoffs: [], appointments: [], sold: [], pending: [], bannerUrl: '' };
+}
 
 interface HubModalsProps {
   expanded: string;
@@ -23,6 +28,7 @@ interface HubModalsProps {
 }
 
 export default function HubModals({ expanded, role, onClose, onOpenShowroom }: HubModalsProps) {
+  const { user } = useAuth();
   const [kpiView, setKpiView] = useState<'overview' | 'sold' | 'pending'>('overview');
   const [leadSearch, setLeadSearch] = useState('');
   const [isAddingLead, setIsAddingLead] = useState(false);
@@ -30,18 +36,70 @@ export default function HubModals({ expanded, role, onClose, onOpenShowroom }: H
   const [newLeadVehicle, setNewLeadVehicle] = useState('');
   const [newLeadNotes, setNewLeadNotes] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState('');
   const [, setPipelineTick] = useState(0);
 
   const { activeStoreId, activeStore } = useStoreAppearance();
 
-  useEffect(() => {
-    hydrateStorePipeline(activeStoreId);
-    const sync = () => setPipelineTick((t) => t + 1);
-    window.addEventListener('eveo:pipeline-updated', sync);
-    return () => window.removeEventListener('eveo:pipeline-updated', sync);
-  }, [activeStoreId]);
+  const [activeStoreData, setActiveStoreData] = useState<StoreData>(() => user ? emptyStoreData() : getStoreDataOrEmpty(activeStoreId));
 
-  const activeStoreData = getStoreDataOrEmpty(activeStoreId);
+  const refreshStoreData = useCallback(async () => {
+    if (!user) {
+      hydrateStorePipeline(activeStoreId);
+      setActiveStoreData(getPersistentStoreData(activeStoreId));
+      return;
+    }
+    try {
+      const [leads, appointments, team, visits] = await Promise.all([
+        apiOperationalRepository.listLeads(activeStoreId),
+        apiOperationalRepository.listAppointments(activeStoreId),
+        teamRepository.listMembers(activeStoreId),
+        showroomRepository.listVisits(activeStoreId),
+      ]);
+      const namesById = new Map(team.map((member) => [member.id, member.name]));
+      const nextData: StoreData = {
+        staff: team.filter((member) => member.role !== 'owner').map((member) => ({ id: member.id, name: member.name, initials: member.name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase(), role: member.role as StoreData['staff'][number]['role'], schedule: '', daysOff: '', kpiTarget: 0, wage: 0, currency: '', route: '', assignedStoreIds: [activeStoreId], liveActivity: '' })),
+        leads: leads.map((lead) => ({
+          id: lead._id, name: lead.customerNameSnapshot, vehicle: lead.vehicleOfInterest || 'Vehicle not specified',
+          status: lead.status.replaceAll('_', ' '), time: new Date(lead.createdAt).toLocaleString(),
+          assignee: namesById.get(lead.assignedStoreUserId || lead.assignedPlatformUserId || '') || 'Unassigned', notes: lead.notes,
+        })),
+        appointments: appointments.map((appointment) => ({
+          id: appointment._id, time: appointment.scheduledAt ? new Date(appointment.scheduledAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Time not set',
+          customer: appointment.customerNameSnapshot, name: appointment.customerNameSnapshot,
+          vehicle: appointment.vehicleSnapshot || 'Vehicle not specified',
+          rep: namesById.get(appointment.assignedStoreUserId || appointment.assignedPlatformUserId || '') || 'Unassigned',
+          status: appointment.status === 'pending_confirmation' ? 'Pending Confirm' : appointment.status.replaceAll('_', ' '),
+          phone: appointment.phoneSnapshot, notes: appointment.notes,
+        })),
+        handoffs: visits.filter(({ visit }) => visit.status === 'handoff_requested').map(({ visit }) => ({
+          id: visit.id, name: visit.customerName, vehicle: [visit.vehicleOfInterest?.modelYear, visit.vehicleOfInterest?.make, visit.vehicleOfInterest?.model].filter(Boolean).join(' ') || 'Vehicle pending',
+          rep: visit.assignedRepName, waitTime: 'Live', status: visit.status,
+        })),
+        sold: [], pending: [], bannerUrl: '',
+      };
+      setActiveStoreData(nextData);
+      setMutationError('');
+    } catch (cause) {
+      setActiveStoreData(emptyStoreData());
+      setMutationError(cause instanceof Error ? cause.message : 'Store records could not be loaded.');
+    }
+  }, [activeStoreId, user]);
+
+  useEffect(() => {
+    void refreshStoreData();
+    const sync = () => { void refreshStoreData(); setPipelineTick((t) => t + 1); };
+    window.addEventListener('eveo:pipeline-updated', sync);
+    window.addEventListener('eveo:operational-updated', sync);
+    window.addEventListener('appointmentsUpdated', sync);
+    const timer = user ? window.setInterval(() => { void refreshStoreData(); }, 5000) : undefined;
+    return () => {
+      window.removeEventListener('eveo:pipeline-updated', sync);
+      window.removeEventListener('eveo:operational-updated', sync);
+      window.removeEventListener('appointmentsUpdated', sync);
+      if (timer !== undefined) window.clearInterval(timer);
+    };
+  }, [refreshStoreData, user]);
 
   const storeLeads = activeStoreData.leads || [];
   const storeHandoffs = activeStoreData.handoffs || [];
@@ -59,17 +117,21 @@ export default function HubModals({ expanded, role, onClose, onOpenShowroom }: H
     e.preventDefault();
     if (!newLeadName.trim() || !newLeadVehicle.trim()) return;
     setBusyId('create_lead');
+    setMutationError('');
     try {
-      await createStoreLeadAsync(activeStoreId, {
-        name: newLeadName,
-        vehicle: newLeadVehicle,
-        notes: newLeadNotes,
-      });
+      if (user) {
+        await apiOperationalRepository.createLead({ storeId: activeStoreId, customerNameSnapshot: newLeadName.trim(), vehicleOfInterest: newLeadVehicle.trim(), notes: newLeadNotes.trim() });
+      } else {
+        await createStoreLeadAsync(activeStoreId, { name: newLeadName, vehicle: newLeadVehicle, notes: newLeadNotes });
+      }
       setNewLeadName('');
       setNewLeadVehicle('');
       setNewLeadNotes('');
       setIsAddingLead(false);
       setPipelineTick((t) => t + 1);
+      await refreshStoreData();
+    } catch (cause) {
+      setMutationError(cause instanceof Error ? cause.message : 'Lead could not be saved.');
     } finally {
       setBusyId(null);
     }
@@ -77,9 +139,14 @@ export default function HubModals({ expanded, role, onClose, onOpenShowroom }: H
 
   const handleConfirmAppt = async (apptId: number | string) => {
     setBusyId(String(apptId));
+    setMutationError('');
     try {
-      await confirmStoreAppointmentAsync(activeStoreId, apptId);
+      if (user) await apiOperationalRepository.updateAppointmentStatus(activeStoreId, String(apptId), 'confirmed');
+      else await confirmStoreAppointmentAsync(activeStoreId, apptId);
       setPipelineTick((t) => t + 1);
+      await refreshStoreData();
+    } catch (cause) {
+      setMutationError(cause instanceof Error ? cause.message : 'Appointment could not be confirmed.');
     } finally {
       setBusyId(null);
     }
@@ -139,6 +206,7 @@ export default function HubModals({ expanded, role, onClose, onOpenShowroom }: H
 
       {/* Scrollable Modal Body */}
       <div className="relative z-10 flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar p-4 sm:p-6 md:p-8 bg-gray-50/50 dark:bg-black/20">
+        {mutationError && <p role="alert" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-200">{mutationError}</p>}
 
         {/* --- LEADS VIEW (With Async Persistent Lead Creator!) --- */}
         {expanded === 'leads' && (
@@ -277,9 +345,10 @@ export default function HubModals({ expanded, role, onClose, onOpenShowroom }: H
         {/* --- URGENT FOLLOW UPS VIEW --- */}
         {expanded === 'followups' && (
           <div className="flex flex-col h-full gap-4 sm:gap-6">
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Customers waiting longer than 15 minutes for a response.</p>
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{user ? 'Follow-up timing will appear when CRM contact activity is connected.' : 'Sample customers waiting longer than 15 minutes for a response.'}</p>
+            {user && <p className="rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600 dark:border-white/10 dark:bg-[#0a0f16] dark:text-gray-300">EVEO does not have a live customer-contact feed for this store yet, so it will not label records as overdue.</p>}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 pb-4">
-              {MOCK_FOLLOWUPS.map((followup) => (
+              {(user ? [] : MOCK_FOLLOWUPS).map((followup) => (
                 <div key={followup.id} className="bg-white dark:bg-[#0a0f16] border border-red-500/30 rounded-2xl p-5 sm:p-6 shadow-xs relative overflow-hidden group">
                   <div className="absolute top-0 left-0 w-1.5 sm:w-2 h-full bg-red-500" />
                   <div className="pl-3 sm:pl-4">
@@ -308,7 +377,7 @@ export default function HubModals({ expanded, role, onClose, onOpenShowroom }: H
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 pb-4">
             {storeHandoffs.map((handoff) => {
               const isCritical = parseInt(handoff.waitTime, 10) >= 4;
-              const isAssignedToMe = handoff.rep === CURRENT_USER;
+              const isAssignedToMe = handoff.rep === (user?.name || CURRENT_USER);
               return (
                 <div key={handoff.id} className={`bg-white dark:bg-[#0a0f16] border ${isCritical ? 'border-red-500/50 shadow-red-500/10' : 'border-orange-500/30 shadow-orange-500/5'} rounded-2xl p-5 sm:p-6 shadow-lg relative overflow-hidden group`}>
                   <div className={`absolute top-0 left-0 w-1.5 sm:w-2 h-full ${isCritical ? 'bg-red-500 animate-pulse' : 'bg-orange-500'}`} />
@@ -418,23 +487,24 @@ export default function HubModals({ expanded, role, onClose, onOpenShowroom }: H
 
                 <div className="grid grid-cols-1 sm:flex sm:flex-wrap justify-center gap-4 sm:gap-8 w-full">
                   {role === 'bdc' ? (
-                    <StatBox icon={<Phone className="text-blue-500" />} label="Outbound Calls" value="142" />
+                    <StatBox icon={<Phone className="text-blue-500" />} label="Outbound Calls" value={user ? '—' : '142'} />
                   ) : (
                     <>
-                      <StatBox icon={<Target className="text-orange-500" />} label="Target" value="20" />
+                      <StatBox icon={<Target className="text-orange-500" />} label="Target" value={user ? '—' : '20'} />
                       <button type="button" onClick={() => setKpiView('sold')} className="group flex flex-col items-center justify-center p-6 bg-gray-50 dark:bg-white/5 hover:bg-emerald-500/10 active:scale-[0.98] rounded-2xl shadow-inner border border-gray-200 dark:border-white/5 transition-all cursor-pointer outline-none min-w-36">
                         <div className="mb-2"><Car className="text-emerald-500 group-hover:scale-110 transition-transform" /></div>
-                        <p className="text-3xl font-black text-gray-900 dark:text-white">{storeSold.length}</p>
+                        <p className="text-3xl font-black text-gray-900 dark:text-white">{user ? '—' : storeSold.length}</p>
                         <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mt-1">Sold <ArrowRight size={10} className="inline" /></p>
                       </button>
                       <button type="button" onClick={() => setKpiView('pending')} className="group flex flex-col items-center justify-center p-6 bg-gray-50 dark:bg-white/5 hover:bg-blue-500/10 active:scale-[0.98] rounded-2xl shadow-inner border border-gray-200 dark:border-white/5 transition-all cursor-pointer outline-none min-w-36">
                         <div className="mb-2"><Clock className="text-blue-500 group-hover:scale-110 transition-transform" /></div>
-                        <p className="text-3xl font-black text-gray-900 dark:text-white">{storePending.length}</p>
+                        <p className="text-3xl font-black text-gray-900 dark:text-white">{user ? '—' : storePending.length}</p>
                         <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mt-1">Pending <ArrowRight size={10} className="inline" /></p>
                       </button>
                     </>
                   )}
                 </div>
+                {user && <p className="mt-5 max-w-xl text-center text-xs leading-relaxed text-gray-500">Call tracking, sales targets, and deal records are not connected for this account yet.</p>}
               </motion.div>
             )}
 
@@ -455,7 +525,7 @@ export default function HubModals({ expanded, role, onClose, onOpenShowroom }: H
                       <div className="min-w-0">
                         <p className="font-bold text-gray-900 dark:text-white truncate">{deal.name}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{deal.vehicle}</p>
-                        <p className="text-[11px] text-gray-400 mt-1">Rep: {deal.rep || CURRENT_USER}</p>
+                        <p className="text-[11px] text-gray-400 mt-1">Rep: {deal.rep || user?.name || CURRENT_USER}</p>
                       </div>
                       <div className="shrink-0 text-right">
                         {kpiView === 'sold' ? (
@@ -487,7 +557,7 @@ export default function HubModals({ expanded, role, onClose, onOpenShowroom }: H
                         <td className="px-6 py-4">
                           {kpiView === 'sold' ? <span className="font-bold text-emerald-600">{deal.profit}</span> : <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest bg-blue-500/10 text-blue-600">{deal.stage}</span>}
                         </td>
-                        <td className="px-6 py-4 text-right text-gray-600 dark:text-gray-300 font-medium">{deal.rep || CURRENT_USER}</td>
+                        <td className="px-6 py-4 text-right text-gray-600 dark:text-gray-300 font-medium">{deal.rep || user?.name || CURRENT_USER}</td>
                       </tr>
                     ))}
                   </tbody>

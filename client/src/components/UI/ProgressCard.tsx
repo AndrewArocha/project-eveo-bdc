@@ -6,7 +6,7 @@ import { playHover, playModalOpen } from '../../utils/soundEngine';
 
 interface ProgressCardProps {
   title: string;
-  percentage: number;
+  percentage: number | null;
   trend: string;
   onClick: () => void;
   layoutId: string;
@@ -20,19 +20,19 @@ export default function ProgressCard({ title, percentage, trend, onClick, layout
     return { stroke: 'text-emerald-500', glow: 'drop-shadow-[0_0_8px_rgba(16,185,129,0.8)]' };
   };
 
-  const colors = getColors(percentage);
+  const colors = getColors(percentage ?? 0);
   const radius = 35;
   const circumference = 2 * Math.PI * radius;
   const [offset, setOffset] = useState(circumference);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setOffset(circumference - (percentage / 100) * circumference);
+      setOffset(percentage === null ? circumference : circumference - (percentage / 100) * circumference);
     }, 100);
     return () => clearTimeout(timer);
   }, [percentage, circumference]);
 
-  const glassClasses = `backdrop-blur-2xl bg-white/5 dark:bg-[#0a0f16]/40 border border-white/20 dark:border-white/10 shadow-[0_15px_30px_rgba(0,0,0,0.1),inset_0_1px_8px_rgba(255,255,255,0.2)] dark:shadow-[0_15px_30px_rgba(0,0,0,0.3),inset_0_1px_8px_rgba(255,255,255,0.1)]`;
+  const glassClasses = `backdrop-blur-xl bg-white dark:bg-[#0a0f16]/80 border border-gray-200 dark:border-white/10 shadow-sm dark:shadow-[0_14px_32px_rgba(0,0,0,0.28)]`;
 
   return (
     <motion.div
@@ -72,7 +72,7 @@ export default function ProgressCard({ title, percentage, trend, onClick, layout
           </svg>
           <div className="absolute inset-1.5 sm:inset-2 rounded-full backdrop-blur-md bg-white/10 dark:bg-black/20 border border-white/20 dark:border-white/10 flex items-center justify-center shadow-inner">
             <span className="text-[11px] sm:text-sm font-black tabular-nums text-gray-900 dark:text-white drop-shadow-md">
-              {percentage}%
+              {percentage === null ? '—' : `${percentage}%`}
             </span>
           </div>
         </div>

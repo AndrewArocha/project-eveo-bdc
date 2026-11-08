@@ -1,14 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
-  User, Camera, Mail, Smartphone, CheckCircle2, ChevronDown,
+  User, CheckCircle2,
   Calendar, DollarSign, AlertCircle, Car, FileText, Target,
   Clock, Coffee, Globe, ArrowRight, Edit2, RotateCcw, Lock, Radio
 } from 'lucide-react';
 
 import SaveButton from './SaveButton';
-import InputField from './InputField';
 import SmartCalendar from './SmartCalendar';
 import GlassActionOrb from '../UI/GlassActionOrb';
 
@@ -16,7 +15,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 
 import {
-  getStoreDataOrEmpty,
   CURRENT_USER,
   getVisibleStoreRoster,
   getOrSeedAgentCalendar,
@@ -30,113 +28,25 @@ import {
 // 1. PROFILE FORM (Clean, Uncluttered, Zero DevTools Warnings)
 // ==========================================
 export function ProfileForm() {
-  const { role } = useAuth();
-  const { getBanner, setBanner, activeStoreId, activeStoreDataKey, activeStore } = useStoreAppearance();
-
-  const isOwner = role === 'owner' || role === 'super_admin';
-  const isAdmin = role === 'manager' || isOwner;
-
-  const initialBanner = getBanner(activeStoreId) || getBanner(activeStoreDataKey) || getStoreDataOrEmpty(activeStoreId).bannerUrl || '';
-
-  const [storeBanner, setStoreBanner] = useState(initialBanner);
-  const [workPhone, setWorkPhone] = useState('Ext. 104');
-  const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    setStoreBanner(getBanner(activeStoreId) || getBanner(activeStoreDataKey) || getStoreDataOrEmpty(activeStoreId).bannerUrl || '');
-  }, [activeStoreId, activeStoreDataKey, getBanner]);
-
-  const bannerInputRef = useRef<HTMLInputElement>(null);
-
-  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setStoreBanner(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSaveProfile = () => {
-    setIsSaving(true);
-    setTimeout(() => {
-      if (isOwner) {
-        setBanner(activeStoreId, storeBanner);
-      }
-      setIsSaving(false);
-    }, 600);
-  };
+  const { user } = useAuth();
+  const { activeStore } = useStoreAppearance();
 
   return (
     <div className="relative z-10 flex flex-col gap-6">
-      {isOwner && (
-        <div className="bg-white/50 dark:bg-black/20 p-4 sm:p-5 rounded-3xl border border-gray-200 dark:border-white/10 shadow-xs">
-          <div className="flex justify-between items-center gap-2 mb-3">
-            <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">{activeStore.name} Hub Banner</h3>
-            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0">
-              Owner
-            </span>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {[
+          ['Full name', user?.name || '—'],
+          ['Email', user?.email || '—'],
+          ['Dealership', activeStore.name || '—'],
+          ['Primary dealership phone', activeStore.phone || 'Not provided'],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-2xl border border-gray-200 bg-white/60 p-4 dark:border-white/10 dark:bg-black/20">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{label}</p>
+            <p className="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-white">{value}</p>
           </div>
-
-          <div className="relative w-full h-32 sm:h-40 rounded-2xl overflow-hidden bg-gray-200 dark:bg-gray-800 group border border-gray-300 dark:border-white/10">
-            <img src={storeBanner} alt={`${activeStore.name} Banner Preview`} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-            <div className="absolute inset-0 bg-black/35 flex items-center justify-center">
-              <input
-                id="store-banner-upload"
-                name="store_banner_upload"
-                type="file"
-                ref={bannerInputRef}
-                onChange={handleBannerUpload}
-                accept="image/*"
-                aria-label="Upload store banner"
-                className="hidden"
-              />
-              <GlassActionOrb
-                icon={<Camera size={18} />}
-                tooltip="Upload New Store Banner"
-                tone="orange"
-                size="lg"
-                onClick={() => bannerInputRef.current?.click()}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Contact & Identity Fields */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-        <InputField label="Full Name" name="full_name" defaultValue="Andres Hernandez" />
-        <InputField label="Primary Email" name="primary_email" defaultValue="andres@dealership.com" type="email" />
-
-        <PhoneVerificationField />
-
-        <div className={`flex flex-col relative group ${!isAdmin ? 'opacity-75' : ''}`}>
-          <label
-            htmlFor="work-phone-ext"
-            className="flex justify-between text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 transition-colors focus-within:text-orange-500 cursor-pointer"
-          >
-            <span>Work Phone (Net2Phone)</span>
-            {isAdmin ? <span className="text-emerald-500">Admin</span> : <span className="text-orange-500">Locked</span>}
-          </label>
-          <div className="relative">
-            <input
-              id="work-phone-ext"
-              name="work_phone_ext"
-              type="text"
-              value={workPhone}
-              onChange={(e) => setWorkPhone(e.target.value)}
-              disabled={!isAdmin}
-              className="w-full bg-transparent border-b border-gray-300 dark:border-white/20 py-2.5 text-base sm:text-sm font-semibold text-gray-900 dark:text-white disabled:cursor-not-allowed outline-none focus:border-orange-500 transition-colors"
-            />
-          </div>
-        </div>
+        ))}
       </div>
-
-      <div className="pt-4 border-t border-gray-200/60 dark:border-white/10 flex justify-end">
-        <SaveButton label={isSaving ? 'Saving...' : 'Save Profile'} onClick={handleSaveProfile} />
-      </div>
+      <p className="text-xs text-gray-500 dark:text-gray-400">Profile edits are not connected to the account service yet.</p>
     </div>
   );
 }
@@ -145,6 +55,7 @@ export function ProfileForm() {
 // 2. SCHEDULE FORM (3D Glass Action Orbs + Hover/Tap Tooltips)
 // ==========================================
 export function ScheduleForm({ role }: { role: UserRole }) {
+  const { user } = useAuth();
   const { activeStoreId, activeStoreDataKey, activeStore } = useStoreAppearance();
 
   type DailyShift = { start: string; end: string };
@@ -175,26 +86,28 @@ export function ScheduleForm({ role }: { role: UserRole }) {
   const [expandShifts, setExpandShifts] = useState(false);
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
 
-  const [teamState, setTeamState] = useState<Array<GlobalUser | StoreStaff>>(() =>
-    getVisibleStoreRoster(activeStoreId)
-  );
+  const [teamState, setTeamState] = useState<Array<GlobalUser | StoreStaff>>(() => user ? [] : getVisibleStoreRoster(activeStoreId));
 
   useEffect(() => {
-    setTeamState(getVisibleStoreRoster(activeStoreId));
-  }, [activeStoreId]);
+    setTeamState(user ? [] : getVisibleStoreRoster(activeStoreId));
+  }, [activeStoreId, user]);
 
   const [calendarRecords, setCalendarRecords] = useState<Record<string, ShiftDayRecord>>(() =>
-    getOrSeedAgentCalendar(activeStoreDataKey, CURRENT_USER)
+    user ? {} : getOrSeedAgentCalendar(activeStoreDataKey, CURRENT_USER)
   );
 
   useEffect(() => {
+    if (user) {
+      setCalendarRecords({});
+      return;
+    }
     const refreshRecords = () => {
       setCalendarRecords(getOrSeedAgentCalendar(activeStoreDataKey, CURRENT_USER));
     };
     refreshRecords();
     window.addEventListener('eveo:calendar-updated', refreshRecords);
     return () => window.removeEventListener('eveo:calendar-updated', refreshRecords);
-  }, [activeStoreDataKey, showCalendar]);
+  }, [activeStoreDataKey, showCalendar, user]);
 
   const completedShiftsHistory = Object.values(calendarRecords)
     .filter((rec) => rec.status === 'worked' || rec.status === 'missed')
@@ -283,6 +196,15 @@ export function ScheduleForm({ role }: { role: UserRole }) {
       ))}
     </div>
   );
+
+  if (user) {
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white/60 p-5 dark:border-white/10 dark:bg-black/20">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Team scheduling</h3>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Shared schedules and attendance are not connected to live dealership records yet, so this page does not show sample shifts or staff.</p>
+      </div>
+    );
+  }
 
   // --- MANAGER & OWNER TEAM VIEW (Sleek Icon-First Glass Orbs!) ---
   if (isManager) {
@@ -647,9 +569,19 @@ export function ScheduleForm({ role }: { role: UserRole }) {
 // 3. PAYROLL FORM (Owner Only for Disbursements; BDC/Sales for Personal Commission Tracker)
 // ==========================================
 export function PayrollForm({ role }: { role: UserRole }) {
+  const { user } = useAuth();
   const isOwner = role === 'owner' || role === 'super_admin';
   const { activeStoreId, activeStore } = useStoreAppearance();
   const navigate = useNavigate();
+
+  if (user) {
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white/60 p-5 dark:border-white/10 dark:bg-black/20">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Payroll and commissions</h3>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Payroll is not connected to live dealership or payment records yet. No sample earnings or payout amounts are shown.</p>
+      </div>
+    );
+  }
 
   const formatCurrency = (amount: number, forceUSD = false) => {
     if (!forceUSD && role === 'bdc') {
@@ -860,96 +792,9 @@ export function PayrollForm({ role }: { role: UserRole }) {
 // ==========================================
 export function SecurityForm() {
   return (
-    <div className="relative z-10 flex flex-col gap-6">
-      <div>
-        <h3 className="text-base font-bold text-gray-900 dark:text-white mb-2">Change Password</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5 mt-3">
-          <InputField label="Current Password" name="current_password" type="password" />
-          <InputField label="New Password" name="new_password" type="password" />
-        </div>
-      </div>
-
-      <div className="pt-5 border-t border-gray-200 dark:border-white/10">
-        <h3 className="text-base font-bold text-gray-900 dark:text-white mb-3">Two-Factor Authentication (2FA)</h3>
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/50 dark:bg-black/20 border border-gray-200 dark:border-white/10 gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 shrink-0 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center"><Smartphone size={18} /></div>
-              <div className="min-w-0">
-                <p className="font-bold text-sm text-gray-900 dark:text-white truncate">Authenticator App</p>
-                <p className="text-xs text-gray-500 truncate">Google Authenticator / Authy</p>
-              </div>
-            </div>
-            <GlassActionOrb icon={<CheckCircle2 size={15} />} tooltip="2FA Active & Verified" tone="emerald" />
-          </div>
-
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/50 dark:bg-black/20 border border-gray-200 dark:border-white/10 gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 shrink-0 rounded-xl bg-white/5 text-gray-400 flex items-center justify-center">
-                <Mail size={18} />
-              </div>
-              <div className="min-w-0">
-                <p className="font-bold text-sm text-gray-900 dark:text-white truncate">Recovery Email</p>
-                <p className="text-xs text-gray-500 truncate">backup@personal.com</p>
-              </div>
-            </div>
-            <GlassActionOrb icon={<Edit2 size={14} />} tooltip="Update Recovery Email" tone="neutral" />
-          </div>
-        </div>
-      </div>
-
-      <div className="pt-4 flex justify-end"><SaveButton label="Update Security" /></div>
-    </div>
-  );
-}
-
-// ==========================================
-// 5. PHONE VERIFICATION FIELD (With Explicit IDs & Labels)
-// ==========================================
-function PhoneVerificationField() {
-  const [phone, setPhone] = useState("300 000 0000");
-  const [isVerified, setIsVerified] = useState(true);
-
-  return (
-    <div className="flex flex-col relative group min-w-0">
-      <label
-        htmlFor="personal-sms-phone"
-        className="flex justify-between text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 transition-colors group-focus-within:text-orange-500 cursor-pointer"
-      >
-        <span>Personal Phone (SMS)</span>
-        {!isVerified && <span className="text-red-500">Unverified</span>}
-      </label>
-      <div className="relative flex items-center bg-transparent border-b border-gray-300 dark:border-white/20 py-1.5 transition-colors focus-within:border-orange-500">
-        <div className="relative flex items-center text-gray-900 dark:text-white font-semibold pr-2 border-r border-gray-300 dark:border-white/20 mr-3 shrink-0">
-          <select
-            id="personal-phone-country"
-            name="personal_phone_country"
-            aria-label="Country code"
-            className="bg-transparent appearance-none outline-none cursor-pointer pl-1 pr-5 py-1 text-base sm:text-sm z-10"
-          >
-            <option value="+1" className="text-black">🇺🇸 +1</option>
-            <option value="+57" className="text-black">🇨🇴 +57</option>
-          </select>
-          <ChevronDown size={14} className="absolute right-0.5 pointer-events-none text-gray-400" />
-        </div>
-        <input
-          id="personal-sms-phone"
-          name="personal_sms_phone"
-          type="tel"
-          value={phone}
-          onChange={(e) => { setPhone(e.target.value); setIsVerified(false); }}
-          className="flex-1 bg-transparent py-1 text-base sm:text-sm font-semibold text-gray-900 dark:text-white outline-none w-full min-w-0"
-        />
-        <div className="shrink-0 ml-2">
-          {isVerified ? (
-            <GlassActionOrb icon={<CheckCircle2 size={14} />} tooltip="SMS Phone Verified" tone="emerald" size="sm" />
-          ) : (
-            <button type="button" onClick={() => setIsVerified(true)} className="text-xs font-bold text-orange-500 bg-orange-500/10 hover:bg-orange-500/20 px-3 py-1 rounded-lg cursor-pointer">
-              Verify
-            </button>
-          )}
-        </div>
-      </div>
+    <div className="rounded-2xl border border-gray-200 bg-white/60 p-5 dark:border-white/10 dark:bg-black/20">
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Account security</h3>
+      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Password changes, recovery email, and two-factor authentication are not connected to the account service yet.</p>
     </div>
   );
 }

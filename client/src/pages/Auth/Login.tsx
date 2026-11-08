@@ -45,7 +45,7 @@ export default function Login() {
             Sign in to your account
           </h2>
           <p className="mt-1.5 text-center text-sm text-gray-600 dark:text-gray-400">
-            Or <NavLink to="/register" className="font-semibold text-orange-500 hover:text-orange-400 transition-colors">start your 14-day free trial</NavLink>
+            New to EVEO? <NavLink to="/register" className="font-semibold text-orange-500 hover:text-orange-400 transition-colors">request dealership access</NavLink>
           </p>
         </div>
 

@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
@@ -10,13 +11,69 @@
     padding: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-family: "Manrope", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+    background-color: #f4f5f7;
+    color: #111827;
+    color-scheme: light;
+  }
+
+  html.dark, html.dark body, html.dark #root {
     background-color: #05080c !important;
+    color: #f9fafb;
     color-scheme: dark;
+  }
+
+  html.light, html.light body, html.light #root {
+    background-color: #f4f5f7 !important;
+    color: #111827;
+    color-scheme: light;
   }
 
   body {
     overflow-x: hidden;
   }
+}
+
+/* A number of older dashboard panels used fixed dark surfaces. Re-skin those
+   surfaces in light mode as a group so their white labels do not disappear. */
+html.light [class*="bg-[#05080c]"],
+html.light [class*="bg-[#0a0f16]"],
+html.light [class*="bg-[#080d13]"],
+html.light [class*="bg-[#0d141c]"],
+html.light [class*="bg-[#0d121a]"],
+html.light [class*="bg-[#101820]"],
+html.light [class*="bg-[#111821]"] {
+  background-color: #ffffff !important;
+  border-color: #e5e7eb !important;
+  color: #111827 !important;
+}
+
+html.light :is([class*="bg-[#05080c]"], [class*="bg-[#0a0f16]"], [class*="bg-[#080d13]"], [class*="bg-[#0d141c]"], [class*="bg-[#0d121a]"], [class*="bg-[#101820]"], [class*="bg-[#111821]"]) :not(button):not(button *):is([class*="text-white"], [class*="text-gray-100"], [class*="text-gray-200"], [class*="text-gray-300"], [class*="text-gray-400"]) {
+  color: #1f2937 !important;
+}
+
+html.light [class*="bg-[#05080c]"] [class*="border-white/"],
+html.light [class*="bg-[#0a0f16]"] [class*="border-white/"],
+html.light [class*="bg-[#080d13]"] [class*="border-white/"],
+html.light [class*="bg-[#0d141c]"] [class*="border-white/"],
+html.light [class*="bg-[#0d121a]"] [class*="border-white/"],
+html.light [class*="bg-[#101820]"] [class*="border-white/"],
+html.light [class*="bg-[#111821]"] [class*="border-white/"] {
+  border-color: #e5e7eb !important;
+}
+
+html.light input[class*="bg-black"],
+html.light select[class*="bg-black"],
+html.light textarea[class*="bg-black"] {
+  background-color: #ffffff !important;
+  border-color: #d1d5db !important;
+  color: #111827 !important;
+  color-scheme: light;
+}
+
+html.light input[class*="bg-black"]::placeholder,
+html.light textarea[class*="bg-black"]::placeholder {
+  color: #6b7280 !important;
 }
 
 /* 

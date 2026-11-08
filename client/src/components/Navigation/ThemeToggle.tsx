@@ -15,6 +15,7 @@ export default function ThemeToggle() {
         ${isDark ? 'bg-white/10' : 'bg-gray-300'}
       `}
       aria-label="Toggle Dark Mode"
+      title={isDark ? 'Switch to light appearance' : 'Switch to dark appearance'}
     >
       <motion.div
         className={`

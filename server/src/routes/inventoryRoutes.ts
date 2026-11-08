@@ -5,6 +5,7 @@ import {
   listOwnInventory,
   observeOwnInventoryVehicle,
   resolveOwnInventoryDiscrepancy,
+  syncOwnWebsiteInventory,
   updateOwnInventoryVehicle,
 } from '../controllers/inventoryController.js';
 import { createOwnInventoryImport, listOwnInventoryImports } from '../controllers/inventoryImportController.js';
@@ -16,6 +17,7 @@ import {
   createInventoryVehicleSchema,
   recordInventoryObservationSchema,
   resolveInventoryDiscrepancySchema,
+  syncWebsiteInventorySchema,
   updateInventoryVehicleSchema,
 } from '../validators/inventory.js';
 import { inventoryCsvImportSchema } from '../validators/integration.js';
@@ -23,6 +25,7 @@ import { inventoryCsvImportSchema } from '../validators/integration.js';
 export const inventoryRoutes = Router();
 inventoryRoutes.use(authenticate);
 inventoryRoutes.get('/', requireStoreAccess(), listOwnInventory);
+inventoryRoutes.post('/sync/website', requireStoreAccess(), validateBody(syncWebsiteInventorySchema), syncOwnWebsiteInventory);
 inventoryRoutes.get('/imports', requireStoreAccess(), listOwnInventoryImports);
 inventoryRoutes.post('/imports/csv', requireStoreAccess(), validateBody(inventoryCsvImportSchema), createOwnInventoryImport);
 inventoryRoutes.post('/', requireStoreAccess(), validateBody(createInventoryVehicleSchema), createOwnInventoryVehicle);

@@ -10,7 +10,6 @@ import {
 import { CURRENT_USER, getStoreDataOrEmpty, getVisibleStoreRoster } from '../../data/mockDatabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
-import defaultBanner from '../../images/defaultBanner.avif';
 import type {
   AppendShowroomEventInput,
   ShowroomEvent,
@@ -23,6 +22,7 @@ import HubModals from '../../components/UI/HubModals';
 import SwipeableModal from '../../components/UI/SwipeableModal';
 import GlobalLoader from '../../components/UI/GlobalLoader';
 import ShowroomVehicleDetails from '../../components/showroom/ShowroomVehicleDetails';
+import VehicleVinLookupField from '../../components/showroom/VehicleVinLookupField';
 import LiveShowroomDeck, { type FloorAppointmentBubble } from '../../components/showroom/LiveShowroomDeck';
 import LiveActivityDeck from '../../components/showroom/LiveActivityDeck';
 import { showroomRepository } from '../../services/showroom';
@@ -102,7 +102,7 @@ type StoreAppointment = Appointment & { appointmentId?: string; customerId?: str
 
 export default function LiveShowroom() {
   const { role, user } = useAuth();
-  const { activeStore, activeStoreId, activeStoreDomainId, getBanner, cycleNextStore, stores, setActiveStoreId } = useStoreAppearance();
+  const { activeStore, activeStoreId, activeStoreDomainId, cycleNextStore, stores, setActiveStoreId } = useStoreAppearance();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const requestedStoreId = searchParams.get('storeId');
@@ -110,8 +110,6 @@ export default function LiveShowroom() {
     store.id === requestedStoreId || store.domainId === requestedStoreId || store.legacyDataKey === requestedStoreId,
   );
   const storeId = requestedStore?.domainId || activeStoreDomainId;
-  const activeStoreIdx = Math.max(0, stores.findIndex((store) => store.id === storeId));
-  const displayBanner = getBanner(storeId) || activeStore.bannerUrl || (storeId === 'njx' ? defaultBanner : '');
 
   useEffect(() => {
     if (requestedStore && requestedStore.id !== activeStoreId) setActiveStoreId(requestedStore.id);
@@ -153,7 +151,7 @@ export default function LiveShowroom() {
     return staff.filter((person) => person.role === 'sales' || person.role === 'manager');
   }, [storeId, storeTeamMembers, user]);
 
-  const roster = useMemo(() => getVisibleStoreRoster(storeId), [storeId]);
+  const roster = useMemo(() => user ? [] : getVisibleStoreRoster(storeId), [storeId, user]);
 
   // --- STATE ---
   const [snapshots, setSnapshots] = useState<ShowroomVisitSnapshot[]>([]);
@@ -181,6 +179,7 @@ export default function LiveShowroom() {
 
   // Live Activity Feed State
   const [feedPosts, setFeedPosts] = useState<LiveFeedPost[]>(() => user ? [] : listLiveFeed(storeId));
+  const [storePipelineCustomers, setStorePipelineCustomers] = useState<string[]>([]);
   const [onlineCursorIdx, setOnlineCursorIdx] = useState(0);
 
   // Smart Actionable "Log Live Activity" Modal State
@@ -206,9 +205,9 @@ export default function LiveShowroom() {
     if (user) {
       const created = await apiLiveActivityRepository.create({
         storeId,
-        category: 'account',
-        title: 'Staff note added',
-        description: `${input.title}${input.detail ? ` — ${input.detail}` : ''}`,
+        category: input.category,
+        title: input.title,
+        description: input.detail || '',
       });
       setFeedPosts((current) => [created, ...current.filter((post) => post.id !== created.id)]);
       return;
@@ -249,7 +248,8 @@ export default function LiveShowroom() {
         setStoreAppts(records.filter((item) => item.scheduledAt && new Date(item.scheduledAt).toDateString() === today.toDateString() && item.status !== 'cancelled')
           .map((item) => ({
             id: item._id, time: new Date(item.scheduledAt!).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-            customer: item.customerNameSnapshot, vehicle: item.vehicleSnapshot || 'Vehicle not specified', rep: user.name,
+            customer: item.customerNameSnapshot, vehicle: item.vehicleSnapshot || 'Vehicle not specified',
+            rep: storeTeamMembers.find((member) => member.id === item.assignedStoreUserId || member.id === item.assignedPlatformUserId)?.name || 'Unassigned',
             status: item.status === 'arrived' || item.status === 'showed' ? 'ARRIVED' : item.status === 'no_show' ? 'NO SHOW' : 'CONFIRMED',
             appointmentId: item._id, customerId: item.customerId || undefined, leadId: item.leadId || undefined, customerPhone: item.phoneSnapshot,
           })));
@@ -265,7 +265,7 @@ export default function LiveShowroom() {
       window.removeEventListener('appointmentsUpdated', syncAppts);
       if (timer !== undefined) window.clearInterval(timer);
     };
-  }, [storeId, user]);
+  }, [storeId, storeTeamMembers, user]);
 
   useEffect(() => {
     const syncFeed = () => { void refreshActivity(); };
@@ -343,14 +343,14 @@ export default function LiveShowroom() {
         time: formatTime(latest.updatedAt),
       };
     }
-    const storeSold = getStoreDataOrEmpty(storeId).sold[0];
+    const storeSold = user ? undefined : getStoreDataOrEmpty(storeId).sold[0];
     return {
       customerName: storeSold?.name || '',
       vehicle: storeSold?.vehicle || '',
       rep: storeSold?.rep || salespeople[0]?.name || '',
       time: '',
     };
-  }, [completedSnapshots, storeId, salespeople]);
+  }, [completedSnapshots, storeId, salespeople, user]);
 
   const ongoingAppointmentBubbles = useMemo<FloorAppointmentBubble[]>(() => {
     const bubbles: FloorAppointmentBubble[] = [];
@@ -406,6 +406,18 @@ export default function LiveShowroom() {
   }, [activeSnapshots, storeAppts, completedSnapshots, strikesLog]);
 
   const onlineUsersList = useMemo(() => {
+    if (user) {
+      const recentByActor = new Map<string, LiveFeedPost>();
+      [...feedPosts].sort((a, b) => b.timestamp - a.timestamp).forEach((post) => {
+        if (!recentByActor.has(post.agentName)) recentByActor.set(post.agentName, post);
+      });
+      return Array.from(recentByActor.values()).map((post) => ({
+        name: post.agentName,
+        initials: getInitials(post.agentName),
+        avatarUrl: null,
+        statusText: post.title,
+      }));
+    }
     return roster.map((member, idx) => {
       const initials = ('initials' in member && member.initials) ? member.initials : getInitials(member.name);
       const latestPost = feedPosts.find((p) => p.agentName === member.name);
@@ -423,18 +435,32 @@ export default function LiveShowroom() {
         statusText,
       };
     });
-  }, [roster, feedPosts]);
+  }, [feedPosts, roster, user]);
 
   const selectedOnlineUser = onlineUsersList[onlineCursorIdx % Math.max(1, onlineUsersList.length)] || null;
 
-  const storePipelineCustomers = useMemo(() => {
-    const s = getStoreDataOrEmpty(storeId);
-    const names = new Set<string>();
-    s.handoffs?.forEach((h) => names.add(h.name));
-    s.leads?.forEach((l) => names.add(l.name));
-    s.appointments?.forEach((a) => names.add(a.name || a.customer || ''));
-    return Array.from(names).filter(Boolean).slice(0, 6);
-  }, [storeId]);
+  useEffect(() => {
+    if (!user) {
+      const demoStore = getStoreDataOrEmpty(storeId);
+      const names = new Set<string>();
+      demoStore.handoffs?.forEach((handoff) => names.add(handoff.name));
+      demoStore.leads?.forEach((lead) => names.add(lead.name));
+      demoStore.appointments?.forEach((appointment) => names.add(appointment.name || appointment.customer || ''));
+      setStorePipelineCustomers(Array.from(names).filter(Boolean).slice(0, 6));
+      return;
+    }
+    let active = true;
+    Promise.all([apiOperationalRepository.listLeads(storeId), apiOperationalRepository.listAppointments(storeId)])
+      .then(([leads, appointments]) => {
+        if (!active) return;
+        const names = new Set<string>();
+        leads.forEach((lead) => names.add(lead.customerNameSnapshot));
+        appointments.forEach((appointment) => names.add(appointment.customerNameSnapshot));
+        setStorePipelineCustomers(Array.from(names).filter(Boolean).slice(0, 6));
+      })
+      .catch(() => { if (active) setStorePipelineCustomers([]); });
+    return () => { active = false; };
+  }, [storeId, user]);
 
   const handleStoreBannerClick = () => {
     if (role === 'bdc' || role === 'bdc_manager' || role === 'owner') {
@@ -697,80 +723,27 @@ export default function LiveShowroom() {
         )}
       </AnimatePresence>
 
-      {/* --- RECYCLED STORE BANNER CARD: ((•)) Live {activeStore.name} --- */}
-      <section
-        onClick={handleStoreBannerClick}
-        className={`relative w-full h-44 sm:h-52 mb-5 rounded-b-3xl md:rounded-4xl overflow-hidden group md:mt-6 md:mx-8 md:w-[calc(100%-4rem)] max-w-6xl xl:mx-auto shadow-2xl ${role === 'bdc' || role === 'bdc_manager' || role === 'owner'
-            ? 'cursor-pointer active:scale-[0.99] transition-transform'
-            : ''
-          }`}
-      >
-        <img
-          src={displayBanner}
-          alt={`${activeStore.name} Live Banner`}
-          className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-1000 group-hover:scale-105"
-        />
-        <div className="absolute inset-0 bg-linear-to-b from-black/45 via-transparent to-transparent" />
-        <div className="absolute inset-0 bg-linear-to-t from-[#05080c]/95 via-[#05080c]/70 to-transparent" />
-
-        {activeView !== 'portal' && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (activeView === 'visit') switchView('showroom');
-              else switchView('portal');
-            }}
-            className="absolute top-4 left-4 z-30 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-black/60 hover:bg-black/80 border border-white/20 backdrop-blur-xl text-xs font-bold text-white active:scale-95 transition-all cursor-pointer"
-          >
-            <ArrowLeft size={13} /> {activeView === 'visit' ? 'Back to Showroom' : 'Live Selector'}
-          </button>
-        )}
-
-        <div className="relative z-10 h-full flex flex-col justify-end p-5 pb-6 sm:p-6">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white drop-shadow-lg flex items-center gap-2.5">
-                <Radio className="text-orange-500 animate-pulse shrink-0" size={26} />
-                <span>Live {activeStore.name}</span>
-              </h1>
-              <p className="text-gray-300 text-xs sm:text-sm font-medium mt-0.5 drop-shadow-xs">
-                {activeView === 'portal'
-                  ? 'Select a live operational workspace below'
-                  : activeView === 'showroom'
-                    ? 'Active Showroom Floor & SLA Appointment Radar'
-                    : activeView === 'activity'
-                      ? 'Real-Time Team & EVEO AI Telemetry Deck'
-                      : `Active Customer Visit • ${selectedSnapshot?.visit.customerName || ''}`}
-              </p>
-            </div>
-
-            <div className="hidden sm:flex items-center p-1.5 pr-3.5 gap-2.5 rounded-full backdrop-blur-xl bg-white/10 dark:bg-black/40 border border-white/20 text-white text-xs font-bold shrink-0">
-              <span className="bg-white text-black px-2.5 py-1 rounded-full text-[10px] font-black">
-                {activeStore.logoText}
-              </span>
-              <span>{activeStore.name}</span>
-              {(role === 'bdc' || role === 'bdc_manager' || role === 'owner') && (
-                <ChevronRight size={14} className="text-white/60" />
-              )}
-            </div>
-          </div>
+      <header className="mx-auto mb-5 mt-4 flex w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 md:mt-6 md:px-8">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-orange-500">Live workspace</p>
+          <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight text-gray-950 dark:text-white sm:text-3xl">{activeStore.name}</h1>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {activeView === 'portal' ? 'Choose a live operational workspace.' : activeView === 'showroom' ? 'Showroom floor and appointment activity.' : activeView === 'activity' ? 'Recent team activity.' : `Customer visit · ${selectedSnapshot?.visit.customerName || ''}`}
+          </p>
         </div>
-
-        {(role === 'bdc' || role === 'bdc_manager' || role === 'owner') && (
-          <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
-            {stores.map((_, idx) => (
-              <div
-                key={idx}
-                className={`h-1.5 rounded-full transition-all duration-500 ${idx === activeStoreIdx
-                    ? 'w-6 bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]'
-                    : 'w-2 bg-white/30'
-                  }`}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+        <div className="flex shrink-0 items-center gap-2">
+          {activeView !== 'portal' && (
+            <button type="button" onClick={() => activeView === 'visit' ? switchView('showroom') : switchView('portal')} className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10">
+              <ArrowLeft size={13} /> {activeView === 'visit' ? 'Back' : 'Selector'}
+            </button>
+          )}
+          {(role === 'bdc' || role === 'bdc_manager' || role === 'owner') && stores.length > 1 && (
+            <button type="button" onClick={handleStoreBannerClick} className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10">
+              Switch store <ChevronRight size={14} />
+            </button>
+          )}
+        </div>
+      </header>
 
       <div className="px-4 sm:px-6 md:px-10 max-w-6xl mx-auto">
 
@@ -781,7 +754,7 @@ export default function LiveShowroom() {
               <div className="flex items-center gap-3 pl-2">
                 <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-400">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.9)]" />
-                  {onlineUsersList.length} Online Now
+                  {user ? `${onlineUsersList.length} Recent Contributors` : `${onlineUsersList.length} Online Now`}
                 </span>
 
                 <div className="flex items-center -space-x-1.5 pr-1">
@@ -1044,7 +1017,9 @@ export default function LiveShowroom() {
                     <span className="text-[10px] font-mono text-emerald-400">{composerVehicleDraft.vin}</span>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                {user ? (
+                  <VehicleVinLookupField purpose="vehicle_of_interest" value={composerVehicleDraft} onChange={setComposerVehicleDraft} />
+                ) : <div className="flex flex-wrap gap-1.5">
                   {DEMO_SCAN_VINS.map((v) => (
                     <button
                       type="button"
@@ -1066,7 +1041,7 @@ export default function LiveShowroom() {
                       {v.label}
                     </button>
                   ))}
-                </div>
+                </div>}
               </div>
             )}
 
@@ -1244,7 +1219,9 @@ export default function LiveShowroom() {
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {user ? (
+                <p className="text-xs text-gray-500">Use “Enter Custom VIN or Trade-In” below to scan or enter a vehicle from your dealership.</p>
+              ) : <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {DEMO_SCAN_VINS.map((v) => {
                   const isMatched = vehicles.vehicleOfInterest?.vin === v.vin;
                   return (
@@ -1274,7 +1251,7 @@ export default function LiveShowroom() {
                     </button>
                   );
                 })}
-              </div>
+              </div>}
 
               {/* Large, Easy-to-Press Custom VIN / Trade-In Expander Button! */}
               <details className="mt-3 group">
@@ -1315,7 +1292,9 @@ export default function LiveShowroom() {
             </button>
           </div>
           <div className="space-y-2">
-            {DEMO_SCAN_VINS.map((v) => (
+            {user ? (
+              <VehicleVinLookupField purpose="vehicle_of_interest" value={composerVehicleDraft} onChange={setComposerVehicleDraft} />
+            ) : DEMO_SCAN_VINS.map((v) => (
               <button
                 type="button"
                 key={v.vin}

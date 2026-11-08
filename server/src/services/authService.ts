@@ -1,94 +1,33 @@
 import bcrypt from 'bcryptjs';
 import { createHash } from 'crypto';
 import jwt, { type SignOptions } from 'jsonwebtoken';
-import mongoose, { Types } from 'mongoose';
+import mongoose from 'mongoose';
 import { env } from '../config/env.js';
-import { DealerAccount } from '../models/DealerAccount.js';
-import { Store } from '../models/Store.js';
 import { User, type UserDocument } from '../models/User.js';
 import { UserInvitation } from '../models/UserInvitation.js';
+import { SignupApplication } from '../models/SignupApplication.js';
 import { API_MESSAGES } from '../constants/api.js';
 import { AppError } from '../utils/AppError.js';
 import { toSafeUser } from '../utils/safeUser.js';
 
 const PASSWORD_SALT_ROUNDS = 12;
 
-export async function signUp(input: {
-  name: string;
-  email: string;
-  password: string;
-  dealershipName: string;
-  storeName: string;
-  website?: string;
-  address?: string;
-  phone?: string;
-  timezone: string;
-  multiStore: boolean;
-}) {
-  if (!env.jwtSecret || env.jwtSecret.length < 32) {
-    throw new AppError(503, 'Set a JWT_SECRET of at least 32 characters before enabling account creation.', 'AUTH_NOT_CONFIGURED');
+export async function submitSignupApplication(input: { name: string; businessName: string; phone: string; email: string }) {
+  if (await User.exists({ email: input.email })) {
+    throw new AppError(409, 'An account already uses this email address. Please sign in or contact EVEO support.', 'EMAIL_IN_USE');
   }
-
-  const existingUser = await User.exists({ email: input.email });
-  if (existingUser) throw new AppError(409, 'An account already uses this email address.', 'EMAIL_IN_USE');
-
-  const userId = new Types.ObjectId();
-  const dealerAccountId = new Types.ObjectId();
-  let accountCreated = false;
-  let userCreated = false;
-  let signupStage = 'create_owner';
-
-  try {
-    const passwordHash = await bcrypt.hash(input.password, PASSWORD_SALT_ROUNDS);
-    const user = await User.create({
-      _id: userId,
-      name: input.name,
-      email: input.email,
-      passwordHash,
-      role: 'owner',
-      dealerAccountId,
-    });
-    userCreated = true;
-
-    signupStage = 'create_dealer_account';
-    const account = await DealerAccount.create({
-      _id: dealerAccountId,
-      businessName: input.dealershipName,
-      ownerId: userId,
-      status: 'pending',
-      multiStore: input.multiStore,
-    });
-    accountCreated = true;
-
-    const storeCode = input.storeName.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12) || 'STORE';
-    signupStage = 'create_initial_store';
-    await Store.create({
-      dealerAccountId: account.id,
-      name: input.storeName,
-      code: storeCode,
-      website: input.website ?? '',
-      address: input.address ?? '',
-      phone: input.phone ?? '',
-      timezone: input.timezone,
-    });
-
-    signupStage = 'issue_session';
-    return issueSession(user);
-  } catch (error) {
-    const cleanup = await Promise.allSettled([
-      ...(accountCreated ? [DealerAccount.deleteOne({ _id: dealerAccountId })] : []),
-      ...(userCreated ? [User.deleteOne({ _id: userId })] : []),
-    ]);
-    const cleanupFailed = cleanup.some((result) => result.status === 'rejected');
-    const errorRecord = typeof error === 'object' && error !== null ? error as { name?: unknown; code?: unknown } : {};
-    console.error('Signup provisioning failed.', {
-      stage: signupStage,
-      errorName: typeof errorRecord.name === 'string' ? errorRecord.name : 'UnknownError',
-      errorCode: typeof errorRecord.code === 'string' || typeof errorRecord.code === 'number' ? errorRecord.code : undefined,
-      cleanupFailed,
-    });
-    throw error;
+  const existing = await SignupApplication.findOne({ email: input.email });
+  if (existing && existing.status !== 'closed' && existing.status !== 'converted') {
+    existing.name = input.name;
+    existing.businessName = input.businessName;
+    existing.phone = input.phone;
+    existing.status = 'submitted';
+    existing.submittedAt = new Date();
+    await existing.save();
+    return { status: existing.status, submittedAt: existing.submittedAt };
   }
+  const application = await SignupApplication.create(input);
+  return { status: application.status, submittedAt: application.submittedAt };
 }
 
 export async function signIn(email: string, password: string) {

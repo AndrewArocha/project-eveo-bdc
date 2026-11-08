@@ -9,6 +9,7 @@ import {
 } from '../repositories/inventoryRepository.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { syncWebsiteInventory } from '../services/websiteInventorySync.js';
 
 function routeId(request: Request, key: string): string {
   const value = request.params[key];
@@ -26,6 +27,11 @@ export const listOwnInventory: RequestHandler = asyncHandler(async (request, res
   const search = typeof request.query.search === 'string' ? request.query.search : undefined;
   const vehicles = await listInventoryVehicles(request.auth!.dealerAccountId, { storeId, status, search });
   response.json({ data: vehicles });
+});
+
+export const syncOwnWebsiteInventory: RequestHandler = asyncHandler(async (request, response) => {
+  const result = await syncWebsiteInventory(request.body.storeId, request.auth!.dealerAccountId, request.auth!.userId);
+  response.json({ data: result });
 });
 
 export const createOwnInventoryVehicle: RequestHandler = asyncHandler(async (request, response) => {

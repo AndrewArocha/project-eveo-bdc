@@ -9,9 +9,9 @@ export type {
 } from './types';
 
 /**
- * Single frontend dependency for the Insights experience.
- * Swap this adapter for an authenticated HTTP implementation when the server
- * agent orchestrator is ready; the page and hook should not need to change.
+ * Single frontend dependency for Insights. Requests are authenticated and run
+ * against the server, which returns live dealership evidence and deterministic
+ * recommendations even when optional AI wording is unavailable.
  */
 export const eveoAgent: EveoAgentService = {
   async respond(request) {

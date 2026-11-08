@@ -27,8 +27,8 @@ export default function DashboardCard({
   onClick,
   layoutId
 }: DashboardCardProps) {
-  const baseClasses = borderGlow || 'bg-white/5 dark:bg-[#0a0f16]/40 border-white/20 dark:border-white/10';
-  const glassClasses = `backdrop-blur-2xl border shadow-[0_15px_30px_rgba(0,0,0,0.1),inset_0_1px_8px_rgba(255,255,255,0.2)] dark:shadow-[0_15px_30px_rgba(0,0,0,0.3),inset_0_1px_8px_rgba(255,255,255,0.1)]`;
+  const baseClasses = borderGlow || 'bg-white dark:bg-[#0a0f16]/80 border-gray-200 dark:border-white/10';
+  const glassClasses = `backdrop-blur-xl border shadow-sm dark:shadow-[0_14px_32px_rgba(0,0,0,0.28)]`;
   const isInteractive = layoutId !== 'none';
   const cursorStyle = isInteractive
     ? 'cursor-pointer active:scale-[0.98] hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-orange-500 group'

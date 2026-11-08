@@ -55,7 +55,6 @@ export const apiShowroomRepository: ShowroomRepository = {
     return mapVisit(record);
   },
   async appendEvent(storeId, visitId, input: AppendShowroomEventInput) {
-    if (input.media) throw new ApiError('Secure showroom photo storage is not configured for this deployment yet.', 501);
     const record = await apiRequest<ApiVisit>(`/showroom/${encodeURIComponent(visitId)}/events?${storeQuery(storeId)}`, {
       method: 'POST', body: JSON.stringify({ type: input.type, message: input.message, media: input.media }),
     });

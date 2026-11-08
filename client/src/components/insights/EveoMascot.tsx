@@ -18,7 +18,7 @@ export interface EveoMascotProps {
   allowSleep?: boolean;
   /** Changing this key triggers a single '!' alert flash before settling into `mood` */
   flashAlertKey?: string | number;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   bubblePosition?: 'top' | 'bottom' | 'left' | 'right' | string;
   speechTitle?: string;
   speechBody?: string;
@@ -177,7 +177,9 @@ export default function EveoMascot({
       ? 'w-20 h-20 sm:w-24 sm:h-24'
       : size === 'md'
         ? 'w-32 h-32 sm:w-36 sm:h-36'
-        : 'w-40 h-40 sm:w-48 sm:h-48';
+        : size === 'xl'
+          ? 'w-56 h-56 sm:w-72 sm:h-72'
+          : 'w-40 h-40 sm:w-48 sm:h-48';
 
   const hasSpeechBubble = Boolean(
     speechTitle || speechBody || (bulletActions && bulletActions.length > 0)

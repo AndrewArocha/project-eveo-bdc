@@ -42,7 +42,7 @@ import {
   type ArchivedReportRecord,
 } from '../../components/reports/OrbModals';
 import SwipeableModal from '../../components/UI/SwipeableModal';
-import StoreKpiPanel from '../../components/reports/StoreKpiPanel';
+import LiveReports from './LiveReports';
 
 import { CURRENT_USER, getVisibleStoreRoster, type Store } from '../../data/mockDatabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -143,8 +143,13 @@ const REPORT_META: Record<ReportId, ReportStaticMeta> = {
 };
 
 export default function Reports() {
+  const { user } = useAuth();
+  return user ? <LiveReports /> : <DemoReports />;
+}
+
+function DemoReports() {
   const { role } = useAuth();
-  const { activeStoreId, setActiveStoreId, getBanner, stores } = useStoreAppearance();
+  const { activeStoreId, setActiveStoreId, stores } = useStoreAppearance();
   const [searchParams, setSearchParams] = useSearchParams();
   const [viewState, setViewState] = useState<ViewState>('store-selection');
   const [telemetryTick, setTelemetryTick] = useState(0);
@@ -171,12 +176,6 @@ export default function Reports() {
   const [selectedStoreIdx, setSelectedStoreIdx] = useState<number>(-1);
   const [didDrag, setDidDrag] = useState(false);
   const [openedStore, setOpenedStore] = useState<Store | null>(null);
-
-  const highlightedStore =
-    openedStore || (selectedStoreIdx !== -1 ? visibleStores[selectedStoreIdx] : null);
-  const activeBgBanner = highlightedStore
-    ? getBanner(highlightedStore.id) || highlightedStore.bannerUrl || ''
-    : null;
 
   const [rotationIndex, setRotationIndex] = useState(0);
   const [isNextApptOpen, setIsNextApptOpen] = useState(false);
@@ -498,28 +497,6 @@ export default function Reports() {
           </motion.div>
         )}
 
-        {/* Store Banner Background */}
-        <AnimatePresence>
-          {activeBgBanner && (
-            <motion.div
-              key={`reports-bg-${highlightedStore?.id}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.5 }}
-              className="absolute inset-0 pointer-events-none z-0 overflow-hidden"
-            >
-              <img
-                src={activeBgBanner}
-                alt={highlightedStore?.name || 'Store Background'}
-                className="w-full h-full object-cover blur-md opacity-30 scale-105"
-              />
-              <div className="absolute inset-0 bg-black/60" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_35%,rgba(5,8,12,0.94)_100%)]" />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* PHASE 2: REPORT VIEW */}
         {viewState === 'dashboard' && openedStore && (
           <motion.div
@@ -530,7 +507,6 @@ export default function Reports() {
             transition={{ duration: 0.25 }}
             className="relative flex-1 h-full w-full overflow-hidden text-white"
           >
-            <StoreKpiPanel key={openedStore.id} storeId={openedStore.id} role={roleStr} />
             <button
               type="button"
               onClick={handleCloseDashboard}

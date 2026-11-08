@@ -4,6 +4,8 @@ import type { StoreRecord } from '../types/domain';
 import { useAuth } from './AuthContext';
 import { ApiError, apiRequest, type ApiStore } from '../services/apiClient';
 import { eveoDomainRepository } from '../services/repositories';
+import defaultBanner from '../images/defaultBanner.avif';
+import eveoSymbol from '../images/logo/eveo-symbol.svg';
 
 interface StoreAppearanceContextType {
   banners: Record<string, string>;
@@ -23,7 +25,7 @@ interface StoreAppearanceContextType {
 }
 
 const EMPTY_STORE: Store = {
-  id: '', name: '', logoText: '', logoUrl: '', bannerUrl: '', themeGradient: '',
+  id: '', name: '', logoText: '', logoUrl: eveoSymbol, bannerUrl: defaultBanner, themeGradient: '',
 };
 
 function toAppearanceStore(store: ApiStore): Store {
@@ -35,8 +37,8 @@ function toAppearanceStore(store: ApiStore): Store {
     websiteUrl: store.website,
     phone: store.phone,
     logoText: store.code,
-    logoUrl: '',
-    bannerUrl: '',
+    logoUrl: eveoSymbol,
+    bannerUrl: defaultBanner,
     themeGradient: '',
   };
 }
@@ -53,8 +55,8 @@ function toDemoAppearanceStore(store: StoreRecord): Store {
     websiteUrl: store.websiteUrl,
     phone: store.phone,
     logoText: store.storeCode,
-    logoUrl: store.logoUrl ?? '',
-    bannerUrl: store.bannerUrl ?? '',
+    logoUrl: store.logoUrl || eveoSymbol,
+    bannerUrl: store.bannerUrl || defaultBanner,
     themeGradient: '',
   };
 }

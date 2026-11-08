@@ -36,7 +36,7 @@ export default function Pricing() {
             Scale your floor. <br /> Without the overhead.
           </motion.h1>
           <motion.p variants={fadeUp} className="text-sm sm:text-lg text-gray-400 font-medium px-2">
-            Choose the plan that fits your dealership&apos;s volume. All plans include a 14-day free trial. Cancel or upgrade at any time.
+            Choose the plan that fits your dealership&apos;s volume. Membership begins after secure billing setup and activation.
           </motion.p>
         </motion.div>
 
@@ -87,7 +87,7 @@ export default function Pricing() {
               onClick={() => navigate('/register')}
               className="w-full min-h-11 py-3 rounded-xl bg-white/10 hover:bg-white/15 active:scale-[0.98] text-white text-xs sm:text-sm font-bold transition-all border border-white/10 outline-none cursor-pointer"
             >
-              Start 14-Day Free Trial
+              Request Access
             </button>
           </motion.div>
 
@@ -135,7 +135,7 @@ export default function Pricing() {
               onClick={() => navigate('/register')}
               className="w-full min-h-11 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white text-xs sm:text-sm font-bold transition-all shadow-md shadow-orange-500/20 outline-none cursor-pointer"
             >
-              Start 14-Day Free Trial
+              Request Access
             </button>
           </motion.div>
 
@@ -163,7 +163,7 @@ export default function Pricing() {
               </div>
               <h4 className="text-base sm:text-lg font-bold text-white mb-2">How does billing work?</h4>
               <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">
-                Your 14-day trial is completely free. We securely process payments via Stripe or PayPal. If you cancel before the trial ends, you will not be charged.
+                A dealership application does not create an account or start a trial. Membership and any trial terms are confirmed during secure billing setup before access is activated.
               </p>
             </div>
 

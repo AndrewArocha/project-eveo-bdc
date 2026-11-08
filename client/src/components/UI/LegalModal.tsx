@@ -42,7 +42,7 @@ export default function LegalModal({ isOpen, onClose, type }: LegalModalProps) {
 
               <div className="space-y-2">
                 <h3 className="text-white font-bold text-base">2. Subscription Tiers, Billing, and No-Refund Policy</h3>
-                <p>EVEO operates on a recurring subscription model across two primary tiers: Software Only ($499/mo) and Full Service + AI ($1,899/mo). All initial signups include a 14-day evaluation period. Upon expiration of the trial, your designated payment method (Stripe or approved gateway) will be billed automatically. <strong>All subscription fees, setup fees, and retainer payments are strictly non-refundable.</strong> You agree not to initiate fraudulent chargebacks through your financial institution for services rendered or active billing cycles.</p>
+                <p>EVEO memberships are recurring subscriptions. Submitting a dealership application does not create a workspace, authorize a charge, or begin a trial. Membership access and any evaluation period start only after the plan, payment method, and billing terms are presented and accepted through secure billing setup. Charges, renewals, cancellation terms, and any refund conditions will be shown before payment is authorized.</p>
               </div>
 
               <div className="space-y-2">

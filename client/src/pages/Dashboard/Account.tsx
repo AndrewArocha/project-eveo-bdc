@@ -10,16 +10,18 @@ type AccountTab = 'profile' | 'security' | 'schedule' | 'payroll';
 
 export default function Account() {
   const [activeTab, setActiveTab] = useState<AccountTab>('profile');
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { activeStore } = useStoreAppearance();
-  const [avatarImg, setAvatarImg] = useState<string | null>(localStorage.getItem('eveo_avatar'));
+  const avatarStorageKey = user ? `eveo_avatar:${user.id}` : 'eveo_avatar';
+  const [avatarImg, setAvatarImg] = useState<string | null>(() => localStorage.getItem(avatarStorageKey));
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const handleAvatarUpdate = () => setAvatarImg(localStorage.getItem('eveo_avatar'));
+    const handleAvatarUpdate = () => setAvatarImg(localStorage.getItem(avatarStorageKey));
+    handleAvatarUpdate();
     window.addEventListener('avatarUpdated', handleAvatarUpdate);
     return () => window.removeEventListener('avatarUpdated', handleAvatarUpdate);
-  }, []);
+  }, [avatarStorageKey]);
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -28,7 +30,7 @@ export default function Account() {
     reader.onloadend = () => {
       const result = reader.result as string;
       setAvatarImg(result);
-      localStorage.setItem('eveo_avatar', result);
+      localStorage.setItem(avatarStorageKey, result);
       window.dispatchEvent(new Event('avatarUpdated'));
     };
     reader.readAsDataURL(file);
@@ -68,9 +70,9 @@ export default function Account() {
             <div className="w-13 h-13 sm:w-15 sm:h-15 rounded-full bg-radial-[at_30%_25%] from-orange-400 via-orange-600 to-orange-950 shadow-[inset_0_2px_6px_rgba(255,255,255,0.45),0_6px_16px_rgba(249,115,22,0.3)] flex items-center justify-center text-white text-lg font-black overflow-hidden border border-white/25 relative transition-transform group-hover:scale-105 active:scale-95">
               <div className="absolute top-0.5 left-1/2 -translate-x-1/2 w-[68%] h-[34%] bg-white/30 rounded-full pointer-events-none z-20" />
               {avatarImg ? (
-                <img src={avatarImg} alt="Andres Hernandez Avatar" className="w-full h-full object-cover relative z-10" />
+                <img src={avatarImg} alt={`${user?.name || 'Profile'} avatar`} className="w-full h-full object-cover relative z-10" />
               ) : (
-                <span className="relative z-10">AH</span>
+                <span className="relative z-10">{(user?.name || 'EV').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</span>
               )}
             </div>
             {/* Mini 3D Glass Camera Orb */}
@@ -82,7 +84,7 @@ export default function Account() {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="text-lg sm:text-xl font-black text-gray-900 dark:text-white tracking-tight truncate">
-                Andres Hernandez
+                {user?.name || 'Demo profile'}
               </h1>
               <span className="px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/30 text-orange-400 text-[9px] font-black uppercase tracking-widest shrink-0">
                 {role.replace('_', ' ')}

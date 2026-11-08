@@ -2,22 +2,20 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Users, Settings, Copy, ExternalLink, ShieldAlert, LoaderCircle, UserPlus } from 'lucide-react';
-import { mockIntegrations, type Integration } from '../../data/mockDatabase';
-import { ApiError, type ApiEmployeeRole, type ApiTeamMember, type ApiUserInvitation } from '../../services/apiClient';
+import { CreditCard, Users, Settings, Copy, ExternalLink, LoaderCircle, UserPlus } from 'lucide-react';
+import { ApiError, apiRequest, type ApiEmployeeRole, type ApiTeamMember, type ApiUserInvitation } from '../../services/apiClient';
 import { teamRepository } from '../../services/team/teamRepository';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 
-import StoreProfileTab from '../../components/Admin/StoreProfileTab';
 import StoreRegistryManager from '../../components/Admin/StoreRegistryManager';
-import IntegrationWizardModal from '../../components/Admin/IntegrationWizardModal';
+import IntegrationConnectionsPanel from '../../components/Admin/IntegrationConnectionsPanel';
 
 type Tab = 'billing' | 'team' | 'settings';
 
 export default function AdminPortal() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('settings');
-  const { registeredStores } = useStoreAppearance();
+  const { registeredStores, activeStoreId } = useStoreAppearance();
   const [teamStoreId, setTeamStoreId] = useState('');
   const [teamMembers, setTeamMembers] = useState<ApiTeamMember[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<ApiUserInvitation[]>([]);
@@ -30,8 +28,8 @@ export default function AdminPortal() {
   const [teamBusy, setTeamBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const [integrations, setIntegrations] = useState<Integration[]>(mockIntegrations);
-  const [isIntegrationModalOpen, setIsIntegrationModalOpen] = useState(false);
+  const [account, setAccount] = useState<{ businessName: string; subscriptionStatus: 'pending_payment' | 'trial' | 'active' | 'past_due' | 'cancelled'; trialEndsAt?: string | null } | null>(null);
+  const [billingError, setBillingError] = useState('');
 
   useEffect(() => {
     if (!teamStoreId && registeredStores[0]) {
@@ -39,6 +37,14 @@ export default function AdminPortal() {
       setAssignedStoreIds([registeredStores[0].id]);
     }
   }, [teamStoreId, registeredStores]);
+
+  useEffect(() => {
+    let active = true;
+    apiRequest<{ businessName: string; subscriptionStatus: 'pending_payment' | 'trial' | 'active' | 'past_due' | 'cancelled'; trialEndsAt?: string | null }>('/account/onboarding')
+      .then((result) => { if (active) setAccount(result); })
+      .catch((cause) => { if (active) setBillingError(cause instanceof ApiError ? cause.message : 'Membership status could not be loaded.'); });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!teamStoreId) return;
@@ -115,16 +121,9 @@ export default function AdminPortal() {
             Master Control
           </span>
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight">Store Administration</h1>
-          <p className="text-gray-400 text-sm sm:text-base mt-1 font-medium">Manage your team access, configurations, and billing.</p>
+          <p className="text-gray-400 text-sm sm:text-base mt-1 font-medium">Manage store details, team access, and membership status.</p>
         </div>
         <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3 sm:gap-4">
-          <button
-            type="button"
-            onClick={() => navigate('/admin/store')}
-            className="min-h-11 px-4 sm:px-5 py-2.5 bg-orange-500/15 hover:bg-orange-500/25 active:scale-[0.98] text-orange-400 text-xs sm:text-sm font-bold rounded-xl transition-all border border-orange-500/35 flex items-center justify-center gap-2 outline-none cursor-pointer"
-          >
-            Upgrade Plan
-          </button>
           <button
             type="button"
             onClick={() => navigate('/app/hub')}
@@ -192,30 +191,12 @@ export default function AdminPortal() {
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 pb-6 border-b border-white/10 mb-6">
                     <div>
-                      <h2 className="text-2xl sm:text-3xl font-black text-white mb-1">14-Day Free Trial</h2>
-                      <p className="text-xs sm:text-sm text-orange-400 font-medium">Expires in 12 days</p>
+                      <h2 className="text-2xl sm:text-3xl font-black text-white mb-1">{account ? ({ pending_payment: 'Membership not activated', trial: 'Trial active', active: 'Membership active', past_due: 'Payment needs attention', cancelled: 'Membership cancelled' } as const)[account.subscriptionStatus] : 'Checking membership'}</h2>
+                      <p className="text-xs sm:text-sm text-orange-400 font-medium">{account?.subscriptionStatus === 'trial' && account.trialEndsAt ? `Trial ends ${new Date(account.trialEndsAt).toLocaleDateString()}` : account?.subscriptionStatus === 'pending_payment' ? 'No payment method or workspace trial was started.' : account?.subscriptionStatus === 'active' ? 'Your membership is active.' : account?.subscriptionStatus === 'past_due' ? 'Update billing through secure membership support.' : account?.subscriptionStatus === 'cancelled' ? 'This account has no active membership.' : 'Membership status loads from your dealership account.'}</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => navigate('/admin/store')}
-                      className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md shadow-orange-500/20 whitespace-nowrap outline-none cursor-pointer"
-                    >
-                      View Plans &amp; Upgrade
-                    </button>
+                    {billingError && <p role="alert" className="text-xs text-red-400">{billingError}</p>}
                   </div>
-                  <div className="flex items-start gap-3 p-4 rounded-xl bg-white/5 border border-red-500/30 relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500" />
-                    <ShieldAlert className="text-red-500 shrink-0 mt-0.5 ml-2" size={18} />
-                    <div>
-                      <h4 className="text-sm font-bold text-white mb-1">Danger Zone</h4>
-                      <p className="text-xs text-gray-400 leading-relaxed mb-3">
-                        Canceling your subscription will immediately revoke workspace access for all your team members and halt any active BDC integrations.
-                      </p>
-                      <button type="button" className="text-xs font-bold text-red-500 hover:text-red-400 transition-colors cursor-pointer">
-                        Cancel Subscription
-                      </button>
-                    </div>
-                  </div>
+                  <p className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs leading-relaxed text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">Dealership applications do not start a trial or collect payment. Secure checkout and membership activation are not connected in this deployment yet.</p>
                 </div>
               </motion.div>
             )}
@@ -314,24 +295,13 @@ export default function AdminPortal() {
             {activeTab === 'settings' && (
               <>
                 <StoreRegistryManager />
-                <StoreProfileTab
-                  integrations={integrations}
-                  setIntegrations={setIntegrations}
-                  setIsIntegrationModalOpen={setIsIntegrationModalOpen}
-                />
+                <IntegrationConnectionsPanel storeId={activeStoreId} />
               </>
             )}
 
           </AnimatePresence>
         </div>
       </div>
-
-      <IntegrationWizardModal
-        isOpen={isIntegrationModalOpen}
-        onClose={() => setIsIntegrationModalOpen(false)}
-        integrations={integrations}
-        setIntegrations={setIntegrations}
-      />
 
     </div>
   );

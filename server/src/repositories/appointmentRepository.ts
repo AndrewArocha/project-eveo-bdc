@@ -5,6 +5,7 @@ import { InventoryVehicle } from '../models/InventoryVehicle.js';
 import { Lead } from '../models/Lead.js';
 import { Store } from '../models/Store.js';
 import { User } from '../models/User.js';
+import { recordActivityEventSafely } from '../services/activityEventService.js';
 import { AppError } from '../utils/AppError.js';
 
 async function assertStore(storeId: string, dealerAccountId: string) {
@@ -48,6 +49,10 @@ export async function createAppointment(input: Record<string, unknown>, userId: 
   appointment.statusHistory.push({ kind: 'status', previousValue: '', nextValue: appointment.status, changedByUserId: userId, changedAt: new Date() });
   if (appointment.scheduledAt) appointment.statusHistory.push({ kind: 'schedule', previousValue: '', nextValue: appointment.scheduledAt.toISOString(), changedByUserId: userId, changedAt: new Date() });
   await appointment.save();
+  await recordActivityEventSafely({
+    dealerAccountId, storeId, userId, category: 'appointment', title: `Appointment booked • ${appointment.customerNameSnapshot}`,
+    description: [appointment.vehicleSnapshot, appointment.scheduledAt?.toLocaleString()].filter(Boolean).join(' · '), entityType: 'appointment', entityId: appointment.id,
+  });
   return appointment;
 }
 
@@ -69,6 +74,10 @@ export async function updateAppointmentDetails(id: string, dealerAccountId: stri
     }
   }
   await appointment.save();
+  await recordActivityEventSafely({
+    dealerAccountId, storeId, userId, category: 'appointment', title: `Appointment updated • ${appointment.customerNameSnapshot}`,
+    description: 'Schedule or assignment updated.', entityType: 'appointment', entityId: appointment.id,
+  });
   return appointment;
 }
 
@@ -83,5 +92,9 @@ export async function updateAppointmentStatus(id: string, dealerAccountId: strin
   appointment.status = status as typeof appointment.status;
   if (previous !== appointment.status) appointment.statusHistory.push({ kind: 'status', previousValue: previous, nextValue: status, changedByUserId: new Types.ObjectId(userId), changedAt: new Date() });
   await appointment.save();
+  if (previous !== status) await recordActivityEventSafely({
+    dealerAccountId, storeId, userId, category: 'appointment', title: `Appointment ${status.replaceAll('_', ' ')} • ${appointment.customerNameSnapshot}`,
+    description: appointment.vehicleSnapshot, entityType: 'appointment', entityId: appointment.id,
+  });
   return appointment;
 }

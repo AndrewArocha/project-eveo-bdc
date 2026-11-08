@@ -1,150 +1,109 @@
 import { useState, type FormEvent } from 'react';
 import { motion } from 'framer-motion';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { CheckCircle2 } from 'lucide-react';
 import eveoSymbol from '../../images/logo/eveo-symbol.svg';
-import { useAuth } from '../../contexts/AuthContext';
+import { apiRequest } from '../../services/apiClient';
+
+interface ApplicationResponse {
+  status: 'submitted';
+  submittedAt: string;
+}
 
 export default function Register() {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-  const handleRegister = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleRegister = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setError('');
     setIsSubmitting(true);
-    const form = new FormData(e.currentTarget);
+    const form = new FormData(event.currentTarget);
     try {
-      await signUp({
-        name: `${String(form.get('firstName')).trim()} ${String(form.get('lastName')).trim()}`,
-        email: String(form.get('email')).trim(),
-        password: String(form.get('password')),
-        dealershipName: String(form.get('dealership')).trim(),
-        storeName: String(form.get('storeName')).trim(),
-        website: String(form.get('website')).trim(),
-        address: String(form.get('address')).trim(),
-        phone: String(form.get('phone')).trim(),
-        timezone: String(form.get('timezone')).trim(),
-        multiStore: form.get('multiStore') === 'yes',
+      await apiRequest<ApplicationResponse>('/auth/signup', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: String(form.get('name')).trim(),
+          businessName: String(form.get('businessName')).trim(),
+          phone: String(form.get('phone')).trim(),
+          email: String(form.get('email')).trim(),
+        }),
       });
-      navigate('/app/customers', {
-        replace: true,
-        state: { notice: 'Application submitted. Your dealership account is pending review; the trial begins after activation.' },
-      });
+      setSubmitted(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Registration failed. Please try again.');
+      setError(cause instanceof Error ? cause.message : 'We could not submit your request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const inputClasses = "w-full min-h-12 px-4 py-3 rounded-xl bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all text-base sm:text-sm text-gray-900 dark:text-white";
+  const inputClasses = 'w-full min-h-12 px-4 py-3 rounded-xl bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all text-base sm:text-sm text-gray-900 dark:text-white';
 
   return (
     <div className="flex-1 flex items-center justify-center px-4 pt-24 pb-10 md:pt-32 sm:px-6 lg:px-8">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-        className="w-full max-w-2xl space-y-6 sm:space-y-8 bg-white dark:bg-[#0a0f16] p-6 sm:p-10 rounded-3xl sm:rounded-4xl border border-gray-100 dark:border-white/5 shadow-2xl my-auto"
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="w-full max-w-lg space-y-6 sm:space-y-8 bg-white dark:bg-[#0a0f16] p-6 sm:p-10 rounded-3xl border border-gray-100 dark:border-white/5 shadow-2xl my-auto"
       >
         <div className="flex flex-col items-center">
           <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20 mb-4 sm:mb-6">
-            <img src={eveoSymbol} alt="EVEO Brand Symbol" className="w-7 h-7 dark:invert-0 invert" />
+            <img src={eveoSymbol} alt="EVEO" className="w-7 h-7" />
           </div>
-          <h2 className="text-center text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-            Create your account
-          </h2>
-          <p className="mt-1.5 text-center text-sm text-gray-600 dark:text-gray-400">
-            Already have an account? <NavLink to="/login" className="font-semibold text-orange-500 hover:text-orange-400 transition-colors">Sign in</NavLink>
+          <h1 className="text-center text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+            {submitted ? 'Request received' : 'Bring your dealership to EVEO'}
+          </h1>
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+            {submitted
+              ? 'Our team will contact you about membership and secure billing setup.'
+              : <>Already have an account? <NavLink to="/login" className="font-semibold text-orange-500 hover:text-orange-400">Sign in</NavLink></>}
           </p>
         </div>
 
-        <form className="mt-6 sm:mt-8 space-y-4 sm:space-y-5" onSubmit={handleRegister}>
-          {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">{error}</p>}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="firstName" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">First name</label>
-              <input id="firstName" name="firstName" type="text" autoComplete="given-name" required className={inputClasses} />
+        {submitted ? (
+          <div className="space-y-5 text-center">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-500">
+              <CheckCircle2 size={28} />
             </div>
+            <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300">
+              This request does not create a login, activate a dealership workspace, or start a trial. Workspace access begins after membership and billing are set up.
+            </p>
+            <button type="button" onClick={() => navigate('/')} className="w-full min-h-12 rounded-xl bg-orange-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-orange-600">
+              Return to EVEO
+            </button>
+          </div>
+        ) : (
+          <form className="space-y-4" onSubmit={(event) => void handleRegister(event)}>
+            {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">{error}</p>}
+
             <div>
-              <label htmlFor="lastName" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Last name</label>
-              <input id="lastName" name="lastName" type="text" autoComplete="family-name" required className={inputClasses} />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="dealership" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Dealership name</label>
-            <input id="dealership" name="dealership" type="text" autoComplete="organization" required className={inputClasses} />
-          </div>
-
-          <div>
-            <label htmlFor="storeName" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Initial store name</label>
-            <input id="storeName" name="storeName" type="text" autoComplete="organization" required className={inputClasses} />
-          </div>
-
-          <fieldset className="grid gap-3 sm:grid-cols-2">
-            <legend className="mb-2 ml-1 text-xs font-semibold text-gray-700 dark:text-gray-300">Store organization</legend>
-            <label className="flex min-h-12 items-center gap-3 rounded-xl border border-gray-200 px-4 text-sm text-gray-700 dark:border-white/10 dark:text-gray-300">
-              <input type="radio" name="multiStore" value="no" defaultChecked className="accent-orange-500" /> Single store
-            </label>
-            <label className="flex min-h-12 items-center gap-3 rounded-xl border border-gray-200 px-4 text-sm text-gray-700 dark:border-white/10 dark:text-gray-300">
-              <input type="radio" name="multiStore" value="yes" className="accent-orange-500" /> Multiple stores
-            </label>
-          </fieldset>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="website" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Store website</label>
-              <input id="website" name="website" type="url" required className={inputClasses} />
+              <label htmlFor="name" className="mb-1.5 ml-1 block text-xs font-semibold text-gray-700 dark:text-gray-300">Your name</label>
+              <input id="name" name="name" type="text" autoComplete="name" required minLength={2} maxLength={100} className={inputClasses} />
             </div>
             <div>
-              <label htmlFor="phone" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Store phone</label>
-              <input id="phone" name="phone" type="tel" required minLength={7} maxLength={40} className={inputClasses} />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="address" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Physical address</label>
-              <input id="address" name="address" type="text" autoComplete="street-address" required minLength={5} maxLength={300} className={inputClasses} />
+              <label htmlFor="businessName" className="mb-1.5 ml-1 block text-xs font-semibold text-gray-700 dark:text-gray-300">Dealership / company name</label>
+              <input id="businessName" name="businessName" type="text" autoComplete="organization" required minLength={2} maxLength={120} className={inputClasses} />
             </div>
             <div>
-              <label htmlFor="timezone" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Store timezone</label>
-              <input id="timezone" name="timezone" type="text" required maxLength={100} className={inputClasses} />
+              <label htmlFor="phone" className="mb-1.5 ml-1 block text-xs font-semibold text-gray-700 dark:text-gray-300">Phone</label>
+              <input id="phone" name="phone" type="tel" autoComplete="tel" required minLength={7} maxLength={40} className={inputClasses} />
             </div>
-          </div>
-
-          <div>
-            <label htmlFor="email" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Work email</label>
-            <input id="email" name="email" type="email" autoComplete="email" required className={inputClasses} />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Password</label>
-            <input id="password" name="password" type="password" autoComplete="new-password" required minLength={12} className={inputClasses} />
-          </div>
-
-          <div className="flex items-start pt-1">
-            <div className="flex items-center h-5">
-              <input id="terms" name="terms" type="checkbox" required className="h-4.5 w-4.5 text-orange-500 focus:ring-orange-500 border-gray-300 rounded cursor-pointer" />
+            <div>
+              <label htmlFor="email" className="mb-1.5 ml-1 block text-xs font-semibold text-gray-700 dark:text-gray-300">Work email</label>
+              <input id="email" name="email" type="email" autoComplete="email" required maxLength={254} className={inputClasses} />
             </div>
-            <div className="ml-2.5 text-xs leading-relaxed">
-              <label htmlFor="terms" className="font-medium text-gray-600 dark:text-gray-400">
-                I agree to the{' '}
-                <a href="#terms" onClick={(e) => e.preventDefault()} className="text-orange-500 hover:text-orange-400 transition-colors">Terms of Service</a>
-                {' '}and{' '}
-                <a href="#privacy" onClick={(e) => e.preventDefault()} className="text-orange-500 hover:text-orange-400 transition-colors">Privacy Policy</a>.
-              </label>
-            </div>
-          </div>
 
-          <button type="submit" disabled={isSubmitting} className="w-full min-h-13 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-base sm:text-sm transition-all shadow-lg hover:shadow-orange-500/25 mt-2 cursor-pointer disabled:opacity-60">
-            {isSubmitting ? 'Submitting application…' : 'Submit dealership application'}
-          </button>
-        </form>
+            <p className="px-1 pt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+              Membership activation and any trial terms are confirmed during secure billing setup. Submitting this request does not start a trial.
+            </p>
+            <button type="submit" disabled={isSubmitting} className="mt-2 w-full min-h-13 rounded-xl bg-orange-500 py-3.5 text-sm font-bold text-white shadow-lg transition hover:bg-orange-600 hover:shadow-orange-500/25 disabled:cursor-wait disabled:opacity-60">
+              {isSubmitting ? 'Sending request…' : 'Request dealership access'}
+            </button>
+          </form>
+        )}
       </motion.div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-const storeId = z.string().regex(/^[a-f\d]{24}$/i);
+const objectId = z.string().regex(/^[a-f\d]{24}$/i);
+const storeId = objectId;
 const vin = z.string().trim().min(11).max(17).regex(/^[A-HJ-NPR-Z0-9]+$/i).transform((value) => value.toUpperCase());
 
 export const createInventoryVehicleSchema = z.object({
@@ -44,4 +45,8 @@ export const resolveInventoryDiscrepancySchema = z.object({
   value: z.union([z.string().max(500), z.number().finite(), z.null()]).optional(),
 }).refine((input) => input.resolution !== 'custom' || input.value !== undefined, {
   message: 'A resolved value is required for a custom resolution.',
+});
+
+export const syncWebsiteInventorySchema = z.object({
+  storeId: objectId,
 });

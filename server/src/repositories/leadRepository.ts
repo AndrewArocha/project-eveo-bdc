@@ -4,6 +4,7 @@ import { InventoryVehicle } from '../models/InventoryVehicle.js';
 import { Lead } from '../models/Lead.js';
 import { Store } from '../models/Store.js';
 import { User } from '../models/User.js';
+import { recordActivityEventSafely } from '../services/activityEventService.js';
 import { AppError } from '../utils/AppError.js';
 
 async function assertStore(storeId: string, dealerAccountId: string) {
@@ -36,6 +37,10 @@ export async function createLead(input: Record<string, unknown>, userId: string,
   const lead = await Lead.create({ ...input, dealerAccountId, createdByUserId: userId });
   lead.statusHistory.push({ kind: 'status', previousValue: '', nextValue: 'new', changedByUserId: userId, changedAt: new Date() });
   await lead.save();
+  await recordActivityEventSafely({
+    dealerAccountId, storeId, userId, category: 'lead', title: `New lead added • ${lead.customerNameSnapshot}`,
+    description: [lead.vehicleOfInterest, lead.source].filter(Boolean).join(' · '), entityType: 'lead', entityId: lead.id,
+  });
   return lead;
 }
 
@@ -53,5 +58,10 @@ export async function updateLead(id: string, dealerAccountId: string, storeId: s
   if ('assignedStoreUserId' in input) lead.assignedStoreUserId = input.assignedStoreUserId as typeof lead.assignedStoreUserId;
   if (typeof input.notes === 'string') lead.notes = input.notes;
   await lead.save();
+  await recordActivityEventSafely({
+    dealerAccountId, storeId, userId, category: 'lead', title: `Lead updated • ${lead.customerNameSnapshot}`,
+    description: input.status ? `Status changed to ${String(input.status).replaceAll('_', ' ')}.` : 'Lead assignment or notes updated.',
+    entityType: 'lead', entityId: lead.id,
+  });
   return lead;
 }

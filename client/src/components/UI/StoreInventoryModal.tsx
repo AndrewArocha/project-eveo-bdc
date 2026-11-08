@@ -8,9 +8,7 @@ import {
   getStoreInventory,
   saveStoreInventory,
   updateStoreVehicleStatus,
-  syncStoreWebsiteInventoryProgressively,
   getStoreWebsiteInventoryUrl,
-  isStoreWebsiteInventorySyncAvailable,
   type InventoryUnitStatus,
 } from '../../services/inventory/storeInventorySync';
 import type { StoreInventorySummary } from '../../data/stores/njx/inventory';
@@ -50,7 +48,7 @@ export default function StoreInventoryModal({
   const { activeStoreId, activeStore } = useStoreAppearance();
   const { user } = useAuth();
   const [summary, setSummary] = useState<StoreInventorySummary>(() =>
-    getStoreInventory(activeStoreId)
+    user ? { storeId: activeStoreId, carsReadyForSale: 0, carsDeliveredMtd: 0, dealsDeliveredToday: 0, averageRatioBenchmark: 0, units: [] } : getStoreInventory(activeStoreId)
   );
   const [apiVehicles, setApiVehicles] = useState<ApiInventoryVehicle[]>([]);
   const [search, setSearch] = useState('');
@@ -58,7 +56,7 @@ export default function StoreInventoryModal({
   const [syncStage, setSyncStage] = useState<string | null>(null);
   const [syncPct, setSyncPct] = useState<number>(0);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const inventorySyncAvailable = isStoreWebsiteInventorySyncAvailable();
+  const inventorySyncAvailable = Boolean(user && activeStore.websiteUrl?.trim());
   const [isAddingUnit, setIsAddingUnit] = useState(false);
   const [newVin, setNewVin] = useState('');
   const [newVehicle, setNewVehicle] = useState('');
@@ -89,13 +87,21 @@ export default function StoreInventoryModal({
 
   const handleProgressiveSync = async () => {
     setSyncError(null);
+    if (!inventorySyncAvailable) {
+      setSyncError(user ? 'Add a dealership website in store settings before syncing inventory.' : 'Sign in to sync a dealership inventory.');
+      return;
+    }
     try {
-      await syncStoreWebsiteInventoryProgressively(activeStoreId, (stage, pct, nextSummary) => {
-        setSyncStage(stage);
-        setSyncPct(pct);
-        setSummary({ ...nextSummary });
-      }, activeStore.websiteUrl);
-      window.setTimeout(() => setSyncStage(null), 1400);
+      setSyncStage('Reading dealership inventory…');
+      setSyncPct(20);
+      const result = await apiInventoryRepository.syncWebsite(activeStoreId);
+      setSyncPct(85);
+      const vehicles = await apiInventoryRepository.list(activeStoreId);
+      setApiVehicles(vehicles);
+      setSummary(summarizeInventory(activeStoreId, vehicles));
+      setSyncStage(`Sync complete · ${result.created} new, ${result.observed} checked`);
+      setSyncPct(100);
+      window.setTimeout(() => { setSyncStage(null); setSyncPct(0); }, 2400);
     } catch (error) {
       setSyncStage(null);
       setSyncPct(0);
@@ -176,7 +182,7 @@ export default function StoreInventoryModal({
     return u.vehicle.toLowerCase().includes(q) || u.vin.toLowerCase().includes(q);
   });
 
-  const websiteUrl = getStoreWebsiteInventoryUrl(activeStoreId, activeStore.websiteUrl);
+  const websiteUrl = activeStore.websiteUrl || getStoreWebsiteInventoryUrl(activeStoreId);
 
   return (
     <SwipeableModal isOpen={isOpen} onClose={onClose} maxWidthClass="md:max-w-5xl">
@@ -207,15 +213,15 @@ export default function StoreInventoryModal({
               type="button"
               onClick={() => void handleProgressiveSync()}
               disabled={!inventorySyncAvailable || syncStage !== null}
-              title={inventorySyncAvailable ? 'Synchronize inventory through the configured EVEO API' : 'Automatic synchronization will be enabled when the EVEO API is connected'}
-              aria-label={inventorySyncAvailable ? 'Sync website inventory' : 'Website inventory sync requires the EVEO API'}
+              title={inventorySyncAvailable ? 'Read vehicle records published by the dealership website' : 'Add a dealership website in store settings to enable sync'}
+              aria-label={inventorySyncAvailable ? 'Sync website inventory' : 'Add a dealership website to enable inventory sync'}
               className="h-9 px-4 rounded-full bg-white/8 hover:bg-white/[0.14] border border-white/15 text-xs font-bold text-white flex items-center gap-2 enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
               <RefreshCw
                 size={13}
                 className={syncStage ? 'animate-spin text-orange-400' : 'text-orange-400'}
               />
-              <span>{syncStage ? `Syncing (${syncPct}%)` : inventorySyncAvailable ? 'Sync Website' : 'API Required'}</span>
+              <span>{syncStage || 'Sync Website'}</span>
             </button>
 
             <a
@@ -238,11 +244,9 @@ export default function StoreInventoryModal({
           </div>
         </div>
 
-        {!inventorySyncAvailable && (
-          <p className="px-6 py-2 text-[11px] text-gray-500 border-b border-white/5" role="status">
-            Automatic website synchronization will be available after the EVEO API is connected. You can still review and manage the current local demo inventory.
-          </p>
-        )}
+        <p className="px-6 py-2 text-[11px] text-gray-500 border-b border-white/5" role="status">
+          Website sync imports VIN-based vehicle data when the site publishes structured inventory. Other sites need a vAuto, CRM, or inventory feed connection.
+        </p>
         {syncError && (
           <p className="px-6 py-2 text-[11px] text-amber-300 border-b border-amber-500/20" role="alert">
             {syncError}

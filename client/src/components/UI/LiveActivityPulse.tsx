@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 import { getStoreDataOrEmpty, CURRENT_USER, getVisibleStoreRoster } from '../../data/mockDatabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { apiLiveActivityRepository } from '../../services/liveActivity/apiLiveActivityRepository';
 
 export type ActivityPriority = 1 | 2 | 3;
 
@@ -144,6 +146,8 @@ export default function LiveActivityPulse() {
   const location = useLocation();
   const navigate = useNavigate();
   const { activeStoreId } = useStoreAppearance();
+  const { user } = useAuth();
+  const isAuthenticated = Boolean(user || localStorage.getItem('eveo_token'));
 
   const isAccountPage = location.pathname.includes('/app/account');
 
@@ -162,10 +166,52 @@ export default function LiveActivityPulse() {
   const lastPointerType = useRef<string>('mouse');
   const [queueTimestamp] = useState(() => Date.now());
 
-  const roster = useMemo(() => getVisibleStoreRoster(activeStoreId), [activeStoreId]);
+  const [serverEvents, setServerEvents] = useState<LiveActivityEvent[]>([]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !activeStoreId) {
+      setServerEvents([]);
+      return;
+    }
+    let active = true;
+    const refresh = () => {
+      apiLiveActivityRepository.list(activeStoreId)
+        .then((posts) => {
+          if (!active) return;
+          setServerEvents(posts.map((post) => ({
+            id: post.id,
+            agentName: post.agentName,
+            initials: getInitials(post.agentName),
+            priority: post.priority,
+            category: post.category,
+            title: post.title,
+            route: post.route,
+            timestamp: post.timestamp,
+          })));
+        })
+        .catch(() => {
+          if (active) setServerEvents([]);
+        });
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 5000);
+    const handleOperationalUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ storeId?: string }>).detail;
+      if (!detail?.storeId || detail.storeId === activeStoreId) refresh();
+    };
+    window.addEventListener('eveo:operational-updated', handleOperationalUpdate);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener('eveo:operational-updated', handleOperationalUpdate);
+    };
+  }, [activeStoreId, isAuthenticated]);
+
+  const roster = useMemo(() => isAuthenticated ? [] : getVisibleStoreRoster(activeStoreId), [activeStoreId, isAuthenticated]);
 
   // Build prioritized, coalesced activity stream including the automated EVEO AI Agent!
   const prioritizedQueue = useMemo<LiveActivityEvent[]>(() => {
+    if (isAuthenticated) return serverEvents;
     const store = getStoreDataOrEmpty(activeStoreId);
     if (!store) return [];
 
@@ -259,7 +305,7 @@ export default function LiveActivityPulse() {
 
     // Sort strictly by Priority (P1 -> P2 -> P3), then recency!
     return events.sort((a, b) => a.priority - b.priority || b.timestamp - a.timestamp);
-  }, [activeStoreId, queueTimestamp, roster, userAvatar]);
+  }, [activeStoreId, isAuthenticated, queueTimestamp, roster, serverEvents, userAvatar]);
 
   const [queueCursor, setQueueCursor] = useState(0);
   const [isVisible, setIsVisible] = useState(true);

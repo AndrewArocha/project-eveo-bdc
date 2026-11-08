@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Clock, User, Car, Plus, Save } from 'lucide-react';
 // 🌟 FIXED: Added the missing import
-import { saveAppointments } from '../../utils/appointmentManager';
+import { saveAppointments, type Appointment as DemoAppointment } from '../../utils/appointmentManager';
 import { SleekPillButton } from '../UI/SleekButtons';
+import { useAuth } from '../../contexts/AuthContext';
+import { apiOperationalRepository, type ApiAppointment } from '../../services/operational/apiOperationalRepository';
+import { teamRepository } from '../../services/team/teamRepository';
+import type { ApiTeamMember } from '../../services/apiClient';
 
 interface AppointmentModalProps {
   isOpen: boolean;
@@ -11,7 +15,7 @@ interface AppointmentModalProps {
   storeId: string;
 }
 
-type ApptStatus = 'CONFIRMED' | 'PENDING CONFIRM' | 'NO SHOW' | 'ARRIVED' | 'SOLD';
+type ApptStatus = DemoAppointment['status'] | 'CANCELLED' | 'SHOWED';
 
 interface Appointment {
   id: string;
@@ -22,19 +26,8 @@ interface Appointment {
   status: ApptStatus;
 }
 
-const DEFAULT_MOCK_DATA: { [key: string]: Appointment[] } = {
-  '2026-9-6': [
-    { id: '1', time: '1:00 PM', customer: 'Gordon Freeman', vehicle: '2024 Tesla Model Y', rep: 'Erick', status: 'CONFIRMED' },
-    { id: '2', time: '2:30 PM', customer: 'Alyx Vance', vehicle: '2022 Honda Civic', rep: 'Laura', status: 'PENDING CONFIRM' },
-    { id: '3', time: '4:00 PM', customer: 'Eli Vance', vehicle: '2021 Ford F-150', rep: 'Erick', status: 'CONFIRMED' },
-  ],
-  '2026-9-7': [
-    { id: '4', time: '9:15 AM', customer: 'Sarah Connor', vehicle: '2025 Toyota RAV4', rep: 'Sarah J.', status: 'CONFIRMED' },
-    { id: '5', time: '11:00 AM', customer: 'John Connor', vehicle: '2023 Jeep Wrangler', rep: 'Erick', status: 'PENDING CONFIRM' },
-  ]
-};
-
 export default function AppointmentModal({ isOpen, onClose, storeId }: AppointmentModalProps) {
+  const { user } = useAuth();
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -42,6 +35,11 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
 
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [isAddingMode, setIsAddingMode] = useState(false);
+  const [apiAppointments, setApiAppointments] = useState<ApiAppointment[]>([]);
+  const [teamMembers, setTeamMembers] = useState<ApiTeamMember[]>([]);
+  const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
+  const [isSavingAppointment, setIsSavingAppointment] = useState(false);
+  const [syncError, setSyncError] = useState('');
 
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
@@ -50,22 +48,74 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
   const dbKey = `eveo_appointments_${storeId}`;
   const [appointmentsDb, setAppointmentsDb] = useState<{ [key: string]: Appointment[] }>(() => {
     const saved = localStorage.getItem(dbKey);
-    return saved ? JSON.parse(saved) : DEFAULT_MOCK_DATA;
+    return saved ? JSON.parse(saved) : {};
   });
 
-  const [newAppt, setNewAppt] = useState({ time: '10:00 AM', customer: '', vehicle: '', rep: 'Sarah J.' });
+  const [newAppt, setNewAppt] = useState({ time: '10:00 AM', customer: '', vehicle: '', rep: '' });
+
+  useEffect(() => {
+    if (!user || !isOpen || !storeId) {
+      setApiAppointments([]);
+      setTeamMembers([]);
+      return;
+    }
+    let active = true;
+    setIsLoadingAppointments(true);
+    setSyncError('');
+    Promise.all([apiOperationalRepository.listAppointments(storeId), teamRepository.listMembers(storeId)])
+      .then(([appointments, members]) => {
+        if (!active) return;
+        setApiAppointments(appointments);
+        setTeamMembers(members.filter((member) => member.role !== 'owner'));
+      })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        setSyncError(cause instanceof Error ? cause.message : 'Schedule could not be loaded.');
+        setApiAppointments([]);
+        setTeamMembers([]);
+      })
+      .finally(() => { if (active) setIsLoadingAppointments(false); });
+    return () => { active = false; };
+  }, [isOpen, storeId, user]);
 
   // 🌟 FIXED: Kept only ONE saveToDatabase function
   const saveToDatabase = (dateKey: string, updatedAppts: Appointment[]) => {
     const newDbState = { ...appointmentsDb, [dateKey]: updatedAppts };
     setAppointmentsDb(newDbState);
-    saveAppointments(storeId, dateKey, updatedAppts);
+    saveAppointments(storeId, dateKey, updatedAppts.map((appointment) => ({ ...appointment, status: appointment.status as DemoAppointment['status'] })));
   };
 
   // 🌟 FIXED: Kept only ONE handleAddAppointment function
-  const handleAddAppointment = (e: React.FormEvent) => {
+  const handleAddAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAppt.customer || !newAppt.vehicle) return;
+
+    if (user) {
+      setIsSavingAppointment(true);
+      setSyncError('');
+      try {
+        const [clock, meridiem] = newAppt.time.split(' ');
+        const [hourText, minuteText] = clock.split(':');
+        const hour = (Number(hourText) % 12) + (meridiem === 'PM' ? 12 : 0);
+        const scheduledAt = new Date(currentYear, currentMonth, selectedDay, hour, Number(minuteText || 0));
+        await apiOperationalRepository.createAppointment({
+          storeId,
+          customerNameSnapshot: newAppt.customer.trim(),
+          vehicleSnapshot: newAppt.vehicle.trim(),
+          scheduledAt: scheduledAt.toISOString(),
+          status: 'pending_confirmation',
+          ...(newAppt.rep ? { assignedStoreUserId: newAppt.rep } : {}),
+        });
+        setApiAppointments(await apiOperationalRepository.listAppointments(storeId));
+        setIsAddingMode(false);
+        setNewAppt({ time: '10:00 AM', customer: '', vehicle: '', rep: '' });
+      } catch (cause) {
+        setSyncError(cause instanceof Error ? cause.message : 'Appointment could not be saved.');
+      } finally {
+        setIsSavingAppointment(false);
+      }
+      return;
+    }
 
     const dateKey = `${currentYear}-${currentMonth}-${selectedDay}`;
     const currentDayAppts = appointmentsDb[dateKey] || [];
@@ -85,7 +135,7 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
 
     saveToDatabase(dateKey, updatedAppts);
     setIsAddingMode(false);
-    setNewAppt({ time: '10:00 AM', customer: '', vehicle: '', rep: 'Sarah J.' });
+    setNewAppt({ time: '10:00 AM', customer: '', vehicle: '', rep: '' });
   };
 
   const handlePrevMonth = () => { if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(y => y - 1); } else setCurrentMonth(m => m - 1); setShowMonthPicker(false); };
@@ -102,17 +152,47 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
     }
   };
 
-  const getStatusDotColor = (status: ApptStatus) => {
+  const getStatusDotColor = (status: string) => {
     switch (status) {
       case 'CONFIRMED': case 'ARRIVED': case 'SOLD': return 'bg-emerald-500';
       case 'PENDING CONFIRM': return 'bg-orange-500';
       case 'NO SHOW': return 'bg-red-500';
+      case 'cancelled': case 'CANCELLED': return 'bg-gray-500';
+      case 'pending_confirmation': return 'bg-orange-500';
+      case 'no_show': return 'bg-red-500';
       default: return 'bg-gray-500';
     }
   };
 
   const selectedDateKey = `${currentYear}-${currentMonth}-${selectedDay}`;
-  const todaysAppointments = appointmentsDb[selectedDateKey] || [];
+  const isSameLocalDay = (value: string | null) => {
+    if (!value) return false;
+    const date = new Date(value);
+    return date.getFullYear() === currentYear && date.getMonth() === currentMonth && date.getDate() === selectedDay;
+  };
+  const todaysAppointments: Appointment[] = user
+    ? apiAppointments.filter((appointment) => isSameLocalDay(appointment.scheduledAt)).map((appointment) => {
+      const assignedId = appointment.assignedStoreUserId || appointment.assignedPlatformUserId || '';
+      const status: ApptStatus = appointment.status === 'pending_confirmation' ? 'PENDING CONFIRM'
+        : appointment.status === 'no_show' ? 'NO SHOW'
+          : appointment.status === 'cancelled' ? 'CANCELLED' : appointment.status.toUpperCase().replaceAll('_', ' ') as ApptStatus;
+      return {
+        id: appointment._id,
+        time: appointment.scheduledAt ? new Date(appointment.scheduledAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Time not set',
+        customer: appointment.customerNameSnapshot,
+        vehicle: appointment.vehicleSnapshot || 'Vehicle not specified',
+        rep: teamMembers.find((member) => member.id === assignedId)?.name || 'Unassigned',
+        status,
+      };
+    })
+    : appointmentsDb[selectedDateKey] || [];
+  const appointmentsForDay = (day: number) => user
+    ? apiAppointments.filter((appointment) => {
+      if (!appointment.scheduledAt) return false;
+      const date = new Date(appointment.scheduledAt);
+      return date.getFullYear() === currentYear && date.getMonth() === currentMonth && date.getDate() === day;
+    })
+    : appointmentsDb[`${currentYear}-${currentMonth}-${day}`] || [];
 
   return (
     <AnimatePresence>
@@ -167,8 +247,7 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
                           {Array.from({ length: daysInMonth }).map((_, i) => {
                             const day = i + 1;
                             const isSelected = selectedDay === day;
-                            const dayKey = `${currentYear}-${currentMonth}-${day}`;
-                            const dayAppts = appointmentsDb[dayKey] || [];
+                            const dayAppts = appointmentsForDay(day);
 
                             return (
                               <button
@@ -218,7 +297,7 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
                   <AnimatePresence>
                     {isAddingMode && (
                       <motion.div initial={{ height: 0, opacity: 0, marginBottom: 0 }} animate={{ height: 'auto', opacity: 1, marginBottom: 24 }} exit={{ height: 0, opacity: 0, marginBottom: 0 }} className="overflow-hidden shrink-0">
-                        <form onSubmit={handleAddAppointment} className="bg-white/5 border border-white/10 p-5 rounded-2xl flex flex-col gap-4">
+                        <form onSubmit={(event) => void handleAddAppointment(event)} className="bg-white/5 border border-white/10 p-5 rounded-2xl flex flex-col gap-4">
                           <h4 className="text-[10px] font-bold text-orange-500 uppercase tracking-widest flex items-center gap-2">
                             <Clock size={12} /> Schedule New Appointment
                           </h4>
@@ -229,12 +308,13 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
                               {['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'].map(t => <option key={t}>{t}</option>)}
                             </select>
                             <select value={newAppt.rep} onChange={e => setNewAppt({ ...newAppt, rep: e.target.value })} className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500 transition-colors">
-                              {['Sarah J.', 'Erick', 'Michael T.', 'Laura'].map(r => <option key={r}>{r}</option>)}
+                              <option value="">Unassigned</option>
+                              {teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
                             </select>
                           </div>
                           <div className="flex justify-end mt-2">
-                            <button type="submit" className="bg-emerald-500 hover:bg-emerald-600 text-white flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition-colors shadow-md outline-none cursor-pointer">
-                              <Save size={14} /> Save Appointment
+                            <button type="submit" disabled={isSavingAppointment} className="bg-emerald-500 hover:bg-emerald-600 text-white flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition-colors shadow-md outline-none cursor-pointer disabled:opacity-60">
+                              <Save size={14} /> {isSavingAppointment ? 'Saving…' : 'Save Appointment'}
                             </button>
                           </div>
                         </form>
@@ -242,7 +322,10 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
                     )}
                   </AnimatePresence>
 
-                  {todaysAppointments.length === 0 ? (
+                  {syncError && <p role="alert" className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">{syncError}</p>}
+                  {isLoadingAppointments ? (
+                    <div className="h-full grid place-items-center text-sm text-gray-400">Loading store schedule…</div>
+                  ) : todaysAppointments.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-gray-500 opacity-50">
                       <Calendar size={48} className="mb-4" />
                       <p className="font-bold">No appointments scheduled.</p>
