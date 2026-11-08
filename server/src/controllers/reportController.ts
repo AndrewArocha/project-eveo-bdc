@@ -12,7 +12,7 @@ function assertReportReader(request: Parameters<RequestHandler>[0]) {
 
 function assertReportManager(request: Parameters<RequestHandler>[0]) {
   if (!['owner', 'manager'].includes(request.auth?.role ?? '')) {
-    throw new AppError(403, 'Only owners and managers can save store report snapshots.', 'REPORT_SNAPSHOT_FORBIDDEN');
+    throw new AppError(403, 'Store report snapshots are available to owners and managers.', 'REPORT_SNAPSHOT_FORBIDDEN');
   }
 }
 
@@ -29,7 +29,8 @@ export const getStoreKpiSummary: RequestHandler = asyncHandler(async (request, r
   if (period.startAt >= period.endAt || period.endAt.getTime() - period.startAt.getTime() > 366 * 24 * 60 * 60 * 1000) {
     throw new AppError(400, 'Choose a valid report period of 366 days or less.', 'INVALID_REPORT_PERIOD');
   }
-  response.json({ data: await calculateStoreKpis(request.auth!.dealerAccountId, period) });
+  const includeEmployeeMetrics = request.auth!.role === 'owner' || request.auth!.role === 'manager';
+  response.json({ data: await calculateStoreKpis(request.auth!.dealerAccountId, period, includeEmployeeMetrics) });
 });
 
 export const createOwnStoreKpiSnapshot: RequestHandler = asyncHandler(async (request, response) => {
@@ -40,7 +41,7 @@ export const createOwnStoreKpiSnapshot: RequestHandler = asyncHandler(async (req
 });
 
 export const listOwnStoreKpiSnapshots: RequestHandler = asyncHandler(async (request, response) => {
-  assertReportReader(request);
+  assertReportManager(request);
   const parsed = reportPeriodQuerySchema.safeParse(request.query);
   if (!parsed.success) throw new AppError(400, parsed.error.issues.map((issue) => issue.message).join(' '), 'VALIDATION_ERROR');
   const startAt = parsed.data.startAt ? new Date(parsed.data.startAt) : undefined;
@@ -58,7 +59,7 @@ export const listOwnStoreKpiSnapshots: RequestHandler = asyncHandler(async (requ
 });
 
 export const getOwnStoreKpiSnapshot: RequestHandler = asyncHandler(async (request, response) => {
-  assertReportReader(request);
+  assertReportManager(request);
   const id = request.params.id;
   if (typeof id !== 'string') throw new AppError(404, 'Report snapshot not found.', 'REPORT_SNAPSHOT_NOT_FOUND');
   response.json({ data: await getStoreKpiSnapshot(request.auth!.dealerAccountId, id) });

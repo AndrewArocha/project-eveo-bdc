@@ -102,8 +102,8 @@ export default function StoreKpiPanel({ storeId, role }: Props) {
   useEffect(() => {
     if (!isOpen || !canRead) return;
     void loadSummary();
-    void loadSnapshots();
-  }, [canRead, isOpen, loadSnapshots, loadSummary]);
+    if (canSave) void loadSnapshots();
+  }, [canRead, canSave, isOpen, loadSnapshots, loadSummary]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -212,13 +212,18 @@ export default function StoreKpiPanel({ storeId, role }: Props) {
               </div>
             )}
 
-            <section className="mt-7 rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+            {displayedSummary?.employeeMetrics && displayedSummary.employeeMetrics.length > 0 && <section className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-[#0d141c]">
+              <div className="border-b border-white/5 px-4 py-3"><h3 className="text-sm font-bold">Employee activity</h3><p className="mt-1 text-[10px] text-gray-500">Counts use current lead and appointment assignments during the period, plus activity events attributed to the actor. Assignment history is not available yet.</p></div>
+              <div className="overflow-x-auto"><table className="w-full min-w-[580px] text-left text-[11px]"><thead className="text-[9px] uppercase tracking-wider text-gray-500"><tr><th scope="col" className="px-4 py-2.5">Employee</th><th scope="col" className="px-3 py-2.5 text-right">Leads assigned</th><th scope="col" className="px-3 py-2.5 text-right">Appointments assigned</th><th scope="col" className="px-4 py-2.5 text-right">Activities logged</th></tr></thead><tbody className="divide-y divide-white/5">{displayedSummary.employeeMetrics.map((employee) => <tr key={employee.userId}><th scope="row" className="px-4 py-3 font-semibold text-gray-200">{employee.name}<span className="ml-2 text-[9px] font-normal uppercase tracking-wider text-gray-500">{employee.role}</span></th><td className="px-3 py-3 text-right tabular-nums text-gray-300">{employee.assignedLeads}</td><td className="px-3 py-3 text-right tabular-nums text-gray-300">{employee.assignedAppointments}</td><td className="px-4 py-3 text-right tabular-nums text-gray-300">{employee.activitiesLogged}</td></tr>)}</tbody></table></div>
+            </section>}
+
+            {canSave && <section className="mt-7 rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div><h3 className="text-sm font-bold">Saved snapshots</h3><p className="mt-1 text-[11px] text-gray-500">Each snapshot preserves its values, formulas, and sampled source records.</p></div>
                 {canSave && <button type="button" onClick={() => void handleSaveSnapshot()} disabled={isSaving || !summary || !startDate || !endDate || startDate > endDate || Boolean(error)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-orange-400/30 px-3 text-xs font-bold text-orange-200 transition hover:bg-orange-400/10 disabled:opacity-50">{isSaving ? <LoaderCircle size={14} className="animate-spin" /> : <Save size={14} />} Save current snapshot</button>}
               </div>
               {snapshots.length ? <div className="mt-3 flex flex-wrap gap-2">{snapshots.map((snapshot) => <button key={snapshot.id} type="button" onClick={() => void handleSelectSnapshot(snapshot.id)} className={`inline-flex min-h-9 items-center gap-2 rounded-lg border px-3 text-[11px] transition ${selectedSnapshot?.id === snapshot.id ? 'border-orange-400/50 bg-orange-500/10 text-orange-100' : 'border-white/10 text-gray-300 hover:bg-white/5'}`}><Clock3 size={13} />{new Date(snapshot.periodStart).toLocaleDateString()} · {new Date(snapshot.generatedAt).toLocaleDateString()}</button>)}</div> : <p className="mt-3 text-xs text-gray-500">No saved report snapshots for this store yet.</p>}
-            </section>
+            </section>}
           </section>
         </div>
       )}

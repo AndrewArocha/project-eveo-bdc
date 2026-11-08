@@ -30,6 +30,14 @@ export interface StoreKpiSummary {
   periodEnd: string;
   generatedAt: string;
   metrics: StoreKpiMetric[];
+  employeeMetrics?: Array<{
+    userId: string;
+    name: string;
+    role: string;
+    assignedLeads: number;
+    assignedAppointments: number;
+    activitiesLogged: number;
+  }>;
 }
 
 export interface StoreKpiSnapshot extends StoreKpiSummary {

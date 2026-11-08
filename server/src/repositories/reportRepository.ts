@@ -5,6 +5,7 @@ import { Lead } from '../models/Lead.js';
 import { ReportSnapshot } from '../models/ReportSnapshot.js';
 import { ShowroomVisit } from '../models/ShowroomVisit.js';
 import { Store } from '../models/Store.js';
+import { User } from '../models/User.js';
 import { AppError } from '../utils/AppError.js';
 
 export const KPI_DEFINITION_VERSION = 1;
@@ -25,6 +26,14 @@ type Metric = {
   sourceRecords: SourceRecord[];
   sourcesTruncated: boolean;
 };
+type EmployeeMetric = {
+  userId: string;
+  name: string;
+  role: string;
+  assignedLeads: number;
+  assignedAppointments: number;
+  activitiesLogged: number;
+};
 
 export interface StoreKpiSummary {
   reportType: 'store_kpi';
@@ -35,6 +44,7 @@ export interface StoreKpiSummary {
   periodEnd: string;
   generatedAt: string;
   metrics: Metric[];
+  employeeMetrics?: EmployeeMetric[];
 }
 
 function sourceRecords<T extends { _id: Types.ObjectId; createdAt: Date; status?: string }>(
@@ -56,7 +66,7 @@ function countMetric(key: string, label: string, formula: string, measurementNot
   };
 }
 
-export async function calculateStoreKpis(dealerAccountId: string, period: ReportPeriod): Promise<StoreKpiSummary> {
+export async function calculateStoreKpis(dealerAccountId: string, period: ReportPeriod, includeEmployeeMetrics = false): Promise<StoreKpiSummary> {
   if (!Types.ObjectId.isValid(period.storeId)) throw new AppError(404, 'Store not found.', 'STORE_NOT_FOUND');
   const store = await Store.findOne({ _id: period.storeId, dealerAccountId, active: true }).select('timezone').lean();
   if (!store) throw new AppError(404, 'Store not found.', 'STORE_NOT_FOUND');
@@ -106,16 +116,48 @@ export async function calculateStoreKpis(dealerAccountId: string, period: Report
     countMetric('operational_activity', 'Recorded activities', 'Count of activity events recorded during the selected period.', 'Includes operational events currently captured by EVEO; external calls, SMS, and email are not yet ingested.', activityCount, activityRecords),
   ];
 
+  let employeeMetrics: EmployeeMetric[] | undefined;
+  if (includeEmployeeMetrics) {
+    const accountObjectId = new Types.ObjectId(dealerAccountId);
+    const storeObjectId = new Types.ObjectId(period.storeId);
+    const [employees, leadAssignments, appointmentAssignments, activitiesByActor] = await Promise.all([
+      User.find({ dealerAccountId, active: true, role: { $ne: 'owner' }, storeIds: period.storeId }).select('_id name role').sort({ name: 1 }).lean(),
+      Lead.aggregate([
+        { $match: { dealerAccountId: accountObjectId, storeId: storeObjectId, createdAt: range, assignedStoreUserId: { $ne: null } } },
+        { $group: { _id: '$assignedStoreUserId', count: { $sum: 1 } } },
+      ]),
+      Appointment.aggregate([
+        { $match: { dealerAccountId: accountObjectId, storeId: storeObjectId, createdAt: range, assignedStoreUserId: { $ne: null } } },
+        { $group: { _id: '$assignedStoreUserId', count: { $sum: 1 } } },
+      ]),
+      ActivityEvent.aggregate([
+        { $match: { dealerAccountId: accountObjectId, storeId: storeObjectId, occurredAt: range } },
+        { $group: { _id: '$actorUserId', count: { $sum: 1 } } },
+      ]),
+    ]);
+    const countsById = (rows: Array<{ _id: Types.ObjectId; count: number }>) => new Map(rows.map((row) => [row._id.toString(), row.count]));
+    const leadsByUser = countsById(leadAssignments);
+    const appointmentsByUser = countsById(appointmentAssignments);
+    const activitiesByUser = countsById(activitiesByActor);
+    employeeMetrics = employees.map((employee) => ({
+      userId: employee._id.toString(), name: employee.name, role: employee.role,
+      assignedLeads: leadsByUser.get(employee._id.toString()) ?? 0,
+      assignedAppointments: appointmentsByUser.get(employee._id.toString()) ?? 0,
+      activitiesLogged: activitiesByUser.get(employee._id.toString()) ?? 0,
+    }));
+  }
+
   return {
     reportType: 'store_kpi', definitionVersion: KPI_DEFINITION_VERSION,
     storeId: period.storeId, storeTimeZone,
     periodStart: period.startAt.toISOString(), periodEnd: period.endAt.toISOString(),
     generatedAt: new Date().toISOString(), metrics,
+    ...(employeeMetrics ? { employeeMetrics } : {}),
   };
 }
 
 export async function createStoreKpiSnapshot(dealerAccountId: string, userId: string, period: ReportPeriod) {
-  const summary = await calculateStoreKpis(dealerAccountId, period);
+  const summary = await calculateStoreKpis(dealerAccountId, period, true);
   const snapshot = await ReportSnapshot.create({
     dealerAccountId, storeId: period.storeId, reportType: summary.reportType,
     periodStart: period.startAt, periodEnd: period.endAt, storeTimeZone: summary.storeTimeZone,
