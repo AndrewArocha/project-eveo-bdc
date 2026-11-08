@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { completeOnboardingStep, getOnboarding, listPlatformAccounts, updatePlatformAccount, updateStoreOnboarding } from '../controllers/accountController.js';
+import { authenticate } from '../middlewares/authenticate.js';
+import { validateBody } from '../validators/validate.js';
+export const accountRoutes = Router();
+accountRoutes.use(authenticate);
+accountRoutes.get('/onboarding', getOnboarding);
+accountRoutes.patch('/onboarding', validateBody(z.object({ step: z.enum(['profile', 'store', 'team', 'inventory', 'integrations']) })), completeOnboardingStep);
+accountRoutes.patch('/store', validateBody(z.object({ storeId: z.string().regex(/^[a-f\d]{24}$/i), name: z.string().trim().min(1).max(120), timezone: z.string().min(1).max(60), website: z.url().or(z.literal('')).optional(), phone: z.string().max(40).optional(), address: z.string().max(300).optional() })), updateStoreOnboarding);
+accountRoutes.get('/platform', listPlatformAccounts);
+accountRoutes.patch('/platform/:id', validateBody(z.object({ status: z.enum(['active', 'suspended']) })), updatePlatformAccount);

@@ -7,6 +7,9 @@ const dealerAccountSchema = new Schema(
     status: { type: String, enum: ['pending', 'active', 'suspended'], default: 'pending', required: true },
     timezone: { type: String, default: 'America/New_York', required: true },
     multiStore: { type: Boolean, default: false, required: true },
+    onboardingCompletedSteps: { type: [String], enum: ['profile', 'store', 'team', 'inventory', 'integrations'], default: [] },
+    subscriptionStatus: { type: String, enum: ['trial', 'active', 'past_due', 'cancelled'], default: 'trial', required: true },
+    trialEndsAt: { type: Date, default: () => new Date(Date.now() + 14 * 86400000), required: true },
   },
   { timestamps: true },
 );
