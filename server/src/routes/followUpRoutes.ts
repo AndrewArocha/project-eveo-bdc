@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import { createOwnFollowUp, listOwnFollowUps, updateOwnFollowUp } from '../controllers/followUpController.js';
+import { authenticate } from '../middlewares/authenticate.js';
+import { requireStoreAccess } from '../middlewares/requireStoreAccess.js';
+import { FollowUp } from '../models/FollowUp.js';
+import { createFollowUpSchema, updateFollowUpSchema } from '../validators/followUp.js';
+import { validateBody } from '../validators/validate.js';
+export const followUpRoutes = Router();
+followUpRoutes.use(authenticate);
+followUpRoutes.get('/', requireStoreAccess(), listOwnFollowUps);
+followUpRoutes.post('/', requireStoreAccess(), validateBody(createFollowUpSchema), createOwnFollowUp);
+followUpRoutes.patch('/:id/status', requireStoreAccess(FollowUp), validateBody(updateFollowUpSchema), updateOwnFollowUp);

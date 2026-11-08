@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import { createOwnDeal, listOwnDeals, updateOwnDealStatus } from '../controllers/dealController.js';
+import { authenticate } from '../middlewares/authenticate.js';
+import { requireStoreAccess } from '../middlewares/requireStoreAccess.js';
+import { Deal } from '../models/Deal.js';
+import { createDealSchema, updateDealStatusSchema } from '../validators/deal.js';
+import { validateBody } from '../validators/validate.js';
+export const dealRoutes = Router();
+dealRoutes.use(authenticate);
+dealRoutes.get('/', requireStoreAccess(), listOwnDeals);
+dealRoutes.post('/', requireStoreAccess(), validateBody(createDealSchema), createOwnDeal);
+dealRoutes.patch('/:id/status', requireStoreAccess(Deal), validateBody(updateDealStatusSchema), updateOwnDealStatus);
