@@ -17,7 +17,10 @@ export async function submitSignupApplication(input: { name: string; businessNam
     throw new AppError(409, 'An account already uses this email address. Please sign in or contact EVEO support.', 'EMAIL_IN_USE');
   }
   const existing = await SignupApplication.findOne({ email: input.email });
-  if (existing && existing.status !== 'closed' && existing.status !== 'converted') {
+  if (existing?.status === 'converted') {
+    throw new AppError(409, 'This dealership request has already been converted. Please contact EVEO support if you need help.', 'APPLICATION_ALREADY_CONVERTED');
+  }
+  if (existing) {
     existing.name = input.name;
     existing.businessName = input.businessName;
     existing.phone = input.phone;
