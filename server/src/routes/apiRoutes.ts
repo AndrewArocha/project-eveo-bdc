@@ -9,6 +9,7 @@ import { appointmentRoutes } from './appointmentRoutes.js';
 import { showroomRoutes } from './showroomRoutes.js';
 import { activityRoutes } from './activityRoutes.js';
 import { reportRoutes } from './reportRoutes.js';
+import { integrationRoutes } from './integrationRoutes.js';
 
 export const apiRoutes = Router();
 // Keep the concise paths required by the full-stack assessment while retaining
@@ -24,3 +25,4 @@ apiRoutes.use('/appointments', appointmentRoutes);
 apiRoutes.use('/showroom', showroomRoutes);
 apiRoutes.use('/activity', activityRoutes);
 apiRoutes.use('/reports', reportRoutes);
+apiRoutes.use('/integrations', integrationRoutes);

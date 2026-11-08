@@ -13,6 +13,7 @@ export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   mongoUri: process.env.MONGODB_URI?.trim() ?? '',
   jwtSecret: process.env.JWT_SECRET?.trim() ?? '',
+  integrationEncryptionKey: process.env.INTEGRATION_ENCRYPTION_KEY?.trim() ?? '',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN?.trim() || DEFAULT_TOKEN_EXPIRY,
   clientOrigins: (process.env.CLIENT_ORIGIN ?? 'http://localhost:3000')
     .split(',')

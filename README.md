@@ -41,6 +41,7 @@ Or run both processes together with `npm run dev`. The client listens on port 30
 - `GET|PATCH|DELETE /api/customers/:id` reads or changes records only within the signed-in user's assigned store.
 - `GET /api/inventory?storeId=...&status=...&search=...` lists vehicles for a store in the signed-in user's dealer account.
 - `POST /api/inventory` creates an inventory vehicle; repeated VINs in the same store are idempotent, while an existing VIN in another store returns a conflict for reconciliation.
+- `POST /api/inventory/imports/csv` imports up to 500 vehicles from a CSV (800 KB max); existing VINs are recorded as observations and disagreements are flagged rather than overwritten. `GET /api/inventory/imports?storeId=...` lists import jobs and row errors. Owners and managers can upload.
 - `GET|PATCH /api/inventory/:id` reads or updates an account-owned inventory vehicle.
 - `POST /api/inventory/:id/observations` records a source observation and opens a discrepancy when a field conflicts with the current record.
 - `PATCH /api/inventory/:id/discrepancies/:discrepancyId` accepts the observed value or keeps the current value.
@@ -50,11 +51,14 @@ Or run both processes together with `npm run dev`. The client listens on port 30
 - `GET /api/showroom?storeId=...` lists visits; `POST /api/showroom` checks in a customer. A visit and its initial event are persisted in MongoDB, with customer, lead, appointment, employee and store links checked against the same dealer account.
 - `GET /api/showroom/:id?storeId=...`, `POST /api/showroom/:id/events?storeId=...` and `PATCH /api/showroom/:id/assignment?storeId=...` load visits, append timeline events and reassign an active visit. Closed visits cannot be changed.
 - `GET /api/activity?storeId=...` lists attributed activities; `POST /api/activity` records a staff-authored note for an owned store. Showroom check-ins, timeline events and assignments also generate linked activity records automatically.
+- `GET|POST /api/integrations?storeId=...` lists or saves an owner's store-specific provider credentials. Secrets are AES-256-GCM encrypted with `INTEGRATION_ENCRYPTION_KEY` and never returned by the API. `DELETE /api/integrations/:id` disables a connection. Saving credentials does not claim that an external provider sync is connected.
 - `GET /api/reports/summary?storeId=...&startAt=...&endAt=...` calculates versioned store KPIs for a store-local date range. It returns formulas, metric notes, and a capped sample of source records. Owners and managers also see per-employee assignment/activity counts. `GET /api/reports/snapshots?storeId=...` lists snapshot metadata, `GET /api/reports/snapshots/:id` loads a snapshot, and `POST /api/reports/snapshots` saves an immutable report payload for owners and managers. KPI reads are limited to owners, managers, and BDC employees; saved snapshots are restricted to owners and managers.
 - `POST /api/signup` and `POST /api/signin` are concise aliases for the `/api/auth/...` registration and sign-in routes used by the assessment checklist.
 - `GET /api/health` reports API liveness without depending on the database.
 
 All routes except registration, sign-in, invitation acceptance, and health require `Authorization: Bearer <token>`. Store creation and updates are owner-only; single-store accounts cannot add stores. Non-owner employees can access only assigned stores. Customer, inventory, lead, appointment, showroom and activity endpoints enforce store scope on both list and record operations. Client-supplied dealer account IDs are ignored. Request bodies are validated before database operations. The API does not return password hashes or invitation token hashes.
+
+Integration credential storage requires a unique 32-byte hex `INTEGRATION_ENCRYPTION_KEY` in each backend environment. Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`; store it in Render's secret environment settings and back it up securely. Do not commit the generated key.
 
 ## Quality commands
 

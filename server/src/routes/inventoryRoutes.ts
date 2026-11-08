@@ -7,6 +7,7 @@ import {
   resolveOwnInventoryDiscrepancy,
   updateOwnInventoryVehicle,
 } from '../controllers/inventoryController.js';
+import { createOwnInventoryImport, listOwnInventoryImports } from '../controllers/inventoryImportController.js';
 import { authenticate } from '../middlewares/authenticate.js';
 import { requireStoreAccess } from '../middlewares/requireStoreAccess.js';
 import { InventoryVehicle } from '../models/InventoryVehicle.js';
@@ -17,10 +18,13 @@ import {
   resolveInventoryDiscrepancySchema,
   updateInventoryVehicleSchema,
 } from '../validators/inventory.js';
+import { inventoryCsvImportSchema } from '../validators/integration.js';
 
 export const inventoryRoutes = Router();
 inventoryRoutes.use(authenticate);
 inventoryRoutes.get('/', requireStoreAccess(), listOwnInventory);
+inventoryRoutes.get('/imports', requireStoreAccess(), listOwnInventoryImports);
+inventoryRoutes.post('/imports/csv', requireStoreAccess(), validateBody(inventoryCsvImportSchema), createOwnInventoryImport);
 inventoryRoutes.post('/', requireStoreAccess(), validateBody(createInventoryVehicleSchema), createOwnInventoryVehicle);
 inventoryRoutes.get('/:id', requireStoreAccess(InventoryVehicle), getOwnInventoryVehicle);
 inventoryRoutes.patch('/:id', requireStoreAccess(InventoryVehicle), validateBody(updateInventoryVehicleSchema), updateOwnInventoryVehicle);
