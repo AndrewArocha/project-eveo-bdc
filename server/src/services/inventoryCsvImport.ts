@@ -8,7 +8,7 @@ type CsvRow = { rowNumber: number; values: string[] };
 type VehicleData = {
   vin: string; stockNumber: string; vehicle: string; make: string; model: string; trim: string;
   modelYear?: number; mileage?: number; price: number; condition: 'NEW' | 'USED' | 'CERTIFIED_PRE_OWNED';
-  status: 'READY_FOR_SALE' | 'PENDING' | 'DELIVERED';
+  status: 'READY_FOR_SALE' | 'PENDING' | 'SOLD' | 'DELIVERED';
 };
 const MAX_ROWS = 500;
 const HEADER_MAP: Record<string, string> = {
@@ -66,7 +66,7 @@ function mapVehicle(row: CsvRow, headerIndexes: Map<string, number>): VehicleDat
   const conditionRaw = field('condition').toLowerCase().replace(/[^a-z]/g, '');
   const condition = conditionRaw.includes('certified') ? 'CERTIFIED_PRE_OWNED' : conditionRaw === 'new' ? 'NEW' : 'USED';
   const statusRaw = field('status').toLowerCase().replace(/[^a-z]/g, '');
-  const status = statusRaw.includes('deliver') || statusRaw.includes('sold') ? 'DELIVERED' : statusRaw.includes('pending') || statusRaw.includes('hold') ? 'PENDING' : 'READY_FOR_SALE';
+  const status = statusRaw.includes('deliver') ? 'DELIVERED' : statusRaw.includes('sold') ? 'SOLD' : statusRaw.includes('pending') || statusRaw.includes('hold') ? 'PENDING' : 'READY_FOR_SALE';
   const vehicle = field('vehicle') || [modelYearValue, make, model, trim].filter(Boolean).join(' ');
   if (vehicle.length < 2) throw new Error('Provide a vehicle description or year, make, and model.');
   const price = parseNumber(field('price'), 'Price') ?? 0;

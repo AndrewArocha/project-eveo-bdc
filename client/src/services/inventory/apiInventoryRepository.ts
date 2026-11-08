@@ -1,6 +1,6 @@
 import { apiRequest } from '../apiClient';
 
-export type InventoryStatus = 'READY_FOR_SALE' | 'PENDING' | 'DELIVERED';
+export type InventoryStatus = 'READY_FOR_SALE' | 'PENDING' | 'SOLD' | 'DELIVERED';
 
 export interface InventoryDiscrepancy {
   _id: string;

@@ -15,3 +15,10 @@ export const createLeadSchema = z.object({
   assignedStoreUserId: objectId.optional(),
   notes: z.string().trim().max(4000).optional(),
 });
+
+export const updateLeadSchema = z.object({
+  status: z.enum(['new', 'contacted', 'qualified', 'appointment_set', 'nurture', 'lost', 'converted']).optional(),
+  assignedPlatformUserId: objectId.nullable().optional(),
+  assignedStoreUserId: objectId.nullable().optional(),
+  notes: z.string().trim().max(4000).optional(),
+}).refine((value) => Object.keys(value).length > 0);

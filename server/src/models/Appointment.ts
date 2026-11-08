@@ -1,5 +1,13 @@
 import { model, Schema, type InferSchemaType } from 'mongoose';
 
+const appointmentHistorySchema = new Schema({
+  kind: { type: String, enum: ['status', 'schedule', 'assignment'], required: true },
+  previousValue: { type: String, default: '' },
+  nextValue: { type: String, default: '' },
+  changedByUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  changedAt: { type: Date, required: true, default: Date.now },
+}, { _id: true });
+
 const appointmentSchema = new Schema(
   {
     dealerAccountId: { type: Schema.Types.ObjectId, ref: 'DealerAccount', required: true, index: true },
@@ -15,6 +23,7 @@ const appointmentSchema = new Schema(
     assignedPlatformUserId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     assignedStoreUserId: { type: Schema.Types.ObjectId, default: null },
     notes: { type: String, trim: true, default: '', maxlength: 4000 },
+    statusHistory: { type: [appointmentHistorySchema], default: [] },
     createdByUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { timestamps: true },

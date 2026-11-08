@@ -9,3 +9,4 @@ export const createCustomerSchema = z.object({
 });
 
 export const updateCustomerSchema = createCustomerSchema.partial();
+export const shareCustomerSchema = z.object({ storeIds: z.array(z.string().regex(/^[a-f\d]{24}$/i)).max(25) });

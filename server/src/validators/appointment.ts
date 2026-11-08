@@ -19,3 +19,4 @@ export const createAppointmentSchema = z.object({
 });
 
 export const updateAppointmentStatusSchema = z.object({ status: z.enum(statuses) });
+export const updateAppointmentDetailsSchema = z.object({ scheduledAt: z.iso.datetime().optional(), assignedPlatformUserId: objectId.nullable().optional(), assignedStoreUserId: objectId.nullable().optional() }).refine((value) => Object.keys(value).length > 0);

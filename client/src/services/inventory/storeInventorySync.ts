@@ -7,7 +7,7 @@ import { LEGACY_DEMO_STORES, readStoreScopedStorage, resolveLegacyStoreDataKey }
 import { playWoodBlockAlert } from '../../utils/soundEngine';
 import { pushStoreNotification } from '../../services/notifications/notificationCenterStore';
 
-export type InventoryUnitStatus = 'READY_FOR_SALE' | 'PENDING' | 'DELIVERED';
+export type InventoryUnitStatus = 'READY_FOR_SALE' | 'PENDING' | 'SOLD' | 'DELIVERED';
 export type StoreInventoryUnit = StoreInventorySummary['units'][number];
 
 const INVENTORY_STORAGE_PREFIX = 'eveo_store_inventory_v2_';
@@ -170,7 +170,7 @@ export function checkAndAlertIfVehicleSold(
   const inv = getStoreInventory(storeId);
   const soldUnit = inv.units.find(
     (u) =>
-      u.status === 'DELIVERED' &&
+      (u.status === 'SOLD' || u.status === 'DELIVERED') &&
       (u.vehicle.toLowerCase().includes(q) ||
         q.includes(u.vehicle.toLowerCase()) ||
         u.vin.toLowerCase() === q)

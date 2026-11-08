@@ -15,7 +15,7 @@ export const createInventoryVehicleSchema = z.object({
   mileage: z.number().nonnegative().nullable().optional(),
   price: z.number().nonnegative().default(0),
   condition: z.enum(['NEW', 'USED', 'CERTIFIED_PRE_OWNED']).default('USED'),
-  status: z.enum(['READY_FOR_SALE', 'PENDING', 'DELIVERED']).default('READY_FOR_SALE'),
+  status: z.enum(['READY_FOR_SALE', 'PENDING', 'SOLD', 'DELIVERED']).default('READY_FOR_SALE'),
   photos: z.array(z.url()).max(30).optional(),
 });
 
@@ -35,7 +35,7 @@ export const recordInventoryObservationSchema = z.object({
     mileage: z.number().nonnegative().nullable().optional(),
     price: z.number().nonnegative().optional(),
     condition: z.enum(['NEW', 'USED', 'CERTIFIED_PRE_OWNED']).optional(),
-    status: z.enum(['READY_FOR_SALE', 'PENDING', 'DELIVERED']).optional(),
+    status: z.enum(['READY_FOR_SALE', 'PENDING', 'SOLD', 'DELIVERED']).optional(),
   }).refine((values) => Object.keys(values).length > 0, 'Provide at least one observed inventory field.'),
 });
 

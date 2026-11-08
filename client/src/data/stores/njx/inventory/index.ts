@@ -10,7 +10,7 @@ export interface StoreInventorySummary {
     vehicle: string;
     daysInStock: number;
     price: number;
-    status: 'READY_FOR_SALE' | 'PENDING' | 'DELIVERED';
+    status: 'READY_FOR_SALE' | 'PENDING' | 'SOLD' | 'DELIVERED';
   }>;
 }
 

@@ -18,8 +18,12 @@ export function requireStoreAccess(model?: StoreScopedModel): RequestHandler {
     if (model && typeof request.params.id === 'string') {
       if (!Types.ObjectId.isValid(request.params.id)) throw new AppError(404, 'Record not found.', 'NOT_FOUND');
       const record = await model.findOne({ _id: request.params.id, dealerAccountId: auth.dealerAccountId })
-        .select('storeId').lean() as { storeId?: Types.ObjectId | string } | null;
+        .select('storeId sharedStoreIds').lean() as { storeId?: Types.ObjectId | string; sharedStoreIds?: Array<Types.ObjectId | string> } | null;
       recordStoreId = record?.storeId?.toString() || '';
+      if (requestedStoreId && recordStoreId && requestedStoreId !== recordStoreId &&
+        !record?.sharedStoreIds?.some((id) => id.toString() === requestedStoreId)) {
+        throw new AppError(404, 'Record not found.', 'NOT_FOUND');
+      }
     }
     const storeIds = [...new Set([requestedStoreId, recordStoreId].filter(Boolean))];
     if (storeIds.length === 0) throw new AppError(400, 'A storeId is required.', 'STORE_REQUIRED');

@@ -5,6 +5,7 @@ import {
   getCustomerByAccount,
   listCustomers,
   updateCustomer,
+  shareCustomer,
 } from '../repositories/customerRepository.js';
 import type { Request } from 'express';
 import { AppError } from '../utils/AppError.js';
@@ -34,11 +35,25 @@ export const getOwnCustomer: RequestHandler = asyncHandler(async (request, respo
 });
 
 export const updateOwnCustomer: RequestHandler = asyncHandler(async (request, response) => {
-  const customer = await updateCustomer(customerId(request), request.auth!.dealerAccountId, request.body);
+  const customerIdValue = customerId(request);
+  const current = await getCustomerByAccount(customerIdValue, request.auth!.dealerAccountId);
+  const requestedStore = typeof request.query.storeId === 'string' ? request.query.storeId : current.storeId?.toString();
+  if (requestedStore && requestedStore !== current.storeId?.toString()) throw new AppError(403, 'Shared customer records are read-only from this store.', 'SHARED_CUSTOMER_READ_ONLY');
+  const customer = await updateCustomer(customerIdValue, request.auth!.dealerAccountId, request.body);
   response.json({ data: customer });
 });
 
 export const deleteOwnCustomer: RequestHandler = asyncHandler(async (request, response) => {
-  await deleteCustomer(customerId(request), request.auth!.dealerAccountId);
+  const customerIdValue = customerId(request);
+  const current = await getCustomerByAccount(customerIdValue, request.auth!.dealerAccountId);
+  const requestedStore = typeof request.query.storeId === 'string' ? request.query.storeId : current.storeId?.toString();
+  if (requestedStore && requestedStore !== current.storeId?.toString()) throw new AppError(403, 'Shared customer records are read-only from this store.', 'SHARED_CUSTOMER_READ_ONLY');
+  await deleteCustomer(customerIdValue, request.auth!.dealerAccountId);
   response.status(204).end();
+});
+
+export const shareOwnCustomer: RequestHandler = asyncHandler(async (request, response) => {
+  if (request.auth!.role !== 'owner') throw new AppError(403, 'Only the dealership owner can share a customer across stores.', 'FORBIDDEN');
+  const ids = request.body.storeIds as string[];
+  response.json({ data: await shareCustomer(customerId(request), request.auth!.dealerAccountId, ids) });
 });

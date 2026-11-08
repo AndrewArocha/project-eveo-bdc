@@ -20,7 +20,7 @@ export const listOwnInventory: RequestHandler = asyncHandler(async (request, res
   const storeId = typeof request.query.storeId === 'string' ? request.query.storeId : '';
   if (!storeId) throw new AppError(400, 'A storeId query parameter is required.', 'STORE_REQUIRED');
   const status = typeof request.query.status === 'string' ? request.query.status : undefined;
-  if (status && !['READY_FOR_SALE', 'PENDING', 'DELIVERED'].includes(status)) {
+  if (status && !['READY_FOR_SALE', 'PENDING', 'SOLD', 'DELIVERED'].includes(status)) {
     throw new AppError(400, 'Choose a supported inventory status.', 'INVALID_STATUS');
   }
   const search = typeof request.query.search === 'string' ? request.query.search : undefined;

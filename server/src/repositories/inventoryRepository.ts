@@ -129,7 +129,7 @@ export async function resolveInventoryDiscrepancy(
     if (input.resolution === 'custom' && (numericFields.has(discrepancy.field) ? (typeof nextValue !== 'number' && nextValue !== null) : (typeof nextValue !== 'string' && nextValue !== null))) {
       throw new AppError(400, 'The resolved value does not match the inventory field type.', 'INVALID_RESOLUTION');
     }
-    if (input.resolution === 'custom' && discrepancy.field === 'status' && !['READY_FOR_SALE', 'PENDING', 'DELIVERED'].includes(String(nextValue))) {
+    if (input.resolution === 'custom' && discrepancy.field === 'status' && !['READY_FOR_SALE', 'PENDING', 'SOLD', 'DELIVERED'].includes(String(nextValue))) {
       throw new AppError(400, 'Choose a supported inventory status.', 'INVALID_RESOLUTION');
     }
     if (input.resolution === 'custom' && discrepancy.field === 'condition' && !['NEW', 'USED', 'CERTIFIED_PRE_OWNED'].includes(String(nextValue))) {

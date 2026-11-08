@@ -4,6 +4,7 @@ const customerSchema = new Schema(
   {
     dealerAccountId: { type: Schema.Types.ObjectId, ref: 'DealerAccount', required: true, index: true },
     storeId: { type: Schema.Types.ObjectId, ref: 'Store', default: null, index: true },
+    sharedStoreIds: { type: [Schema.Types.ObjectId], ref: 'Store', default: [] },
     ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     name: { type: String, required: true, trim: true, maxlength: 120 },
     email: { type: String, trim: true, lowercase: true, default: '' },

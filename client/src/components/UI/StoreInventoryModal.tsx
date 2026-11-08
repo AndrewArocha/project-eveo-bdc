@@ -321,7 +321,7 @@ export default function StoreInventoryModal({
           </div>
 
           <div className="flex items-center gap-1.5">
-            {(['ALL', 'READY_FOR_SALE', 'PENDING', 'DELIVERED'] as const).map((st) => (
+            {(['ALL', 'READY_FOR_SALE', 'PENDING', 'SOLD', 'DELIVERED'] as const).map((st) => (
               <button
                 key={st}
                 type="button"
@@ -344,7 +344,7 @@ export default function StoreInventoryModal({
             <div
               key={unit.vin}
               className={`p-5 rounded-3xl border flex flex-col justify-between gap-3 bg-linear-to-b from-[#141a23]/95 to-[#0a0f16] ${
-                unit.status === 'DELIVERED'
+                unit.status === 'DELIVERED' || unit.status === 'SOLD'
                   ? 'border-red-500/35 opacity-80'
                   : 'border-white/10'
               }`}
@@ -367,7 +367,7 @@ export default function StoreInventoryModal({
                         : 'bg-red-500/25 border-red-500/50 text-red-300'
                   }`}
                 >
-                  {unit.status === 'DELIVERED' ? 'SOLD / DELIVERED' : unit.status.replace(/_/g, ' ')}
+                  {unit.status === 'DELIVERED' ? 'DELIVERED' : unit.status.replace(/_/g, ' ')}
                 </span>
               </div>
 
@@ -396,7 +396,7 @@ export default function StoreInventoryModal({
               })}
 
               <div className="flex items-center gap-1.5 pt-2 border-t border-white/8">
-                {(['READY_FOR_SALE', 'PENDING', 'DELIVERED'] as const).map((st) => (
+                {(['READY_FOR_SALE', 'PENDING', 'SOLD', 'DELIVERED'] as const).map((st) => (
                   <button
                     key={st}
                     type="button"
@@ -405,11 +405,13 @@ export default function StoreInventoryModal({
                       unit.status === st
                         ? st === 'DELIVERED'
                           ? 'bg-red-500/25 border-red-500/50 text-red-300'
+                          : st === 'SOLD'
+                            ? 'bg-purple-500/25 border-purple-500/50 text-purple-300'
                           : 'bg-white/15 border-white/30 text-white'
                         : 'bg-white/3 border-white/6 text-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    {st === 'READY_FOR_SALE' ? 'Ready' : st === 'DELIVERED' ? 'Mark Sold' : 'Pending'}
+                    {st === 'READY_FOR_SALE' ? 'Ready' : st === 'PENDING' ? 'Pending' : st === 'SOLD' ? 'Sold' : 'Delivered'}
                   </button>
                 ))}
               </div>

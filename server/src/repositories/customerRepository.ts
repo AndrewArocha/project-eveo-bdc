@@ -20,13 +20,24 @@ export async function listCustomers(
 ) {
   if (filters.storeId) await assertStoreBelongsToAccount(filters.storeId, dealerAccountId);
   const query: Record<string, unknown> = { dealerAccountId };
-  if (filters.storeId) query.storeId = filters.storeId;
+  const conditions: Record<string, unknown>[] = [];
+  if (filters.storeId) conditions.push({ $or: [{ storeId: filters.storeId }, { sharedStoreIds: filters.storeId }] });
   if (filters.search?.trim()) {
     const escaped = filters.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const match = new RegExp(escaped, 'i');
-    query.$or = [{ name: match }, { email: match }, { phone: match }];
+    conditions.push({ $or: [{ name: match }, { email: match }, { phone: match }] });
   }
+  if (conditions.length) query.$and = conditions;
   return Customer.find(query).sort({ createdAt: -1 }).lean();
+}
+
+export async function shareCustomer(id: string, dealerAccountId: string, storeIds: string[]) {
+  const customer = await getCustomerByAccount(id, dealerAccountId);
+  const valid = await Store.countDocuments({ _id: { $in: storeIds }, dealerAccountId, active: true });
+  if (valid !== new Set(storeIds).size) throw new AppError(400, 'Every shared store must be active and belong to this dealership.', 'INVALID_SHARED_STORE');
+  customer.sharedStoreIds = storeIds.filter((storeId) => storeId !== customer.storeId?.toString()).map((storeId) => new Types.ObjectId(storeId));
+  await customer.save();
+  return customer;
 }
 
 export async function createCustomer(

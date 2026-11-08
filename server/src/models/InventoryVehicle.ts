@@ -43,7 +43,7 @@ const inventoryVehicleSchema = new Schema(
     mileage: { type: Number, min: 0, default: null },
     price: { type: Number, min: 0, default: 0, required: true },
     condition: { type: String, enum: ['NEW', 'USED', 'CERTIFIED_PRE_OWNED'], default: 'USED', required: true },
-    status: { type: String, enum: ['READY_FOR_SALE', 'PENDING', 'DELIVERED'], default: 'READY_FOR_SALE', required: true },
+    status: { type: String, enum: ['READY_FOR_SALE', 'PENDING', 'SOLD', 'DELIVERED'], default: 'READY_FOR_SALE', required: true },
     photos: { type: [String], default: [] },
     sourceObservations: { type: [sourceObservationSchema], default: [] },
     discrepancies: { type: [discrepancySchema], default: [] },
