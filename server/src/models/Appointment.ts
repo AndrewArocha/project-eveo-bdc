@@ -20,7 +20,8 @@ const appointmentSchema = new Schema(
   { timestamps: true },
 );
 
-appointmentSchema.index({ dealerAccountId: 1, storeId: 1, scheduledAt: 1 });
+appointmentSchema.index({ dealerAccountId: 1, storeId: 1, createdAt: -1 });
+appointmentSchema.index({ dealerAccountId: 1, storeId: 1, scheduledAt: 1, status: 1 });
 appointmentSchema.index({ dealerAccountId: 1, leadId: 1 });
 
 export type IAppointment = InferSchemaType<typeof appointmentSchema>;

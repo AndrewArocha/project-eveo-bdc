@@ -42,6 +42,7 @@ import {
   type ArchivedReportRecord,
 } from '../../components/reports/OrbModals';
 import SwipeableModal from '../../components/UI/SwipeableModal';
+import StoreKpiPanel from '../../components/reports/StoreKpiPanel';
 
 import { CURRENT_USER, getVisibleStoreRoster, type Store } from '../../data/mockDatabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -529,6 +530,7 @@ export default function Reports() {
             transition={{ duration: 0.25 }}
             className="relative flex-1 h-full w-full overflow-hidden text-white"
           >
+            <StoreKpiPanel key={openedStore.id} storeId={openedStore.id} role={roleStr} />
             <button
               type="button"
               onClick={handleCloseDashboard}

@@ -1,5 +1,5 @@
 import type { RequestHandler } from 'express';
-import type { Model, Types } from 'mongoose';
+import { Types, type Model } from 'mongoose';
 import { Store } from '../models/Store.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -16,6 +16,7 @@ export function requireStoreAccess(model?: StoreScopedModel): RequestHandler {
         : '';
     let recordStoreId = '';
     if (model && typeof request.params.id === 'string') {
+      if (!Types.ObjectId.isValid(request.params.id)) throw new AppError(404, 'Record not found.', 'NOT_FOUND');
       const record = await model.findOne({ _id: request.params.id, dealerAccountId: auth.dealerAccountId })
         .select('storeId').lean() as { storeId?: Types.ObjectId | string } | null;
       recordStoreId = record?.storeId?.toString() || '';
@@ -23,6 +24,7 @@ export function requireStoreAccess(model?: StoreScopedModel): RequestHandler {
     const storeIds = [...new Set([requestedStoreId, recordStoreId].filter(Boolean))];
     if (storeIds.length === 0) throw new AppError(400, 'A storeId is required.', 'STORE_REQUIRED');
     for (const storeId of storeIds) {
+      if (!Types.ObjectId.isValid(storeId)) throw new AppError(404, 'Store not found.', 'STORE_NOT_FOUND');
       if (!await Store.exists({ _id: storeId, dealerAccountId: auth.dealerAccountId })) {
         throw new AppError(404, 'Store not found.', 'STORE_NOT_FOUND');
       }

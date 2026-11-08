@@ -21,6 +21,7 @@ const leadSchema = new Schema(
 );
 
 leadSchema.index({ dealerAccountId: 1, storeId: 1, status: 1, createdAt: -1 });
+leadSchema.index({ dealerAccountId: 1, storeId: 1, createdAt: -1 });
 leadSchema.index({ dealerAccountId: 1, customerId: 1 });
 
 export type ILead = InferSchemaType<typeof leadSchema>;

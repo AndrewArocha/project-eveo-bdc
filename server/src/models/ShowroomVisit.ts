@@ -29,6 +29,7 @@ const showroomVisitSchema = new Schema({
 }, { timestamps: true });
 
 showroomVisitSchema.index({ dealerAccountId: 1, storeId: 1, updatedAt: -1 });
+showroomVisitSchema.index({ dealerAccountId: 1, storeId: 1, createdAt: -1 });
 
 export type IShowroomVisit = InferSchemaType<typeof showroomVisitSchema>;
 export const ShowroomVisit = model('ShowroomVisit', showroomVisitSchema);
