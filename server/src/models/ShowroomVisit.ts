@@ -1,7 +1,7 @@
 import { model, Schema, type InferSchemaType } from 'mongoose';
 
 const showroomEventSchema = new Schema({
-  type: { type: String, enum: ['customer_greeted', 'visit_claimed', 'walkaround_started', 'media_added', 'test_drive_started', 'test_drive_completed', 'handoff_requested', 'bdc_contact_logged', 'note_added', 'visit_completed'], required: true },
+  type: { type: String, enum: ['customer_greeted', 'visit_claimed', 'walkaround_started', 'media_added', 'test_drive_started', 'test_drive_completed', 'handoff_requested', 'handoff_accepted', 'manager_intervention', 'sla_breached', 'bdc_contact_logged', 'note_added', 'visit_completed'], required: true },
   actorUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   actorName: { type: String, required: true, trim: true, maxlength: 100 },
   occurredAt: { type: Date, required: true, default: Date.now },

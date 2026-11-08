@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i);
 const vehicle = z.record(z.string(), z.unknown()).nullable().optional();
-const eventTypes = ['customer_greeted', 'visit_claimed', 'walkaround_started', 'media_added', 'test_drive_started', 'test_drive_completed', 'handoff_requested', 'bdc_contact_logged', 'note_added', 'visit_completed'] as const;
+const eventTypes = ['customer_greeted', 'visit_claimed', 'walkaround_started', 'media_added', 'test_drive_started', 'test_drive_completed', 'handoff_requested', 'handoff_accepted', 'manager_intervention', 'sla_breached', 'bdc_contact_logged', 'note_added', 'visit_completed'] as const;
 
 export const createShowroomVisitSchema = z.object({
   storeId: objectId,

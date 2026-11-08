@@ -1,5 +1,6 @@
 // src/services/showroomMedia/mockShowroomMediaStore.ts
 import type { ShowroomMediaAsset } from '../../types';
+import { apiBaseUrl, authHeaders } from '../apiClient';
 
 const DATABASE_NAME = 'eveo-showroom-media-demo';
 const STORE_NAME = 'assets';
@@ -95,7 +96,7 @@ async function compressImageFile(file: File): Promise<{ blob: Blob; fileName: st
 }
 
 /** Demo adapter with automatic 4K photo optimization. Replace with backend S3/GCS upload in Phase 2. */
-export async function saveMockShowroomMedia(file: File): Promise<ShowroomMediaAsset> {
+export async function saveMockShowroomMedia(file: File, storeId?: string): Promise<ShowroomMediaAsset> {
   const isImage = file.type.startsWith('image/');
   const isVideo = file.type.startsWith('video/');
 
@@ -107,6 +108,18 @@ export async function saveMockShowroomMedia(file: File): Promise<ShowroomMediaAs
   }
   if (isImage && file.size > MAX_IMAGE_INPUT_BYTES) {
     throw new Error('Image file exceeds the 50 MB maximum limit.');
+  }
+
+  const token = localStorage.getItem('eveo_token');
+  if (token) {
+    if (!storeId) throw new Error('Choose a store before uploading showroom media.');
+    if (file.size > MAX_VIDEO_SIZE_BYTES) throw new Error('Showroom media must be 25 MB or smaller.');
+    const response = await fetch(`${apiBaseUrl}/showroom/media?${new URLSearchParams({ storeId })}`, {
+      method: 'POST', headers: authHeaders({ 'Content-Type': file.type, 'X-File-Name': encodeURIComponent(file.name) }), body: file,
+    });
+    const result = await response.json().catch(() => null) as { data?: ShowroomMediaAsset; error?: { message?: string } } | null;
+    if (!response.ok || !result?.data) throw new Error(result?.error?.message || 'Could not upload showroom media.');
+    return result.data;
   }
 
   let targetBlob: Blob = file;
@@ -146,6 +159,11 @@ export async function saveMockShowroomMedia(file: File): Promise<ShowroomMediaAs
 }
 
 export async function getMockShowroomMedia(assetId: string): Promise<Blob | null> {
+  if (/^[a-f\d]{24}$/i.test(assetId) && localStorage.getItem('eveo_token')) {
+    const response = await fetch(`${apiBaseUrl}/showroom/media/${encodeURIComponent(assetId)}/content`, { headers: authHeaders() });
+    if (!response.ok) return null;
+    return response.blob();
+  }
   const database = await openDatabase();
   try {
     return await new Promise<Blob | null>((resolve, reject) => {

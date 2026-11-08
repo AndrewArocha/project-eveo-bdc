@@ -1,4 +1,12 @@
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').trim().replace(/\/$/, '');
+export const apiBaseUrl = API_BASE_URL;
+
+export function authHeaders(headers: HeadersInit = {}) {
+  const result = new Headers(headers);
+  const token = localStorage.getItem('eveo_token');
+  if (token) result.set('Authorization', `Bearer ${token}`);
+  return result;
+}
 
 export interface ApiUser {
   id: string;

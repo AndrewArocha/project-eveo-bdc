@@ -578,7 +578,7 @@ export default function LiveShowroom() {
       setBusyAction('media_added');
       setMutationError(null);
       try {
-        const asset = await saveMockShowroomMedia(stagedMediaFile);
+        const asset = await saveMockShowroomMedia(stagedMediaFile, storeId);
         const caption = trimmed || `${asset.kind === 'video' ? 'Walkaround video' : 'Showroom photo'} attached (${asset.fileName})`;
         await appendEvent('media_added', caption, { media: asset });
         setStagedMediaFile(null);
@@ -623,8 +623,7 @@ export default function LiveShowroom() {
     try {
       let mediaAsset = undefined;
       if (postMediaFile) {
-        if (user) throw new Error('Secure photo storage is not configured for authenticated showroom visits yet.');
-        mediaAsset = await saveMockShowroomMedia(postMediaFile);
+        mediaAsset = await saveMockShowroomMedia(postMediaFile, storeId);
       }
 
       const targetCustomer = selectedCustomerPill || storePipelineCustomers[0] || 'Walk-In Client';

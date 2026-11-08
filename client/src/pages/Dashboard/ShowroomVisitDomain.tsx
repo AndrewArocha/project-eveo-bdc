@@ -285,13 +285,9 @@ export default function ShowroomVisitDomain() {
     }
 
     if (stagedFile) {
-      if (user) {
-        setMutationError('Secure photo storage is not configured for authenticated showroom visits yet.');
-        return;
-      }
       setBusyAction(stepConfig.submitType);
       try {
-        const asset = await saveMockShowroomMedia(stagedFile);
+        const asset = await saveMockShowroomMedia(stagedFile, storeId);
         const msg =
           noteText.trim() ||
           `${stepConfig.short} media verified (${asset.fileName})`;
