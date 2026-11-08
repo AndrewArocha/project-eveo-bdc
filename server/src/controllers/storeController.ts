@@ -43,7 +43,7 @@ function toStoreResponse(store: {
 }
 
 export const listOwnStores: RequestHandler = asyncHandler(async (request, response) => {
-  const stores = await listStoresForDealerAccount(dealerAccountId(request));
+  const stores = await listStoresForDealerAccount(dealerAccountId(request), request.auth!.role, request.auth!.storeIds);
   response.json({ data: stores.map(toStoreResponse) });
 });
 

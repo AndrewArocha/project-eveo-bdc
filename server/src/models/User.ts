@@ -10,6 +10,7 @@ const userSchema = new Schema(
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: USER_ROLES, default: 'owner', required: true },
     dealerAccountId: { type: Schema.Types.ObjectId, ref: 'DealerAccount', required: true, index: true },
+    storeIds: { type: [{ type: Schema.Types.ObjectId, ref: 'Store' }], default: [] },
     active: { type: Boolean, default: true, required: true },
   },
   { timestamps: true },

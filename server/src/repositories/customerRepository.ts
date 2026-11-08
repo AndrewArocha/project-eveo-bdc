@@ -38,6 +38,9 @@ export async function createCustomer(
   const email = typeof input.email === 'string' ? input.email.trim().toLowerCase() : '';
   const mergeMissingDetails = async (existing: HydratedDocument<ICustomer> | null) => {
     if (!existing) return null;
+    if (existing.storeId && input.storeId && existing.storeId.toString() !== String(input.storeId)) {
+      throw new AppError(409, 'A customer with this email already belongs to another store. Use an approved cross-store sharing workflow.', 'CUSTOMER_IN_ANOTHER_STORE');
+    }
     let changed = false;
     for (const field of ['phone', 'notes', 'storeId'] as const) {
       const current = existing.get(field);

@@ -7,6 +7,7 @@ declare global {
         userId: string;
         role: UserRole;
         dealerAccountId: string;
+        storeIds: string[];
       };
     }
   }

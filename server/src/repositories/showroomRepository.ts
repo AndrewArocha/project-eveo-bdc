@@ -21,9 +21,12 @@ async function findVisit(id: string, dealerAccountId: string, storeId: string) {
   return visit;
 }
 
-async function resolveAssignedUser(userId: string, dealerAccountId: string) {
+async function resolveAssignedUser(userId: string, dealerAccountId: string, storeId: string) {
   if (!Types.ObjectId.isValid(userId)) throw new AppError(400, 'Assigned employee is invalid.', 'INVALID_ASSIGNED_USER');
-  const user = await User.findOne({ _id: userId, dealerAccountId, active: true }).select('name role').lean();
+  const user = await User.findOne({
+    _id: userId, dealerAccountId, active: true,
+    $or: [{ role: 'owner' }, { storeIds: storeId }],
+  }).select('name role').lean();
   if (!user) throw new AppError(400, 'Assigned employee must belong to this dealership.', 'INVALID_ASSIGNED_USER');
   return user;
 }
@@ -43,7 +46,7 @@ export async function createShowroomVisit(input: Record<string, unknown>, userId
   await assertStore(storeId, dealerAccountId);
   const customerName = String(input.customerName).trim();
   const phone = String(input.customerPhone || '').trim();
-  const assignedUser = await resolveAssignedUser(String(input.assignedUserId), dealerAccountId);
+  const assignedUser = await resolveAssignedUser(String(input.assignedUserId), dealerAccountId, storeId);
   const actor = await User.findById(userId).select('name').lean();
   if (!actor) throw new AppError(401, 'User session is no longer valid.', 'UNAUTHORIZED');
 
@@ -102,7 +105,7 @@ export async function appendShowroomEvent(id: string, dealerAccountId: string, s
 export async function assignShowroomVisit(id: string, dealerAccountId: string, storeId: string, userId: string, assignedUserId: string) {
   const visit = await findVisit(id, dealerAccountId, storeId);
   if (visit.status === 'completed' || visit.status === 'cancelled') throw new AppError(409, 'This showroom visit is closed.', 'SHOWROOM_VISIT_CLOSED');
-  const assignedUser = await resolveAssignedUser(assignedUserId, dealerAccountId);
+  const assignedUser = await resolveAssignedUser(assignedUserId, dealerAccountId, storeId);
   const actor = await User.findById(userId).select('name').lean();
   if (!actor) throw new AppError(401, 'User session is no longer valid.', 'UNAUTHORIZED');
   visit.assignedUserId = assignedUser._id;

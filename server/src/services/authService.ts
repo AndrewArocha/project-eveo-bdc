@@ -1,10 +1,12 @@
 import bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 import jwt, { type SignOptions } from 'jsonwebtoken';
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { env } from '../config/env.js';
 import { DealerAccount } from '../models/DealerAccount.js';
 import { Store } from '../models/Store.js';
 import { User, type UserDocument } from '../models/User.js';
+import { UserInvitation } from '../models/UserInvitation.js';
 import { API_MESSAGES } from '../constants/api.js';
 import { AppError } from '../utils/AppError.js';
 import { toSafeUser } from '../utils/safeUser.js';
@@ -86,6 +88,41 @@ export async function signIn(email: string, password: string) {
   }
 
   return issueSession(user);
+}
+
+export async function acceptUserInvitation(input: { token: string; name: string; password: string }) {
+  if (!env.jwtSecret || env.jwtSecret.length < 32) {
+    throw new AppError(503, 'Authentication is not configured on this server.', 'AUTH_NOT_CONFIGURED');
+  }
+  const tokenHash = createHash('sha256').update(input.token).digest('hex');
+  const passwordHash = await bcrypt.hash(input.password, PASSWORD_SALT_ROUNDS);
+  const session = await mongoose.startSession();
+  let acceptedUser: UserDocument | null = null;
+  try {
+    await session.withTransaction(async () => {
+      const invitation = await UserInvitation.findOne({ tokenHash, status: 'pending', expiresAt: { $gt: new Date() } })
+        .select('+tokenHash').session(session);
+      if (!invitation) throw new AppError(400, 'This invitation is invalid, expired, or already used.', 'INVITATION_INVALID');
+
+      const created = await User.create([{
+        name: input.name,
+        email: invitation.email,
+        passwordHash,
+        role: invitation.role,
+        dealerAccountId: invitation.dealerAccountId,
+        storeIds: invitation.storeIds,
+        active: true,
+      }], { session });
+      acceptedUser = created[0] as UserDocument;
+      invitation.status = 'accepted';
+      invitation.acceptedAt = new Date();
+      await invitation.save({ session });
+    });
+  } finally {
+    await session.endSession();
+  }
+  if (!acceptedUser) throw new AppError(400, 'This invitation could not be accepted.', 'INVITATION_INVALID');
+  return issueSession(acceptedUser);
 }
 
 function issueSession(user: UserDocument) {

@@ -34,6 +34,11 @@ export const authenticate: RequestHandler = asyncHandler(async (request, _respon
   if (!account || account.status === 'suspended') {
     throw new AppError(403, API_MESSAGES.forbidden, 'ACCOUNT_SUSPENDED');
   }
-  request.auth = { userId: user.id, role: user.role, dealerAccountId: user.dealerAccountId.toString() };
+  request.auth = {
+    userId: user.id,
+    role: user.role,
+    dealerAccountId: user.dealerAccountId.toString(),
+    storeIds: user.storeIds.map((storeId) => storeId.toString()),
+  };
   next();
 });

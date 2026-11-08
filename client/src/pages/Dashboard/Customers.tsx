@@ -27,6 +27,7 @@ export default function Customers() {
     setError('');
     try {
       const params = new URLSearchParams();
+      if (activeStoreId) params.set('storeId', activeStoreId);
       if (query.trim()) params.set('search', query.trim());
       setCustomers(await apiRequest<CustomerRecord[]>(`/customers${params.size ? `?${params}` : ''}`));
     } catch (cause) {
@@ -34,7 +35,7 @@ export default function Customers() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeStoreId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadCustomers(search), 250);
@@ -94,7 +95,7 @@ export default function Customers() {
         <header>
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-orange-500">Dealership workspace</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-gray-900 dark:text-white">Customers</h1>
-          <p className="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-400">Customer records are scoped to your signed-in account.</p>
+          <p className="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-400">Customer records are scoped to your active store and dealership account.</p>
         </header>
 
         {notice && <p role="status" className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">{notice}</p>}

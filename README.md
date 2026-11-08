@@ -30,12 +30,15 @@ Or run both processes together with `npm run dev`. The client listens on port 30
 - `POST /api/auth/signup` creates a user, a pending DealerAccount, and its first Store.
 - `POST /api/auth/signin` verifies the password and returns a short-lived JWT.
 - `GET /api/users/me` returns the signed-in user's safe profile.
-- `GET /api/stores` lists stores belonging to the signed-in user's dealer account.
+- `GET /api/users?storeId=...` lists active employees who can access that store.
+- `POST /api/users/invitations` lets an owner invite a manager, BDC representative or salesperson to one or more active stores. The response contains a single-use token; only its hash is stored. `GET /api/users/invitations?storeId=...` lists pending invitations, and `DELETE /api/users/invitations/:id` revokes one.
+- `POST /api/auth/accept-invitation` accepts a valid invitation, creates the employee account transactionally and returns a JWT. Invitations expire after seven days. Email delivery is not configured; owners copy and share the returned link.
+- `GET /api/stores` lists all stores for an owner and only assigned stores for other employees.
 - `POST /api/stores` creates a store under the signed-in owner's dealer account.
 - `PATCH /api/stores/:id` updates only a store owned by that dealer account.
-- `GET /api/customers?search=...&storeId=...` queries customers within the signed-in user's dealer account.
-- `POST /api/customers` creates a customer or returns the matching dealer-account record when its email already exists. A duplicate submission fills only missing contact details; customers with linked leads or appointments cannot be moved or deleted.
-- `GET|PATCH|DELETE /api/customers/:id` reads or changes records only within the signed-in user's dealer account.
+- `GET /api/customers?search=...&storeId=...` queries customers within an assigned store.
+- `POST /api/customers` creates a customer or returns the matching same-store record when its email already exists. Cross-store duplicates return a conflict until an explicit sharing workflow exists.
+- `GET|PATCH|DELETE /api/customers/:id` reads or changes records only within the signed-in user's assigned store.
 - `GET /api/inventory?storeId=...&status=...&search=...` lists vehicles for a store in the signed-in user's dealer account.
 - `POST /api/inventory` creates an inventory vehicle; repeated VINs in the same store are idempotent, while an existing VIN in another store returns a conflict for reconciliation.
 - `GET|PATCH /api/inventory/:id` reads or updates an account-owned inventory vehicle.
@@ -50,7 +53,7 @@ Or run both processes together with `npm run dev`. The client listens on port 30
 - `POST /api/signup` and `POST /api/signin` are concise aliases for the `/api/auth/...` registration and sign-in routes used by the assessment checklist.
 - `GET /api/health` reports API liveness without depending on the database.
 
-All routes except registration, sign-in, and health require `Authorization: Bearer <token>`. Store creation and updates are owner-only; customer and inventory reads and writes are tenant-scoped. Client-supplied dealer account IDs are ignored. Request bodies are validated before database operations. The API does not return password hashes.
+All routes except registration, sign-in, invitation acceptance, and health require `Authorization: Bearer <token>`. Store creation and updates are owner-only; single-store accounts cannot add stores. Non-owner employees can access only assigned stores. Customer, inventory, lead, appointment, showroom and activity endpoints enforce store scope on both list and record operations. Client-supplied dealer account IDs are ignored. Request bodies are validated before database operations. The API does not return password hashes or invitation token hashes.
 
 ## Quality commands
 
@@ -61,6 +64,6 @@ npm run lint
 
 ## Current implementation scope
 
-Authentication, registration, store provisioning, customer and inventory records, plus initial lead, appointment, showroom and activity operations establish the persistent full-stack workflows. Authenticated showroom sessions use the tenant-scoped API; unauthenticated sessions retain the local demonstration adapter. Authenticated media uploads remain disabled until an authorized object-storage integration is configured. KPI reporting, deterministic E.V.E. tools, billing, and external integrations remain follow-up milestones.
+Authentication, registration, store provisioning, employee invitations and store assignments, customer and inventory records, plus initial lead, appointment, showroom and activity operations establish the persistent full-stack workflows. Authenticated showroom sessions use the tenant-scoped API; unauthenticated sessions retain the local demonstration adapter. Authenticated media uploads remain disabled until an authorized object-storage integration is configured. KPI reporting, deterministic E.V.E. tools, billing, and external integrations remain follow-up milestones.
 
 Active store selection now reads authenticated stores from the API and demo stores from the canonical domain repository. Phase 1 store metadata and data remain available through a compatibility adapter while those screens migrate to persistent records.

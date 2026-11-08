@@ -1,9 +1,12 @@
 // src/pages/Admin/AdminPortal.tsx
-import { useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Users, Settings, Copy, Trash2, CheckCircle2, ExternalLink, ShieldAlert } from 'lucide-react';
+import { CreditCard, Users, Settings, Copy, ExternalLink, ShieldAlert, LoaderCircle, UserPlus } from 'lucide-react';
 import { mockIntegrations, type Integration } from '../../data/mockDatabase';
+import { ApiError, type ApiEmployeeRole, type ApiTeamMember, type ApiUserInvitation } from '../../services/apiClient';
+import { teamRepository } from '../../services/team/teamRepository';
+import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 
 import StoreProfileTab from '../../components/Admin/StoreProfileTab';
 import StoreRegistryManager from '../../components/Admin/StoreRegistryManager';
@@ -14,22 +17,92 @@ type Tab = 'billing' | 'team' | 'settings';
 export default function AdminPortal() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('settings');
+  const { registeredStores } = useStoreAppearance();
+  const [teamStoreId, setTeamStoreId] = useState('');
+  const [teamMembers, setTeamMembers] = useState<ApiTeamMember[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<ApiUserInvitation[]>([]);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<ApiEmployeeRole>('sales');
+  const [assignedStoreIds, setAssignedStoreIds] = useState<string[]>([]);
+  const [inviteLink, setInviteLink] = useState('');
+  const [teamError, setTeamError] = useState('');
+  const [teamFeedback, setTeamFeedback] = useState('');
+  const [teamBusy, setTeamBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const [integrations, setIntegrations] = useState<Integration[]>(mockIntegrations);
   const [isIntegrationModalOpen, setIsIntegrationModalOpen] = useState(false);
 
-  const inviteLink = 'https://eveo.app/invite/dlr_7x9Q2mP';
-  const teamMembers = [
-    { id: 1, name: 'Andres Hernandez', role: 'Owner', email: 'admin@premiumauto.com' },
-    { id: 2, name: 'Sofia', role: 'BDC Agent', email: 'sofia@premiumauto.com' },
-    { id: 3, name: 'Ricardo', role: 'Floor Manager', email: 'ricardo@premiumauto.com' },
-  ];
+  useEffect(() => {
+    if (!teamStoreId && registeredStores[0]) {
+      setTeamStoreId(registeredStores[0].id);
+      setAssignedStoreIds([registeredStores[0].id]);
+    }
+  }, [teamStoreId, registeredStores]);
 
-  const handleCopyLink = () => {
-    void navigator.clipboard.writeText(inviteLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  useEffect(() => {
+    if (!teamStoreId) return;
+    let active = true;
+    setTeamBusy(true);
+    setTeamError('');
+    Promise.all([teamRepository.listMembers(teamStoreId), teamRepository.listInvitations(teamStoreId)])
+      .then(([members, invitations]) => {
+        if (!active) return;
+        setTeamMembers(members);
+        setPendingInvitations(invitations);
+      })
+      .catch((cause) => {
+        if (active) setTeamError(cause instanceof ApiError ? cause.message : 'Could not load dealership users.');
+      })
+      .finally(() => { if (active) setTeamBusy(false); });
+    return () => { active = false; };
+  }, [teamStoreId]);
+
+  const handleInvite = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setTeamError('');
+    setTeamFeedback('');
+    if (assignedStoreIds.length === 0) {
+      setTeamError('Assign the employee to at least one store.');
+      return;
+    }
+    setTeamBusy(true);
+    try {
+      const invitation = await teamRepository.invite({ email: inviteEmail.trim(), role: inviteRole, storeIds: assignedStoreIds });
+      setInviteLink(`${window.location.origin}/invite?token=${encodeURIComponent(invitation.token || '')}`);
+      setTeamFeedback(`Invitation created for ${invitation.email}. It expires ${new Date(invitation.expiresAt).toLocaleDateString()}.`);
+      setInviteEmail('');
+      const [members, invitations] = await Promise.all([teamRepository.listMembers(teamStoreId), teamRepository.listInvitations(teamStoreId)]);
+      setTeamMembers(members);
+      setPendingInvitations(invitations);
+    } catch (cause) {
+      setTeamError(cause instanceof ApiError ? cause.message : 'Could not create the invitation.');
+    } finally {
+      setTeamBusy(false);
+    }
+  };
+
+  const handleCopyInvite = async () => {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setTeamError('Clipboard access was blocked. Select and copy the invitation link.');
+    }
+  };
+
+  const handleRevokeInvite = async (invitation: ApiUserInvitation) => {
+    setTeamError('');
+    setTeamFeedback('');
+    try {
+      await teamRepository.revokeInvitation(invitation.id);
+      setPendingInvitations((current) => current.filter((item) => item.id !== invitation.id));
+      setTeamFeedback(`Invitation for ${invitation.email} was revoked.`);
+    } catch (cause) {
+      setTeamError(cause instanceof ApiError ? cause.message : 'Could not revoke this invitation.');
+    }
   };
 
   return (
@@ -150,65 +223,90 @@ export default function AdminPortal() {
             {/* --- TAB: TEAM MANAGEMENT --- */}
             {activeTab === 'team' && (
               <motion.div key="team" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
-                <div className="p-5 sm:p-6 rounded-2xl bg-[#0a0f16] border border-white/10 shadow-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-orange-500">Onboarding</span>
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <section className="rounded-2xl border border-white/10 bg-[#0a0f16] p-5 shadow-lg sm:p-6">
+                  <div className="mb-4">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-orange-500">Employee onboarding</span>
+                    <h3 className="mt-1 text-base font-bold text-white sm:text-lg">Invite a dealership employee</h3>
+                    <p className="mt-1 text-xs leading-relaxed text-gray-400">Invitations are single-use, expire after seven days, and only grant access to the selected stores. Email delivery is not configured yet; share the generated link through an approved channel.</p>
                   </div>
-                  <h3 className="text-base sm:text-lg font-bold text-white mb-1.5">Dealership Invite Link</h3>
-                  <p className="text-xs sm:text-sm text-gray-400 mb-4 leading-relaxed">
-                    Send this unique URL to your employees. Anyone who registers through this link will be automatically tied to your store&apos;s master hub.
-                  </p>
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                    <div className="flex-1 px-3.5 py-2.5 bg-black/40 border border-white/15 rounded-xl text-xs sm:text-sm font-mono text-gray-300 overflow-x-auto whitespace-nowrap">
-                      {inviteLink}
+                  <form onSubmit={(event) => void handleInvite(event)} className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="employee-email" className="mb-1.5 ml-1 block text-xs font-semibold text-gray-400">Work email</label>
+                      <input id="employee-email" type="email" required value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} className="min-h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm text-white outline-none focus:border-orange-500" />
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleCopyLink}
-                      className="min-h-11 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 shrink-0 outline-none cursor-pointer"
-                    >
-                      {copied ? <CheckCircle2 size={16} /> : <Copy size={16} />}
-                      <span>{copied ? 'Copied!' : 'Copy Invite Link'}</span>
+                    <div>
+                      <label htmlFor="employee-role" className="mb-1.5 ml-1 block text-xs font-semibold text-gray-400">Role</label>
+                      <select id="employee-role" value={inviteRole} onChange={(event) => setInviteRole(event.target.value as ApiEmployeeRole)} className="min-h-11 w-full rounded-xl border border-white/10 bg-[#111821] px-3.5 py-2.5 text-sm text-white outline-none focus:border-orange-500">
+                        <option value="manager">Manager</option>
+                        <option value="bdc">BDC</option>
+                        <option value="sales">Sales</option>
+                      </select>
+                    </div>
+                    <fieldset className="space-y-2 sm:col-span-2">
+                      <legend className="mb-1 ml-1 text-xs font-semibold text-gray-400">Store access</legend>
+                      {registeredStores.length === 0 ? <p className="text-xs text-gray-500">Add a store before inviting employees.</p> : registeredStores.map((store) => (
+                        <label key={store.id} className="flex min-h-10 items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-gray-300">
+                          <input type="checkbox" checked={assignedStoreIds.includes(store.id)} onChange={(event) => setAssignedStoreIds((current) => event.target.checked ? [...new Set([...current, store.id])] : current.filter((id) => id !== store.id))} className="accent-orange-500" />
+                          <span>{store.name} <span className="text-[10px] uppercase tracking-widest text-gray-500">{store.code}</span></span>
+                        </label>
+                      ))}
+                    </fieldset>
+                    {(teamError || teamFeedback) && <p role={teamError ? 'alert' : 'status'} className={`text-xs sm:col-span-2 ${teamError ? 'text-red-400' : 'text-emerald-400'}`}>{teamError || teamFeedback}</p>}
+                    <button type="submit" disabled={teamBusy || registeredStores.length === 0} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-xs font-bold text-white transition hover:bg-orange-600 disabled:cursor-wait disabled:opacity-60 sm:col-span-2 sm:justify-self-start">
+                      {teamBusy ? <LoaderCircle size={15} className="animate-spin" /> : <UserPlus size={15} />}{teamBusy ? 'Working…' : 'Create invitation'}
                     </button>
+                  </form>
+                  {inviteLink && (
+                    <div className="mt-5 space-y-3 rounded-xl border border-orange-500/25 bg-orange-500/5 p-4">
+                      <p className="text-xs font-semibold text-orange-300">Copy this one-time invitation link. The raw token will not be shown again after leaving this page.</p>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <input aria-label="Invitation link" readOnly value={inviteLink} className="min-h-11 min-w-0 flex-1 rounded-lg border border-white/10 bg-black/40 px-3 text-xs text-gray-300" />
+                        <button type="button" onClick={() => void handleCopyInvite()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 text-xs font-bold text-white"><Copy size={14} />{copied ? 'Copied' : 'Copy link'}</button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+
+                <div className="rounded-2xl border border-white/10 bg-[#0a0f16] p-5 shadow-lg sm:p-6">
+                  <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-white">Team members</h3>
+                      <p className="mt-1 text-xs text-gray-500">Users with access to the selected store.</p>
+                    </div>
+                    <label className="text-xs text-gray-400">Store
+                      <select value={teamStoreId} onChange={(event) => setTeamStoreId(event.target.value)} className="ml-2 min-h-10 rounded-lg border border-white/10 bg-[#111821] px-3 text-xs text-white">
+                        {registeredStores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
+                      </select>
+                    </label>
                   </div>
+                  {teamBusy && teamMembers.length === 0 ? <p className="flex items-center gap-2 py-5 text-xs text-gray-400"><LoaderCircle size={14} className="animate-spin" /> Loading team…</p> : teamMembers.length === 0 ? <p className="py-5 text-xs text-gray-500">No active team members were found for this store.</p> : (
+                    <div className="divide-y divide-white/5">
+                      {teamMembers.map((member) => (
+                        <div key={member.id} className="flex items-center justify-between gap-3 py-4 first:pt-0 last:pb-0">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold text-white">{member.name}</p>
+                            <p className="mt-1 truncate text-xs text-gray-400">{member.email}</p>
+                          </div>
+                          <span className={`shrink-0 rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${member.role === 'owner' ? 'bg-orange-500/10 text-orange-400' : 'bg-white/5 text-gray-300'}`}>{member.role}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-[#0a0f16] overflow-hidden shadow-lg">
-                  <div className="px-5 sm:px-6 py-4 border-b border-white/10 bg-white/5">
-                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Active Users</h3>
-                  </div>
-                  <div className="divide-y divide-white/5">
-                    {teamMembers.map((user) => (
-                      <div key={user.id} className="p-5 sm:p-6 flex items-center justify-between gap-4 hover:bg-white/2 transition-colors">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2.5 mb-1">
-                            <span className="font-bold text-white text-base truncate">{user.name}</span>
-                            {user.role === 'Owner' && (
-                              <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-widest bg-orange-500/10 text-orange-500 shrink-0">
-                                Owner
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-gray-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                            <span>{user.role}</span>
-                            <span>&bull;</span>
-                            <span className="truncate">{user.email}</span>
-                          </div>
+                {pendingInvitations.length > 0 && (
+                  <div className="rounded-2xl border border-white/10 bg-[#0a0f16] p-5 shadow-lg sm:p-6">
+                    <h3 className="mb-3 text-sm font-bold text-white">Pending invitations</h3>
+                    <div className="divide-y divide-white/5">
+                      {pendingInvitations.map((invitation) => (
+                        <div key={invitation.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                          <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{invitation.email}</p><p className="mt-1 text-[10px] uppercase tracking-wider text-gray-500">{invitation.role} · expires {new Date(invitation.expiresAt).toLocaleDateString()}</p></div>
+                          <button type="button" onClick={() => void handleRevokeInvite(invitation)} className="min-h-10 rounded-lg border border-red-500/20 px-3 text-xs font-bold text-red-300 transition hover:bg-red-500/10">Revoke</button>
                         </div>
-                        {user.role !== 'Owner' && (
-                          <button
-                            type="button"
-                            aria-label={`Remove ${user.name}`}
-                            className="p-2.5 text-gray-400 hover:text-red-500 bg-white/5 hover:bg-red-500/10 active:scale-95 rounded-xl transition-all border border-white/5 hover:border-red-500/20 shrink-0 outline-none cursor-pointer"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </motion.div>
             )}
 

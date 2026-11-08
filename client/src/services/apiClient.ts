@@ -6,7 +6,21 @@ export interface ApiUser {
   email: string;
   role: 'owner' | 'manager' | 'bdc' | 'sales';
   dealerAccountId: string;
+  storeIds: string[];
   createdAt: string;
+}
+
+export type ApiEmployeeRole = Exclude<ApiUser['role'], 'owner'>;
+export interface ApiTeamMember extends Omit<ApiUser, 'createdAt'> { createdAt: string; }
+export interface ApiUserInvitation {
+  id: string;
+  email: string;
+  role: ApiEmployeeRole;
+  storeIds: string[];
+  status: 'pending' | 'accepted' | 'revoked';
+  expiresAt: string;
+  createdAt: string;
+  token?: string;
 }
 
 export interface CustomerRecord {

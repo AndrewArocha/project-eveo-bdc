@@ -9,11 +9,13 @@ import {
 import { authenticate } from '../middlewares/authenticate.js';
 import { validateBody } from '../validators/validate.js';
 import { createCustomerSchema, updateCustomerSchema } from '../validators/customer.js';
+import { requireStoreAccess } from '../middlewares/requireStoreAccess.js';
+import { Customer } from '../models/Customer.js';
 
 export const customerRoutes = Router();
 customerRoutes.use(authenticate);
-customerRoutes.get('/', listOwnCustomers);
-customerRoutes.post('/', validateBody(createCustomerSchema), createOwnCustomer);
-customerRoutes.get('/:id', getOwnCustomer);
-customerRoutes.patch('/:id', validateBody(updateCustomerSchema), updateOwnCustomer);
-customerRoutes.delete('/:id', deleteOwnCustomer);
+customerRoutes.get('/', requireStoreAccess(), listOwnCustomers);
+customerRoutes.post('/', requireStoreAccess(), validateBody(createCustomerSchema), createOwnCustomer);
+customerRoutes.get('/:id', requireStoreAccess(Customer), getOwnCustomer);
+customerRoutes.patch('/:id', requireStoreAccess(Customer), validateBody(updateCustomerSchema), updateOwnCustomer);
+customerRoutes.delete('/:id', requireStoreAccess(Customer), deleteOwnCustomer);

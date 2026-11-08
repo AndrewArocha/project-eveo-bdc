@@ -5,8 +5,13 @@ import Footer from '../components/Layout/Footer';
 import AdminPortal from '../pages/Admin/AdminPortal';
 import StorePortal from '../pages/Admin/StorePortal';
 import PaymentPortal from '../pages/Admin/PaymentPortal';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function AdminRoutes() {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'owner') return <Navigate to="/app/hub" replace />;
   return (
     <div className="flex flex-col min-h-screen bg-[#05080c]">
       <Header />

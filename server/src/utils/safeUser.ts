@@ -8,6 +8,7 @@ export function toSafeUser(user: HydratedDocument<IUser>) {
     email: user.email,
     role: user.role,
     dealerAccountId: user.dealerAccountId,
+    storeIds: user.storeIds.map((storeId) => storeId.toString()),
     createdAt: user.createdAt,
   };
 }

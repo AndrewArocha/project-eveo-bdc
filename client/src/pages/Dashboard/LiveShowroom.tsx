@@ -28,6 +28,8 @@ import LiveActivityDeck from '../../components/showroom/LiveActivityDeck';
 import { showroomRepository } from '../../services/showroom';
 import { apiLiveActivityRepository } from '../../services/liveActivity/apiLiveActivityRepository';
 import { apiOperationalRepository } from '../../services/operational/apiOperationalRepository';
+import { teamRepository } from '../../services/team/teamRepository';
+import type { ApiTeamMember } from '../../services/apiClient';
 import { getMockShowroomMedia, saveMockShowroomMedia } from '../../services/showroomMedia/mockShowroomMediaStore';
 import { decodeVin } from '../../utils/nhtsaVinService';
 import { getAppointmentsByDate, getTodayDateKey, type Appointment } from '../../utils/appointmentManager';
@@ -126,12 +128,30 @@ export default function LiveShowroom() {
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(visitIdFromUrl);
   const [isSwitchingStore, setIsSwitchingStore] = useState(false);
   const actor = useMemo(() => createActor(role, user), [role, user]);
+  const [storeTeamMembers, setStoreTeamMembers] = useState<ApiTeamMember[]>([]);
+
+  useEffect(() => {
+    if (!user || !storeId) {
+      setStoreTeamMembers([]);
+      return;
+    }
+    let active = true;
+    teamRepository.listMembers(storeId)
+      .then((members) => { if (active) setStoreTeamMembers(members); })
+      .catch(() => { if (active) setStoreTeamMembers([]); });
+    return () => { active = false; };
+  }, [storeId, user]);
 
   const salespeople = useMemo(() => {
-    if (user) return [{ id: user.id, name: user.name, role: 'sales' as const }];
+    if (user) {
+      const assigned = storeTeamMembers
+        .filter((member) => member.role === 'sales' || member.role === 'manager')
+        .map((member) => ({ id: member.id, name: member.name, role: member.role as 'sales' | 'manager' }));
+      return assigned.length > 0 ? assigned : [{ id: user.id, name: user.name, role: 'sales' as const }];
+    }
     const staff = getStoreDataOrEmpty(storeId).staff;
     return staff.filter((person) => person.role === 'sales' || person.role === 'manager');
-  }, [storeId, user]);
+  }, [storeId, storeTeamMembers, user]);
 
   const roster = useMemo(() => getVisibleStoreRoster(storeId), [storeId]);
 

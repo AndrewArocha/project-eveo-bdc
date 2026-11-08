@@ -1,0 +1,35 @@
+import type { RequestHandler } from 'express';
+import type { Model, Types } from 'mongoose';
+import { Store } from '../models/Store.js';
+import { AppError } from '../utils/AppError.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+
+type StoreScopedModel = Pick<Model<unknown>, 'findOne'>;
+
+export function requireStoreAccess(model?: StoreScopedModel): RequestHandler {
+  return asyncHandler(async (request, _response, next) => {
+    const auth = request.auth;
+    if (!auth) throw new AppError(401, 'A valid sign-in is required.', 'UNAUTHORIZED');
+
+    const requestedStoreId = typeof request.query.storeId === 'string' ? request.query.storeId
+      : typeof request.body?.storeId === 'string' ? request.body.storeId
+        : '';
+    let recordStoreId = '';
+    if (model && typeof request.params.id === 'string') {
+      const record = await model.findOne({ _id: request.params.id, dealerAccountId: auth.dealerAccountId })
+        .select('storeId').lean() as { storeId?: Types.ObjectId | string } | null;
+      recordStoreId = record?.storeId?.toString() || '';
+    }
+    const storeIds = [...new Set([requestedStoreId, recordStoreId].filter(Boolean))];
+    if (storeIds.length === 0) throw new AppError(400, 'A storeId is required.', 'STORE_REQUIRED');
+    for (const storeId of storeIds) {
+      if (!await Store.exists({ _id: storeId, dealerAccountId: auth.dealerAccountId })) {
+        throw new AppError(404, 'Store not found.', 'STORE_NOT_FOUND');
+      }
+      if (auth.role !== 'owner' && !auth.storeIds.includes(storeId)) {
+        throw new AppError(403, 'You do not have access to this store.', 'STORE_ACCESS_DENIED');
+      }
+    }
+    next();
+  });
+}
