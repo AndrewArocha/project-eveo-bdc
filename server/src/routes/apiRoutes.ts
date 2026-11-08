@@ -10,6 +10,12 @@ import { showroomRoutes } from './showroomRoutes.js';
 import { activityRoutes } from './activityRoutes.js';
 import { reportRoutes } from './reportRoutes.js';
 import { integrationRoutes } from './integrationRoutes.js';
+import { dealRoutes } from './dealRoutes.js';
+import { followUpRoutes } from './followUpRoutes.js';
+import { eveRoutes } from './eveRoutes.js';
+import { marketingCampaignRoutes } from './marketingCampaignRoutes.js';
+import { accountRoutes } from './accountRoutes.js';
+import { showroomMediaRoutes } from './showroomMediaRoutes.js';
 
 export const apiRoutes = Router();
 // Keep the concise paths required by the full-stack assessment while retaining
@@ -26,3 +32,9 @@ apiRoutes.use('/showroom', showroomRoutes);
 apiRoutes.use('/activity', activityRoutes);
 apiRoutes.use('/reports', reportRoutes);
 apiRoutes.use('/integrations', integrationRoutes);
+apiRoutes.use('/deals', dealRoutes);
+apiRoutes.use('/follow-ups', followUpRoutes);
+apiRoutes.use('/eve', eveRoutes);
+apiRoutes.use('/marketing/campaigns', marketingCampaignRoutes);
+apiRoutes.use('/account', accountRoutes);
+apiRoutes.use('/showroom/media', showroomMediaRoutes);

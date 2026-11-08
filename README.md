@@ -37,7 +37,7 @@ Or run both processes together with `npm run dev`. The client listens on port 30
 - `POST /api/stores` creates a store under the signed-in owner's dealer account.
 - `PATCH /api/stores/:id` updates only a store owned by that dealer account.
 - `GET /api/customers?search=...&storeId=...` queries customers within an assigned store.
-- `POST /api/customers` creates a customer or returns the matching same-store record when its email already exists. Cross-store duplicates return a conflict until an explicit sharing workflow exists.
+- `POST /api/customers` creates a customer or returns the matching dealership record when its email already exists. Owners can explicitly grant/remove cross-store access with `PATCH /api/customers/:id/sharing`.
 - `GET|PATCH|DELETE /api/customers/:id` reads or changes records only within the signed-in user's assigned store.
 - `GET /api/inventory?storeId=...&status=...&search=...` lists vehicles for a store in the signed-in user's dealer account.
 - `POST /api/inventory` creates an inventory vehicle; repeated VINs in the same store are idempotent, while an existing VIN in another store returns a conflict for reconciliation.
@@ -48,17 +48,25 @@ Or run both processes together with `npm run dev`. The client listens on port 30
 - `GET /api/leads?storeId=...` lists leads for an owned store; `POST /api/leads` creates a lead linked only to a customer and inventory vehicle in that same store.
 - `GET /api/appointments?storeId=...` lists a store's appointments; `POST /api/appointments` validates its customer, lead, and inventory links against that store.
 - `PATCH /api/appointments/:id/status?storeId=...` updates an appointment in the selected owned store. Cancelled appointments are terminal.
+- `PATCH /api/appointments/:id?storeId=...` reschedules or reassigns an open appointment and records the change history.
+- `PATCH /api/leads/:id?storeId=...` updates lead status/assignment and records a history entry. Appointment status changes enforce valid lifecycle transitions and cannot be booked against sold or delivered inventory.
+- `GET|POST /api/deals?storeId=...` lists and creates store deals; `PATCH /api/deals/:id/status?storeId=...` progresses the sale, delivery, cancellation, or reversal lifecycle and synchronizes linked inventory, lead, and appointment state.
+- `GET|POST /api/follow-ups?storeId=...` manages assigned follow-ups; `PATCH /api/follow-ups/:id/status?storeId=...` completes or cancels them.
 - `GET /api/showroom?storeId=...` lists visits; `POST /api/showroom` checks in a customer. A visit and its initial event are persisted in MongoDB, with customer, lead, appointment, employee and store links checked against the same dealer account.
 - `GET /api/showroom/:id?storeId=...`, `POST /api/showroom/:id/events?storeId=...` and `PATCH /api/showroom/:id/assignment?storeId=...` load visits, append timeline events and reassign an active visit. Closed visits cannot be changed.
+- `POST /api/showroom/media?storeId=...` uploads private 25 MB showroom assets to MongoDB GridFS; `GET /api/showroom/media/:id/content` streams them only to an authorized account user assigned to that store.
 - `GET /api/activity?storeId=...` lists attributed activities; `POST /api/activity` records a staff-authored note for an owned store. Showroom check-ins, timeline events and assignments also generate linked activity records automatically.
 - `GET|POST /api/integrations?storeId=...` lists or saves an owner's store-specific provider credentials. Secrets are AES-256-GCM encrypted with `INTEGRATION_ENCRYPTION_KEY` and never returned by the API. `DELETE /api/integrations/:id` disables a connection. Saving credentials does not claim that an external provider sync is connected.
 - `GET /api/reports/summary?storeId=...&startAt=...&endAt=...` calculates versioned store KPIs for a store-local date range. It returns formulas, metric notes, and a capped sample of source records. Owners and managers also see per-employee assignment/activity counts. `GET /api/reports/snapshots?storeId=...` lists snapshot metadata, `GET /api/reports/snapshots/:id` loads a snapshot, and `POST /api/reports/snapshots` saves an immutable report payload for owners and managers. KPI reads are limited to owners, managers, and BDC employees; saved snapshots are restricted to owners and managers.
+- `POST /api/eve/respond` provides store-scoped inventory, lead, appointment, deal and follow-up counts. Set `OPENAI_API_KEY` to enable generated analysis through the OpenAI Responses API; without it E.V.E. returns deterministic summaries with their evidence.
+- `GET|POST /api/marketing/campaigns?storeId=...` saves campaign drafts referencing media events; `PATCH /api/marketing/campaigns/:id/status` submits drafts for approval or approves them. External publishing is not enabled until channel OAuth/app credentials are configured.
+- `GET|PATCH /api/account/onboarding` reads owner onboarding progress and records completed setup steps; `PATCH /api/account/store` updates the first store profile. Platform account review at `GET|PATCH /api/account/platform` is restricted to emails in `PLATFORM_ADMIN_EMAILS`.
 - `POST /api/signup` and `POST /api/signin` are concise aliases for the `/api/auth/...` registration and sign-in routes used by the assessment checklist.
 - `GET /api/health` reports API liveness without depending on the database.
 
 All routes except registration, sign-in, invitation acceptance, and health require `Authorization: Bearer <token>`. Store creation and updates are owner-only; single-store accounts cannot add stores. Non-owner employees can access only assigned stores. Customer, inventory, lead, appointment, showroom and activity endpoints enforce store scope on both list and record operations. Client-supplied dealer account IDs are ignored. Request bodies are validated before database operations. The API does not return password hashes or invitation token hashes.
 
-Integration credential storage requires a unique 32-byte hex `INTEGRATION_ENCRYPTION_KEY` in each backend environment. Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`; store it in Render's secret environment settings and back it up securely. Do not commit the generated key.
+Integration credential storage requires a unique 32-byte hex `INTEGRATION_ENCRYPTION_KEY` in each backend environment. Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`; store it in Render's secret environment settings and back it up securely. `OPENAI_API_KEY` enables AI-generated analysis and incurs provider charges. `PLATFORM_ADMIN_EMAILS` is a comma-separated allowlist for EVEO platform account reviewers. Do not commit these values.
 
 ## Quality commands
 
@@ -69,6 +77,6 @@ npm run lint
 
 ## Current implementation scope
 
-Authentication, registration, store provisioning, employee invitations and store assignments, customer and inventory records, plus initial lead, appointment, showroom and activity operations establish the persistent full-stack workflows. The first data-backed KPI summary covers lead and appointment creation, appointment show rate, showroom visits, and recorded EVEO activity; it does not report call, SMS, email, or sales conversion data before those sources are integrated. Authenticated showroom sessions use the tenant-scoped API; unauthenticated sessions retain the local demonstration adapter. Authenticated media uploads remain disabled until an authorized object-storage integration is configured. Deterministic E.V.E. tools, billing, and external integrations remain follow-up milestones.
+The current full-stack scope includes tenant-scoped customer sharing, inventory import, leads, appointment lifecycle, deals, follow-ups, showroom events and private media, versioned KPIs and snapshots, deterministic E.V.E. metrics tools, optional server-side AI analysis, campaign draft approval, onboarding progress, and platform account review. CRM, messaging, payment and social network connections still need provider credentials and their external account/app registrations; campaign publishing and subscription billing are not represented as active until those are connected. KPI reporting does not include external call/SMS/email events that have not been imported.
 
 Active store selection now reads authenticated stores from the API and demo stores from the canonical domain repository. Phase 1 store metadata and data remain available through a compatibility adapter while those screens migrate to persistent records.
