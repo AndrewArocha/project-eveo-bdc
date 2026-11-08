@@ -36,6 +36,7 @@ export async function signUp(input: {
   const dealerAccountId = new Types.ObjectId();
   let accountCreated = false;
   let userCreated = false;
+  let signupStage = 'create_owner';
 
   try {
     const passwordHash = await bcrypt.hash(input.password, PASSWORD_SALT_ROUNDS);
@@ -49,6 +50,7 @@ export async function signUp(input: {
     });
     userCreated = true;
 
+    signupStage = 'create_dealer_account';
     const account = await DealerAccount.create({
       _id: dealerAccountId,
       businessName: input.dealershipName,
@@ -59,6 +61,7 @@ export async function signUp(input: {
     accountCreated = true;
 
     const storeCode = input.storeName.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12) || 'STORE';
+    signupStage = 'create_initial_store';
     await Store.create({
       dealerAccountId: account.id,
       name: input.storeName,
@@ -69,10 +72,21 @@ export async function signUp(input: {
       timezone: input.timezone,
     });
 
+    signupStage = 'issue_session';
     return issueSession(user);
   } catch (error) {
-    if (accountCreated) await DealerAccount.deleteOne({ _id: dealerAccountId });
-    if (userCreated) await User.deleteOne({ _id: userId });
+    const cleanup = await Promise.allSettled([
+      ...(accountCreated ? [DealerAccount.deleteOne({ _id: dealerAccountId })] : []),
+      ...(userCreated ? [User.deleteOne({ _id: userId })] : []),
+    ]);
+    const cleanupFailed = cleanup.some((result) => result.status === 'rejected');
+    const errorRecord = typeof error === 'object' && error !== null ? error as { name?: unknown; code?: unknown } : {};
+    console.error('Signup provisioning failed.', {
+      stage: signupStage,
+      errorName: typeof errorRecord.name === 'string' ? errorRecord.name : 'UnknownError',
+      errorCode: typeof errorRecord.code === 'string' || typeof errorRecord.code === 'number' ? errorRecord.code : undefined,
+      cleanupFailed,
+    });
     throw error;
   }
 }
