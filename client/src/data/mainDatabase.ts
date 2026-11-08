@@ -1,6 +1,6 @@
 // src/data/mainDatabase.ts
 import * as type from '../types';
-import { STORE_DATA } from './stores';
+import { STORE_DATA, resolveLegacyStoreDataKey } from './stores';
 export * from '../types';
 export * from './stores';
 
@@ -27,9 +27,8 @@ export const generateDefaultUser = (
   return { id: `usr_${Date.now()}`, name, role, initials };
 };
 
-const STORES_STORAGE_KEY = 'eveo_stores_registry_v2';
-
-const DEFAULT_STORES: type.Store[] = [
+/** Phase 1 fixture metadata only; active store selection comes from the canonical registry. */
+export const LEGACY_DEMO_STORES: type.Store[] = [
   {
     id: 'njx',
     name: 'NJ Auto Xchange',
@@ -55,31 +54,6 @@ const DEFAULT_STORES: type.Store[] = [
     themeGradient: 'from-[#374151]/20 to-[#4c0519]/80',
   },
 ];
-
-export const STORES: type.Store[] = (() => {
-  if (typeof window === 'undefined') return DEFAULT_STORES;
-  try {
-    const saved = localStorage.getItem(STORES_STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
-  } catch {
-    // Fallback
-  }
-  return DEFAULT_STORES;
-})();
-
-export function updateStoreMetadata(
-  storeId: string,
-  updates: Partial<type.Store> & { websiteUrl?: string; phone?: string }
-) {
-  const idx = STORES.findIndex((s) => s.id === storeId);
-  if (idx !== -1) {
-    STORES[idx] = { ...STORES[idx], ...updates };
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORES_STORAGE_KEY, JSON.stringify(STORES));
-      window.dispatchEvent(new CustomEvent('eveo:store-metadata-updated', { detail: { storeId } }));
-    }
-  }
-}
 
 export const ALL_REPORTS = [
   { id: 'agent', label: 'Agent KPI', value: null, progress: 85, color: 'from-gray-800 to-black', ring: 'border-emerald-500/40' },
@@ -294,9 +268,10 @@ export function saveAgentCalendarRecords(
 }
 
 export function getVisibleStoreRoster(storeId: string): Array<type.GlobalUser | type.StoreStaff> {
-  const localStaff = STORE_DATA[storeId]?.staff ?? [];
+  const compatibilityStoreId = resolveLegacyStoreDataKey(storeId);
+  const localStaff = STORE_DATA[compatibilityStoreId]?.staff ?? [];
   const globalAgentsForStore = EVEO_GLOBAL_TEAM.filter(
-    (u) => !u.isExecutiveHidden && (!u.assignedStoreIds || u.assignedStoreIds.includes(storeId))
+    (u) => !u.isExecutiveHidden && (!u.assignedStoreIds || u.assignedStoreIds.includes(storeId) || u.assignedStoreIds.includes(compatibilityStoreId))
   );
   return [...localStaff.filter((s) => !s.isExecutiveHidden), ...globalAgentsForStore];
 }

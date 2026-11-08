@@ -9,7 +9,7 @@ import type {
   ShowroomVisitRecord,
   ShowroomVisitSnapshot,
 } from '../../types/showroom';
-import { getStoreDataOrEmpty } from '../../data/mockDatabase';
+import { getStoreDataOrEmpty, readStoreScopedStorage } from '../../data/mockDatabase';
 
 interface PersistedState {
   visits: ShowroomVisitRecord[];
@@ -131,7 +131,7 @@ function seedFromStoreHandoffs(storeId: string): PersistedState {
 
 function readState(storeId: string): PersistedState {
   try {
-    const stored = localStorage.getItem(getStorageKey(storeId));
+    const stored = readStoreScopedStorage(STORAGE_PREFIX, storeId);
     if (!stored) return seedFromStoreHandoffs(storeId);
     const parsed = JSON.parse(stored) as Partial<PersistedState>;
     if (!Array.isArray(parsed.visits)) return seedFromStoreHandoffs(storeId);

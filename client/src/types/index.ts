@@ -94,6 +94,12 @@ export interface UserProfile {
 // --- Store & Asset Types ---
 export interface Store {
   id: string;
+  /** Stable ID from the canonical domain repository or API. */
+  domainId?: string;
+  /** Legacy demo key used only by Phase 1 fixture adapters. */
+  legacyDataKey?: string;
+  storeCode?: string;
+  dealerAccountId?: string;
   name: string;
   websiteUrl?: string;
   phone?: string;

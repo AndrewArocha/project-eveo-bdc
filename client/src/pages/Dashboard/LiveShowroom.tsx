@@ -7,7 +7,7 @@ import {
   MessageSquareText, Radio, ScanBarcode, Send, Sparkles, Trash2,
   UserCheck, Users, Video, X, Zap
 } from 'lucide-react';
-import { CURRENT_USER, STORE_DATA, getStoreDataOrEmpty, getVisibleStoreRoster } from '../../data/mockDatabase';
+import { CURRENT_USER, getStoreDataOrEmpty, getVisibleStoreRoster } from '../../data/mockDatabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 import defaultBanner from '../../images/defaultBanner.avif';
@@ -96,12 +96,20 @@ type ExclusiveView = 'portal' | 'showroom' | 'activity' | 'visit';
 
 export default function LiveShowroom() {
   const { role } = useAuth();
-  const { activeStore, getBanner, cycleNextStore, stores } = useStoreAppearance();
+  const { activeStore, activeStoreId, activeStoreDomainId, getBanner, cycleNextStore, stores, setActiveStoreId } = useStoreAppearance();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const storeId = activeStore.id;
+  const requestedStoreId = searchParams.get('storeId');
+  const requestedStore = stores.find((store) =>
+    store.id === requestedStoreId || store.domainId === requestedStoreId || store.legacyDataKey === requestedStoreId,
+  );
+  const storeId = requestedStore?.domainId || activeStoreDomainId;
   const activeStoreIdx = Math.max(0, stores.findIndex((store) => store.id === storeId));
   const displayBanner = getBanner(storeId) || activeStore.bannerUrl || (storeId === 'njx' ? defaultBanner : '');
+
+  useEffect(() => {
+    if (requestedStore && requestedStore.id !== activeStoreId) setActiveStoreId(requestedStore.id);
+  }, [activeStoreId, requestedStore, setActiveStoreId]);
 
   const viewFromUrl = searchParams.get('view') as ExclusiveView | null;
   const visitIdFromUrl = searchParams.get('visitId');
@@ -116,7 +124,7 @@ export default function LiveShowroom() {
   const actor = useMemo(() => createActor(role), [role]);
 
   const salespeople = useMemo(() => {
-    const staff = STORE_DATA[storeId]?.staff ?? [];
+    const staff = getStoreDataOrEmpty(storeId).staff;
     return staff.filter((person) => person.role === 'sales' || person.role === 'manager');
   }, [storeId]);
 
@@ -262,7 +270,7 @@ export default function LiveShowroom() {
         time: formatTime(latest.updatedAt),
       };
     }
-    const storeSold = STORE_DATA[storeId]?.sold?.[0];
+    const storeSold = getStoreDataOrEmpty(storeId).sold[0];
     return {
       customerName: storeSold?.name || '',
       vehicle: storeSold?.vehicle || '',

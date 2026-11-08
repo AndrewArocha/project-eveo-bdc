@@ -16,7 +16,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 
 import {
-  STORE_DATA,
+  getStoreDataOrEmpty,
   CURRENT_USER,
   getVisibleStoreRoster,
   getOrSeedAgentCalendar,
@@ -31,20 +31,20 @@ import {
 // ==========================================
 export function ProfileForm() {
   const { role } = useAuth();
-  const { getBanner, setBanner, activeStoreId, activeStore } = useStoreAppearance();
+  const { getBanner, setBanner, activeStoreId, activeStoreDataKey, activeStore } = useStoreAppearance();
 
   const isOwner = role === 'owner' || role === 'super_admin';
   const isAdmin = role === 'manager' || isOwner;
 
-  const initialBanner = getBanner(activeStoreId) || STORE_DATA[activeStoreId]?.bannerUrl || '';
+  const initialBanner = getBanner(activeStoreId) || getBanner(activeStoreDataKey) || getStoreDataOrEmpty(activeStoreId).bannerUrl || '';
 
   const [storeBanner, setStoreBanner] = useState(initialBanner);
   const [workPhone, setWorkPhone] = useState('Ext. 104');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    setStoreBanner(getBanner(activeStoreId) || STORE_DATA[activeStoreId]?.bannerUrl || '');
-  }, [activeStoreId, getBanner]);
+    setStoreBanner(getBanner(activeStoreId) || getBanner(activeStoreDataKey) || getStoreDataOrEmpty(activeStoreId).bannerUrl || '');
+  }, [activeStoreId, activeStoreDataKey, getBanner]);
 
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
@@ -145,7 +145,7 @@ export function ProfileForm() {
 // 2. SCHEDULE FORM (3D Glass Action Orbs + Hover/Tap Tooltips)
 // ==========================================
 export function ScheduleForm({ role }: { role: UserRole }) {
-  const { activeStoreId, activeStore } = useStoreAppearance();
+  const { activeStoreId, activeStoreDataKey, activeStore } = useStoreAppearance();
 
   type DailyShift = { start: string; end: string };
   type WeeklySchedule = Record<string, DailyShift>;
@@ -184,17 +184,17 @@ export function ScheduleForm({ role }: { role: UserRole }) {
   }, [activeStoreId]);
 
   const [calendarRecords, setCalendarRecords] = useState<Record<string, ShiftDayRecord>>(() =>
-    getOrSeedAgentCalendar(activeStoreId, CURRENT_USER)
+    getOrSeedAgentCalendar(activeStoreDataKey, CURRENT_USER)
   );
 
   useEffect(() => {
     const refreshRecords = () => {
-      setCalendarRecords(getOrSeedAgentCalendar(activeStoreId, CURRENT_USER));
+      setCalendarRecords(getOrSeedAgentCalendar(activeStoreDataKey, CURRENT_USER));
     };
     refreshRecords();
     window.addEventListener('eveo:calendar-updated', refreshRecords);
     return () => window.removeEventListener('eveo:calendar-updated', refreshRecords);
-  }, [activeStoreId, showCalendar]);
+  }, [activeStoreDataKey, showCalendar]);
 
   const completedShiftsHistory = Object.values(calendarRecords)
     .filter((rec) => rec.status === 'worked' || rec.status === 'missed')
@@ -238,7 +238,7 @@ export function ScheduleForm({ role }: { role: UserRole }) {
       setIsRequestingChange(false);
       setEditingAgent(null);
     } else {
-      localStorage.removeItem(`eveo_cal_v3_${activeStoreId}_${targetAgentName}`);
+      localStorage.removeItem(`eveo_cal_v3_${activeStoreDataKey}_${targetAgentName}`);
       localStorage.removeItem(`eveo_calendar_v2_${targetAgentName}`);
       setEditingAgent(null);
     }

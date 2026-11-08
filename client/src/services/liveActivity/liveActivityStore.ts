@@ -1,5 +1,5 @@
 // src/services/liveActivity/liveActivityStore.ts
-import { STORE_DATA, getStoreDataOrEmpty, CURRENT_USER, getVisibleStoreRoster, type StoreData } from '../../data/mockDatabase';
+import { STORE_DATA, getStoreDataOrEmpty, readStoreScopedStorage, resolveLegacyStoreDataKey, CURRENT_USER, getVisibleStoreRoster, type StoreData } from '../../data/mockDatabase';
 import type { ShowroomMediaAsset } from '../../types';
 import type { ActivityCategory, ActivityPriority, LiveActivityEvent } from '../../components/UI/LiveActivityPulse';
 
@@ -41,7 +41,7 @@ export function getPersistentStoreData(storeId: string): StoreData {
   const fallback = getStoreDataOrEmpty(storeId);
 
   try {
-    const raw = localStorage.getItem(key);
+    const raw = readStoreScopedStorage(PIPELINE_STORAGE_PREFIX, storeId);
     if (!raw) {
       localStorage.setItem(key, JSON.stringify(fallback));
       return fallback;
@@ -66,12 +66,13 @@ export function savePersistentStoreData(storeId: string, updated: StoreData): St
   } catch {
     // Ignore storage quota lock
   }
-  if (STORE_DATA[storeId]) {
-    STORE_DATA[storeId].leads = updated.leads;
-    STORE_DATA[storeId].handoffs = updated.handoffs;
-    STORE_DATA[storeId].appointments = updated.appointments;
-    STORE_DATA[storeId].sold = updated.sold;
-    STORE_DATA[storeId].pending = updated.pending;
+  const legacyStoreKey = resolveLegacyStoreDataKey(storeId);
+  if (STORE_DATA[legacyStoreKey]) {
+    STORE_DATA[legacyStoreKey].leads = updated.leads;
+    STORE_DATA[legacyStoreKey].handoffs = updated.handoffs;
+    STORE_DATA[legacyStoreKey].appointments = updated.appointments;
+    STORE_DATA[legacyStoreKey].sold = updated.sold;
+    STORE_DATA[legacyStoreKey].pending = updated.pending;
   }
   window.dispatchEvent(new CustomEvent('eveo:pipeline-updated', { detail: { storeId } }));
   return updated;
@@ -300,7 +301,7 @@ export function seedInitialLiveFeed(storeId: string): LiveFeedPost[] {
 
 export function listLiveFeed(storeId: string): LiveFeedPost[] {
   try {
-    const raw = localStorage.getItem(getStorageKey(storeId));
+    const raw = readStoreScopedStorage(STORAGE_PREFIX, storeId);
     const parsed: LiveFeedPost[] = raw ? JSON.parse(raw) : seedInitialLiveFeed(storeId);
     const list = Array.isArray(parsed) && parsed.length > 0 ? parsed : seedInitialLiveFeed(storeId);
 

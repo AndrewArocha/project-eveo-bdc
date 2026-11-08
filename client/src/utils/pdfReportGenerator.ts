@@ -1,5 +1,5 @@
 // src/utils/pdfReportGenerator.ts
-import { STORES, getStoreDataOrEmpty } from '../data/mockDatabase';
+import { LEGACY_DEMO_STORES, getStoreDataOrEmpty, resolveLegacyStoreDataKey } from '../data/mockDatabase';
 import defaultBanner from '../images/defaultBanner.avif';
 
 export type ReportType = 'agent' | 'lead' | 'conv' | 'sold' | 'pending';
@@ -33,8 +33,9 @@ export function mapReportTypeToArchiveCategory(reportId: ReportType): ArchiveCat
 }
 
 function seedStoreArchive(storeId: string): GeneratedReportRecord[] {
-  if (!STORES.some((store) => store.id === storeId)) return [];
-  const storeObj = STORES.find((s) => s.id === storeId)!;
+  const compatibilityStoreId = resolveLegacyStoreDataKey(storeId);
+  if (!LEGACY_DEMO_STORES.some((store) => store.id === compatibilityStoreId)) return [];
+  const storeObj = LEGACY_DEMO_STORES.find((s) => s.id === compatibilityStoreId)!;
   const storeName = storeObj.name;
 
   const baseSeeds: Omit<GeneratedReportRecord, 'storeId' | 'storeName'>[] = [
@@ -94,9 +95,9 @@ export function createNewGeneratedReportSnapshot(
   reportType: ReportType
 ): GeneratedReportRecord {
   const existing = getStoreGeneratedReports(storeId);
-  const storeObj = STORES.find((s) => s.id === storeId) || { id: storeId, name: '', logoText: '', logoUrl: '', bannerUrl: '', themeGradient: '' };
+  const storeObj = LEGACY_DEMO_STORES.find((s) => s.id === resolveLegacyStoreDataKey(storeId)) || { id: storeId, name: '', logoText: '', logoUrl: '', bannerUrl: '', themeGradient: '' };
   const storeData = getStoreDataOrEmpty(storeId);
-  const hasDemoData = STORES.some((store) => store.id === storeId);
+  const hasDemoData = LEGACY_DEMO_STORES.some((store) => store.id === resolveLegacyStoreDataKey(storeId));
   const category = mapReportTypeToArchiveCategory(reportType);
 
   const sameCat = existing.filter((r) => r.category === category);
@@ -223,10 +224,10 @@ export function exportPersonalizedReportPDF(
   existingRecord?: GeneratedReportRecord
 ): GeneratedReportRecord {
   const record = existingRecord || createNewGeneratedReportSnapshot(storeId, reportId);
-  const storeObj = STORES.find((s) => s.id === storeId) || { id: storeId, name: '', logoText: '', logoUrl: '', bannerUrl: '', themeGradient: '' };
+  const storeObj = LEGACY_DEMO_STORES.find((s) => s.id === resolveLegacyStoreDataKey(storeId)) || { id: storeId, name: '', logoText: '', logoUrl: '', bannerUrl: '', themeGradient: '' };
   const storeData = getStoreDataOrEmpty(storeId);
 
-  const bannerSrc = storeObj.bannerUrl || storeData.bannerUrl || (STORES.some((store) => store.id === storeId) ? defaultBanner : '');
+  const bannerSrc = storeObj.bannerUrl || storeData.bannerUrl || (LEGACY_DEMO_STORES.some((store) => store.id === resolveLegacyStoreDataKey(storeId)) ? defaultBanner : '');
   const logoSrc = storeObj.logoUrl || '';
 
   const html = `<!DOCTYPE html>

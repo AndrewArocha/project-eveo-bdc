@@ -43,7 +43,7 @@ export default function SmartCalendar({
   onResolveRequest,
   initialSelectedDay = null
 }: SmartCalendarProps) {
-  const { activeStoreId } = useStoreAppearance();
+  const { activeStoreDataKey } = useStoreAppearance();
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -60,12 +60,12 @@ export default function SmartCalendar({
   const offsetDays = new Date(currentYear, currentMonth, 1).getDay();
 
   const [calendarState, setCalendarState] = useState<Record<string, ShiftDayRecord>>(() =>
-    getOrSeedAgentCalendar(activeStoreId, agentName, currentYear, currentMonth)
+    getOrSeedAgentCalendar(activeStoreDataKey, agentName, currentYear, currentMonth)
   );
 
   useEffect(() => {
-    setCalendarState(getOrSeedAgentCalendar(activeStoreId, agentName, currentYear, currentMonth));
-  }, [activeStoreId, agentName, currentYear, currentMonth]);
+    setCalendarState(getOrSeedAgentCalendar(activeStoreDataKey, agentName, currentYear, currentMonth));
+  }, [activeStoreDataKey, agentName, currentYear, currentMonth]);
 
   // Inspector & Request Creation States
   const [selectedDay, setSelectedDay] = useState<number | null>(initialSelectedDay);
@@ -92,7 +92,7 @@ export default function SmartCalendar({
   const updateAndSaveCalendar = (updates: Record<string, ShiftDayRecord>) => {
     const nextState = { ...calendarState, ...updates };
     setCalendarState(nextState);
-    saveAgentCalendarRecords(activeStoreId, agentName, nextState);
+    saveAgentCalendarRecords(activeStoreDataKey, agentName, nextState);
   };
 
   const getDayRecord = (day: number): ShiftDayRecord => {

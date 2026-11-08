@@ -6,7 +6,8 @@ import TabButton from '../../components/account/TabButton';
 import { AppearanceForm, NotificationsForm, IntegrationsForm } from '../../components/settings/SettingsForms';
 import { useAuth } from '../../contexts/AuthContext';
 import LiquidVolumeSlider from '../../components/settings/LiquidVolumeSlider';
-import { EVEO_GLOBAL_TEAM, STORES, updateEveoBdcStoreAssignment } from '../../data/mockDatabase';
+import { EVEO_GLOBAL_TEAM, resolveLegacyStoreDataKey, updateEveoBdcStoreAssignment } from '../../data/mockDatabase';
+import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 import {
   getAudioPreferences,
   updateAudioPreferences,
@@ -20,6 +21,7 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
   const [, setTick] = useState(0);
   const { role } = useAuth();
+  const { stores } = useStoreAppearance();
   const [audioPrefs, setAudioPrefs] = useState(() => getAudioPreferences());
 
   const roleStr = String(role).toLowerCase();
@@ -31,13 +33,9 @@ export default function Settings() {
     const refreshRosterAndStores = () => setTick((tick) => tick + 1);
 
     window.addEventListener('eveo:bdc-roster-updated', refreshRosterAndStores);
-    window.addEventListener('eveo:store-metadata-updated', refreshRosterAndStores);
-    window.addEventListener('eveo:stores-updated', refreshRosterAndStores);
 
     return () => {
       window.removeEventListener('eveo:bdc-roster-updated', refreshRosterAndStores);
-      window.removeEventListener('eveo:store-metadata-updated', refreshRosterAndStores);
-      window.removeEventListener('eveo:stores-updated', refreshRosterAndStores);
     };
   }, []);
 
@@ -228,10 +226,10 @@ export default function Settings() {
                           <p className="text-xs text-gray-400">{agent.schedule} • {agent.liveActivity}</p>
                         </div>
                         <StoreAssignmentDropdown
-                          stores={STORES}
-                          selectedStoreIds={agent.assignedStoreIds || []}
+                          stores={stores}
+                          selectedStoreIds={(agent.assignedStoreIds || []).map((id) => stores.find((store) => store.id === id || store.legacyDataKey === id)?.id || id)}
                           onToggleStore={(storeId) => {
-                            updateEveoBdcStoreAssignment(Number(agent.id), storeId);
+                            updateEveoBdcStoreAssignment(Number(agent.id), resolveLegacyStoreDataKey(storeId));
                             setTick((tick) => tick + 1);
                           }}
                         />
@@ -249,7 +247,7 @@ export default function Settings() {
 }
 
 interface StoreAssignmentDropdownProps {
-  stores: typeof STORES;
+  stores: import('../../types').Store[];
   selectedStoreIds: string[];
   onToggleStore: (storeId: string) => void;
 }

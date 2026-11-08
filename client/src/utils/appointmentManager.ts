@@ -1,5 +1,5 @@
 // src/utils/appointmentManager.ts
-import { STORE_DATA } from '../data/mockDatabase';
+import { getStoreDataOrEmpty } from '../data/mockDatabase';
 
 type ApptStatus = 'CONFIRMED' | 'PENDING CONFIRM' | 'NO SHOW' | 'ARRIVED' | 'SOLD';
 
@@ -36,7 +36,7 @@ if (saved) {
   }
 
   // Dynamic Multi-Tenant Fallback: Pull from whichever storeId is active (njx, dk, kia)!
-  const storeAppts = STORE_DATA[storeId]?.appointments;
+  const storeAppts = getStoreDataOrEmpty(storeId).appointments;
   if (storeAppts && storeAppts.length > 0) {
     return storeAppts.map((appt) => ({
       id: appt.id.toString(),

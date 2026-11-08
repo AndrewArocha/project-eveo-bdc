@@ -16,10 +16,10 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import {
-  STORE_DATA,
   getStoreDataOrEmpty,
+  resolveLegacyStoreDataKey,
   CURRENT_USER,
-  STORES,
+  LEGACY_DEMO_STORES,
   EVEO_GLOBAL_TEAM,
   getVisibleStoreRoster,
 } from '../../data/mockDatabase';
@@ -70,7 +70,7 @@ export function setAgentLiveActivity(storeId: string, agentName: string, taskDes
     map[`${storeId}_${agentName}`] = taskDescription;
     localStorage.setItem(LIVE_ACTIVITY_MAP_KEY, JSON.stringify(map));
 
-    const storeStaff = STORE_DATA[storeId]?.staff;
+    const storeStaff = getStoreDataOrEmpty(storeId).staff;
     if (storeStaff) {
       const staffMember = storeStaff.find((s) => s.name === agentName);
       if (staffMember) staffMember.liveActivity = taskDescription;
@@ -129,7 +129,8 @@ if (typeof window !== 'undefined') {
 function buildTelemetryRaw(storeId: string) {
   const fallbackStore = getStoreDataOrEmpty(storeId);
   const store = getPersistentStoreData(storeId) || fallbackStore;
-  const storeMeta = STORES.find((s) => s.id === storeId) || { id: storeId, name: '', logoText: '', logoUrl: '', bannerUrl: '', themeGradient: '' };
+  const compatibilityStoreId = resolveLegacyStoreDataKey(storeId);
+  const storeMeta = LEGACY_DEMO_STORES.find((s) => s.id === compatibilityStoreId) || { id: storeId, name: '', logoText: '', logoUrl: '', bannerUrl: '', themeGradient: '' };
 
   const leads = store.leads || [];
   const handoffs = store.handoffs || [];
@@ -364,7 +365,7 @@ export function computeLiveStoreTelemetry(storeId: string) {
 // ============================================================================
 export function resolveActiveReportAuthor(storeId: string, role?: string): ReportAuditAuthor {
   const activeRole = String(role || localStorage.getItem('eveo_role') || 'super_admin').toLowerCase();
-  const storeStaff = (getPersistentStoreData(storeId) || STORE_DATA[storeId])?.staff || [];
+  const storeStaff = (getPersistentStoreData(storeId) || getStoreDataOrEmpty(storeId))?.staff || [];
 
   let name = CURRENT_USER;
   if (activeRole === 'bdc') {
@@ -557,7 +558,7 @@ export function createArchivedReportSnapshot(
   summary: string,
   roleOverride?: string
 ): ArchivedReportRecord {
-  const storeName = STORES.find((s) => s.id === storeId)?.name || storeId.toUpperCase();
+  const storeName = LEGACY_DEMO_STORES.find((s) => s.id === resolveLegacyStoreDataKey(storeId))?.name || storeId.toUpperCase();
   const now = new Date();
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -1467,11 +1468,9 @@ function useLiveStoreTelemetry(storeId: string) {
   useEffect(() => {
     const sync = () => setTick((t) => t + 1);
     window.addEventListener('eveo:pipeline-updated', sync);
-    window.addEventListener('eveo:store-metadata-updated', sync);
     window.addEventListener('eveo:live-activity-updated', sync);
     return () => {
       window.removeEventListener('eveo:pipeline-updated', sync);
-      window.removeEventListener('eveo:store-metadata-updated', sync);
       window.removeEventListener('eveo:live-activity-updated', sync);
     };
   }, []);

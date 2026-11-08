@@ -18,7 +18,7 @@ import {
   Video,
   Zap,
 } from 'lucide-react';
-import { CURRENT_USER, STORE_DATA } from '../../data/mockDatabase';
+import { CURRENT_USER, getStoreDataOrEmpty } from '../../data/mockDatabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 import { showroomRepository } from '../../services/showroom';
@@ -62,9 +62,13 @@ export default function ShowroomVisitDomain() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { role } = useAuth();
-  const { activeStoreId, activeStore } = useStoreAppearance();
+  const { activeStoreId, activeStoreDomainId, activeStore, stores, storesLoading, setActiveStoreId } = useStoreAppearance();
 
-  const storeId = searchParams.get('storeId') || activeStoreId || 'njx';
+  const requestedStoreId = searchParams.get('storeId') || activeStoreId;
+  const resolvedStore = stores.find((store) =>
+    store.id === requestedStoreId || store.domainId === requestedStoreId || store.legacyDataKey === requestedStoreId,
+  );
+  const storeId = resolvedStore?.domainId || activeStoreDomainId;
   const actorName = localStorage.getItem('eveo_user_name') || CURRENT_USER;
   const actorId = localStorage.getItem('eveo_user_id') || `user_${role}`;
 
@@ -81,19 +85,27 @@ export default function ShowroomVisitDomain() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadVisit = useCallback(async () => {
-    if (!visitId) return;
+    if (!visitId || !storeId) return;
     const res = await showroomRepository.getVisit(storeId, visitId);
     setSnapshot(res);
     setIsLoading(false);
   }, [storeId, visitId]);
 
   useEffect(() => {
+    if (resolvedStore && resolvedStore.id !== activeStoreId) setActiveStoreId(resolvedStore.id);
+  }, [activeStoreId, resolvedStore, setActiveStoreId]);
+
+  useEffect(() => {
+    if (!storeId) {
+      if (!storesLoading) setIsLoading(false);
+      return;
+    }
     void loadVisit();
     const unsub = showroomRepository.subscribe(storeId, () => {
       void loadVisit();
     });
     return () => unsub();
-  }, [storeId, loadVisit]);
+  }, [storeId, loadVisit, storesLoading]);
 
   useEffect(() => {
     if (!stagedFile) {
@@ -144,7 +156,7 @@ export default function ShowroomVisitDomain() {
 
   const handleClaimVisit = async () => {
     if (!snapshot || !visitId) return;
-    const staff = STORE_DATA[storeId]?.staff ?? [];
+    const staff = getStoreDataOrEmpty(storeId).staff;
     const rep = staff.find((s) => s.name === actorName);
     setBusyAction('visit_claimed');
     try {

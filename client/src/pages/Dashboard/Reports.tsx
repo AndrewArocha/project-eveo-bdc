@@ -209,7 +209,11 @@ export default function Reports() {
     const storeParam = searchParams.get('store');
     const reportIdParam = searchParams.get('reportId');
     if (reportIdParam) {
-      const targetStore = stores.find((store) => store.id === (storeParam || activeStoreId));
+      const targetStore = stores.find((store) =>
+        store.id === (storeParam || activeStoreId)
+        || store.domainId === (storeParam || activeStoreId)
+        || store.legacyDataKey === (storeParam || activeStoreId),
+      );
       if (!targetStore) return;
       setOpenedStore(targetStore);
       setActiveStoreId(targetStore.id);

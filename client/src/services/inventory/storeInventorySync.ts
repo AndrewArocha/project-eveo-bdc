@@ -3,7 +3,7 @@ import {
   njxInventory,
   type StoreInventorySummary,
 } from '../../data/stores/njx/inventory';
-import { STORES } from '../../data/mockDatabase';
+import { LEGACY_DEMO_STORES, readStoreScopedStorage, resolveLegacyStoreDataKey } from '../../data/mockDatabase';
 import { playWoodBlockAlert } from '../../utils/soundEngine';
 import { pushStoreNotification } from '../../services/notifications/notificationCenterStore';
 
@@ -26,13 +26,13 @@ export function isStoreWebsiteInventorySyncAvailable(): boolean {
 export function getStoreWebsiteInventoryUrl(storeId: string, configuredWebsite = ''): string {
   if (configuredWebsite.trim()) return normalizeInventorySourceUrl(configuredWebsite);
   try {
-    const customUrl = localStorage.getItem(`eveo_store_website_${storeId}`);
+    const customUrl = readStoreScopedStorage('eveo_store_website_', storeId);
     if (customUrl?.trim()) return normalizeInventorySourceUrl(customUrl);
   } catch {
     // Fall through to the store's configured public website.
   }
 
-  const store = STORES.find((item) => item.id === storeId);
+  const store = LEGACY_DEMO_STORES.find((item) => item.id === resolveLegacyStoreDataKey(storeId));
   return store?.websiteUrl ? normalizeInventorySourceUrl(store.websiteUrl) : '';
 }
 
@@ -47,7 +47,7 @@ function normalizeInventorySourceUrl(value: string): string {
 }
 
 function buildDefaultStoreInventory(storeId: string): StoreInventorySummary {
-  if (storeId === 'njx') {
+  if (resolveLegacyStoreDataKey(storeId) === 'njx') {
     return {
       ...njxInventory,
       units: [
@@ -80,7 +80,7 @@ function buildDefaultStoreInventory(storeId: string): StoreInventorySummary {
 export function getStoreInventory(storeId: string): StoreInventorySummary {
   if (typeof window === 'undefined') return buildDefaultStoreInventory(storeId);
   try {
-    const raw = localStorage.getItem(`${INVENTORY_STORAGE_PREFIX}${storeId}`);
+    const raw = readStoreScopedStorage(INVENTORY_STORAGE_PREFIX, storeId);
     if (raw) return JSON.parse(raw) as StoreInventorySummary;
   } catch {
     // Fallback
@@ -200,12 +200,12 @@ export async function syncStoreWebsiteInventoryProgressively(
   onProgress?: (stage: string, pct: number, summary: StoreInventorySummary) => void,
   configuredWebsite = '',
 ): Promise<StoreInventorySummary> {
-  const storeMeta = STORES.find((store) => store.id === storeId);
-  if (!storeMeta) throw new Error(`Store ${storeId} is not registered in EVEO.`);
+  const storeMeta = LEGACY_DEMO_STORES.find((store) => store.id === resolveLegacyStoreDataKey(storeId));
+  if (!storeMeta && !configuredWebsite.trim()) throw new Error(`Store ${storeId} is not registered in EVEO.`);
 
   const sourceUrl = getStoreWebsiteInventoryUrl(storeId, configuredWebsite);
   if (!sourceUrl) {
-    throw new Error(`No valid inventory source URL is configured for ${storeMeta.name}.`);
+    throw new Error(`No valid inventory source URL is configured for ${storeMeta?.name || storeId}.`);
   }
 
   const current = getStoreInventory(storeId);
@@ -231,7 +231,8 @@ export async function syncStoreWebsiteInventoryProgressively(
     throw new Error('The inventory connector returned an invalid response: expected a units array.');
   }
 
-  onProgress?.(`Reconciling ${storeMeta.name} inventory observations...`, 70, current);
+  const storeName = storeMeta?.name || storeId;
+  onProgress?.(`Reconciling ${storeName} inventory observations...`, 70, current);
 
   const nextUnits = [...current.units];
   const existingByVin = new Map(nextUnits.map((unit) => [unit.vin.toUpperCase(), unit]));
@@ -274,7 +275,7 @@ export async function syncStoreWebsiteInventoryProgressively(
     storeId,
     type: 'inventory_sync',
     severity: 'normal',
-    title: `${storeMeta.name} inventory feed processed`,
+    title: `${storeName} inventory feed processed`,
     message: `${payload.units.length} source records reviewed; ${newUnits} new vehicles added. Existing status and price disagreements were preserved for human review.`,
     route: '/app/reports',
   });

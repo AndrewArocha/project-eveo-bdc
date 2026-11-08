@@ -1,5 +1,6 @@
 // src/services/notifications/notificationCenterStore.ts
 import { playWoodBlockAlert, playSocialMediaChime } from '../../utils/soundEngine';
+import { readStoreScopedStorage } from '../../data/mockDatabase';
 
 export interface StoreNotificationItem {
   id: string;
@@ -56,7 +57,7 @@ function seedNotificationsForStore(storeId: string): StoreNotificationItem[] {
 export function getStoreNotifications(storeId: string): StoreNotificationItem[] {
   if (typeof window === 'undefined') return seedNotificationsForStore(storeId);
   try {
-    const raw = localStorage.getItem(`${NOTIFICATIONS_KEY_PREFIX}${storeId}`);
+    const raw = readStoreScopedStorage(NOTIFICATIONS_KEY_PREFIX, storeId);
     if (raw) return JSON.parse(raw) as StoreNotificationItem[];
   } catch {
     // Fallback

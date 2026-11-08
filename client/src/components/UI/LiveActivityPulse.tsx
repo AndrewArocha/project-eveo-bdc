@@ -14,7 +14,7 @@ import {
   Flame,
 } from 'lucide-react';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
-import { STORE_DATA, CURRENT_USER, getVisibleStoreRoster } from '../../data/mockDatabase';
+import { getStoreDataOrEmpty, CURRENT_USER, getVisibleStoreRoster } from '../../data/mockDatabase';
 
 export type ActivityPriority = 1 | 2 | 3;
 
@@ -166,7 +166,7 @@ export default function LiveActivityPulse() {
 
   // Build prioritized, coalesced activity stream including the automated EVEO AI Agent!
   const prioritizedQueue = useMemo<LiveActivityEvent[]>(() => {
-    const store = STORE_DATA[activeStoreId];
+    const store = getStoreDataOrEmpty(activeStoreId);
     if (!store) return [];
 
     const leads = store.leads || [];
