@@ -152,7 +152,7 @@ export default function Insights() {
       setFlashKey(`prompt_${Date.now()}`);
     }
 
-    setAgentLiveActivity(activeStoreId, activeUser.fullName, 'Consulting E.V.E. (local preview)');
+    setAgentLiveActivity(activeStoreId, activeUser.fullName, 'Consulting E.V.E. (store-scoped tools)');
     setMobileCardsOpen(false);
     setExpandedCardId(null);
     void sendPrompt(promptPayload, expandedCard || undefined);
@@ -383,7 +383,7 @@ export default function Insights() {
                       {activeUser.firstName} &bull; {activeUser.roleBadge}
                     </span>
                     <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-400/8 border border-amber-300/15 text-[9px] font-black uppercase tracking-wider text-amber-200/80">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-300" /> Local preview
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" /> Store data connected
                     </span>
                   </div>
                   <p className="text-xs text-gray-300 leading-relaxed">
@@ -475,8 +475,8 @@ export default function Insights() {
         {/* Bottom Docked Command Composer */}
         <div className="relative z-20 shrink-0 w-full">
           <div className="flex items-center justify-between gap-3 px-1 pb-2">
-            <span className="text-[9px] font-semibold tracking-wide text-gray-500">E.V.E. can preview answers and drafts; nothing is sent or changed in this client-only build.</span>
-            <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-amber-200/70">Local demo mode</span>
+            <span className="text-[9px] font-semibold tracking-wide text-gray-500">Answers use role-scoped store counts. OpenAI analysis requires a server key; no customer messages or record changes are sent.</span>
+            <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-emerald-200/70">Server tools</span>
           </div>
           {attachedPreview && (
             <div className="w-full mb-2 px-3 py-1.5 rounded-xl bg-white/8 border border-white/15 flex items-center justify-between text-xs text-gray-300">

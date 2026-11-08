@@ -14,6 +14,9 @@ export const env = {
   mongoUri: process.env.MONGODB_URI?.trim() ?? '',
   jwtSecret: process.env.JWT_SECRET?.trim() ?? '',
   integrationEncryptionKey: process.env.INTEGRATION_ENCRYPTION_KEY?.trim() ?? '',
+  openAiApiKey: process.env.OPENAI_API_KEY?.trim() ?? '',
+  openAiModel: process.env.OPENAI_MODEL?.trim() || 'gpt-5-mini',
+  platformAdminEmails: (process.env.PLATFORM_ADMIN_EMAILS ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN?.trim() || DEFAULT_TOKEN_EXPIRY,
   clientOrigins: (process.env.CLIENT_ORIGIN ?? 'http://localhost:3000')
     .split(',')
