@@ -38,3 +38,5 @@ function getCapabilityHint(prompt: string): string {
   if (/plan|action plan|strategy/.test(text)) return 'action-plan preparation';
   return 'your requested task';
 }
+export { apiOperationalRepository } from './operational/apiOperationalRepository';
+export type { ApiLead, ApiAppointment, CreateLeadInput, CreateAppointmentInput, LeadStatus, AppointmentStatus } from './operational/apiOperationalRepository';
