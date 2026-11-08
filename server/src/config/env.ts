@@ -12,6 +12,7 @@ export const env = {
   port: Number(process.env.PORT) || DEFAULT_PORT,
   nodeEnv: process.env.NODE_ENV ?? 'development',
   mongoUri: process.env.MONGODB_URI?.trim() ?? '',
+  mongoDatabase: process.env.MONGODB_DATABASE?.trim() || 'eveo_bdc',
   jwtSecret: process.env.JWT_SECRET?.trim() ?? '',
   integrationEncryptionKey: process.env.INTEGRATION_ENCRYPTION_KEY?.trim() ?? '',
   openAiApiKey: process.env.OPENAI_API_KEY?.trim() ?? '',

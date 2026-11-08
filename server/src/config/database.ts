@@ -9,6 +9,7 @@ export async function connectDatabase(): Promise<boolean> {
   }
 
   await mongoose.connect(env.mongoUri, {
+    dbName: env.mongoDatabase,
     maxPoolSize: DATABASE_MAX_POOL_SIZE,
     serverSelectionTimeoutMS: 8000,
   });
