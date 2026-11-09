@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import { createCampaign, listCampaigns, updateCampaignStatus } from '../controllers/marketingCampaignController.js';
+import { authenticate } from '../middlewares/authenticate.js';
+import { requireStoreAccess } from '../middlewares/requireStoreAccess.js';
+import { MarketingCampaign } from '../models/MarketingCampaign.js';
+import { campaignStatusSchema, createCampaignSchema } from '../validators/marketingCampaign.js';
+import { validateBody } from '../validators/validate.js';
+export const marketingCampaignRoutes = Router();
+marketingCampaignRoutes.use(authenticate);
+marketingCampaignRoutes.get('/', requireStoreAccess(), listCampaigns);
+marketingCampaignRoutes.post('/', requireStoreAccess(), validateBody(createCampaignSchema), createCampaign);
+marketingCampaignRoutes.patch('/:id/status', requireStoreAccess(MarketingCampaign), validateBody(campaignStatusSchema), updateCampaignStatus);

@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { respondToEve } from '../controllers/eveController.js';
+import { authenticate } from '../middlewares/authenticate.js';
+import { requireStoreAccess } from '../middlewares/requireStoreAccess.js';
+import { validateBody } from '../validators/validate.js';
+const schema = z.object({ storeId: z.string().regex(/^[a-f\d]{24}$/i), prompt: z.string().trim().min(1).max(2000) });
+export const eveRoutes = Router();
+eveRoutes.use(authenticate);
+eveRoutes.post('/respond', requireStoreAccess(), validateBody(schema), respondToEve);

@@ -1,0 +1,195 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  html, body, #root {
+    min-height: 100vh;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: "Outfit", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+    background-color: #f4f5f7;
+    color: #111827;
+    color-scheme: light;
+  }
+
+  html.dark, html.dark body, html.dark #root {
+    background-color: #05080c !important;
+    color: #f9fafb;
+    color-scheme: dark;
+  }
+
+  html.light, html.light body, html.light #root {
+    background-color: #f4f5f7 !important;
+    color: #111827;
+    color-scheme: light;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  .eveo-demo-view, .eveo-demo-view * {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* A number of older dashboard panels used fixed dark surfaces. Re-skin those
+   surfaces in light mode as a group so their white labels do not disappear. */
+html.light [class*="bg-[#05080c]"],
+html.light [class*="bg-[#0a0f16]"],
+html.light [class*="bg-[#080d13]"],
+html.light [class*="bg-[#0d141c]"],
+html.light [class*="bg-[#0d121a]"],
+html.light [class*="bg-[#101820]"],
+html.light [class*="bg-[#111821]"] {
+  background-color: #ffffff !important;
+  border-color: #e5e7eb !important;
+  color: #111827 !important;
+}
+
+html.light :is([class*="bg-[#05080c]"], [class*="bg-[#0a0f16]"], [class*="bg-[#080d13]"], [class*="bg-[#0d141c]"], [class*="bg-[#0d121a]"], [class*="bg-[#101820]"], [class*="bg-[#111821]"]) :not(button):not(button *):is([class*="text-white"], [class*="text-gray-100"], [class*="text-gray-200"], [class*="text-gray-300"], [class*="text-gray-400"]) {
+  color: #1f2937 !important;
+}
+
+html.light [class*="bg-[#05080c]"] [class*="border-white/"],
+html.light [class*="bg-[#0a0f16]"] [class*="border-white/"],
+html.light [class*="bg-[#080d13]"] [class*="border-white/"],
+html.light [class*="bg-[#0d141c]"] [class*="border-white/"],
+html.light [class*="bg-[#0d121a]"] [class*="border-white/"],
+html.light [class*="bg-[#101820]"] [class*="border-white/"],
+html.light [class*="bg-[#111821]"] [class*="border-white/"] {
+  border-color: #e5e7eb !important;
+}
+
+html.light input[class*="bg-black"],
+html.light select[class*="bg-black"],
+html.light textarea[class*="bg-black"] {
+  background-color: #ffffff !important;
+  border-color: #d1d5db !important;
+  color: #111827 !important;
+  color-scheme: light;
+}
+
+html.light input[class*="bg-black"]::placeholder,
+html.light textarea[class*="bg-black"]::placeholder {
+  color: #6b7280 !important;
+}
+
+html.light .eveo-report-chart [class*="text-white"],
+html.light .eveo-report-chart [class*="text-gray-100"],
+html.light .eveo-report-chart [class*="text-gray-200"],
+html.light .eveo-report-chart [class*="text-gray-300"] {
+  color: #111827 !important;
+}
+
+html.light .eveo-report-chart [class*="text-gray-400"],
+html.light .eveo-report-chart [class*="text-gray-500"],
+html.light .eveo-report-chart [class*="text-gray-600"] {
+  color: #4b5563 !important;
+}
+
+html.light .eveo-report-chart [class*="bg-white/5"],
+html.light .eveo-report-chart [class*="bg-white/7"] {
+  background-color: #e5e7eb !important;
+}
+
+/* 
+  ========================================
+  CUSTOM "TINY PILL" SCROLLBAR
+  Placed outside @layer base to ensure it 
+  applies to the <main> scroll container.
+  ========================================
+*/
+
+/* 1. Set the overall width of the scrollbar area */
+::-webkit-scrollbar {
+  width: 14px; 
+  height: 14px;
+}
+
+/* 2. Make the track (background) completely invisible */
+::-webkit-scrollbar-track {
+  background: transparent; 
+}
+
+/* 3. Style the thumb (the pill itself) */
+::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5); /* Light mode gray */
+  border-radius: 20px; /* Fully rounded edges */
+  
+  /* The secret to the floating pill: a thick transparent border */
+  border: 4px solid rgba(0, 0, 0, 0); 
+  background-clip: padding-box; /* Shrinks the background color inside the transparent border */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.8);
+}
+
+/* 4. Adjust the pill color for Dark Mode */
+.dark ::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.15); /* Subtle white for dark mode */
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+/* --- EVEO Accessibility & Settings Overrides --- */
+
+/* 1. Reduce Motion: Kills all transitions and framer-motion physics */
+.reduce-motion * {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* 2. High Contrast: Forces darker backgrounds and harsher borders */
+.high-contrast .backdrop-blur-xl,
+.high-contrast .bg-white\/5,
+.high-contrast .bg-white\/40,
+.high-contrast .bg-white\/50,
+.high-contrast .bg-black\/20 {
+  background-color: rgba(5, 8, 12, 0.98) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* Force text to be readable without breaking tooltip opacities */
+.high-contrast h1, 
+.high-contrast h2, 
+.high-contrast h3, 
+.high-contrast h4,
+.high-contrast p {
+  color: #f9fafb !important;
+}
+
+/* Brighten previously muted gray text */
+.high-contrast .text-gray-500, 
+.high-contrast .text-gray-400, 
+.high-contrast .text-gray-600 {
+  color: #e5e7eb !important;
+}
+
+/* 3. Compact UI: Shrinks padding, scaling, and text to fit more data */
+.compact-ui {
+  font-size: 0.925em;
+}
+.compact-ui .p-6, .compact-ui .p-8 {
+  padding: 1.25rem !important;
+}
+.compact-ui .gap-6, .compact-ui .gap-8 {
+  gap: 1rem !important;
+}
+.compact-ui .mb-6, .compact-ui .mb-8 {
+  margin-bottom: 1rem !important;
+}
+.compact-ui button {
+  transform: scale(0.95);
+}
