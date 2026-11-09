@@ -60,7 +60,7 @@ export interface CreateShowroomVisitInput {
   customerName: string;
   customerPhone?: string;
   greetedPerson: string;
-  greetingMedia: ShowroomMediaAsset;
+  greetingMedia?: ShowroomMediaAsset;
   /** Link an existing canonical customer instead of resolving by phone. */
   customerId?: string;
   leadId?: string;

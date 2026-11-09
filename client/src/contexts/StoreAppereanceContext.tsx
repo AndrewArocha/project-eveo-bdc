@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import type { Store } from '../types';
 import type { StoreRecord } from '../types/domain';
 import { useAuth } from './AuthContext';
@@ -65,6 +66,8 @@ const StoreAppearanceContext = createContext<StoreAppearanceContextType | undefi
 
 export function StoreAppearanceProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const location = useLocation();
+  const useDemoStores = !user || (user.demoMode && location.pathname.startsWith('/app'));
   const [banners, setBanners] = useState<Record<string, string>>(() => {
     try {
       const saved = localStorage.getItem('eveo_store_banners');
@@ -78,10 +81,10 @@ export function StoreAppearanceProvider({ children }: { children: React.ReactNod
   const [storesLoading, setStoresLoading] = useState(false);
   const [storesError, setStoresError] = useState('');
   const [activeStoreId, setActiveStoreIdState] = useState(() => localStorage.getItem('eveo_active_store_id') || '');
-  const stores = useMemo(() => user ? registeredStores.map(toAppearanceStore) : demoStores, [user, registeredStores, demoStores]);
+  const stores = useMemo(() => useDemoStores ? demoStores : registeredStores.map(toAppearanceStore), [useDemoStores, registeredStores, demoStores]);
 
   const refreshStores = useCallback(async () => {
-    if (!user) {
+    if (useDemoStores) {
       setRegisteredStores([]);
       setStoresError('');
       setStoresLoading(true);
@@ -122,13 +125,13 @@ export function StoreAppearanceProvider({ children }: { children: React.ReactNod
     } finally {
       setStoresLoading(false);
     }
-  }, [user]);
+  }, [useDemoStores]);
 
   useEffect(() => {
     void refreshStores();
-    if (user) return;
+    if (!useDemoStores) return;
     return eveoDomainRepository.subscribe(() => { void refreshStores(); });
-  }, [refreshStores, user]);
+  }, [refreshStores, useDemoStores]);
 
   useEffect(() => {
     try { localStorage.setItem('eveo_store_banners', JSON.stringify(banners)); } catch { /* Ignore storage errors */ }

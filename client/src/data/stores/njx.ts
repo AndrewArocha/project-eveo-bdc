@@ -1,4 +1,5 @@
 import { type StoreData } from '../../types';
+import defaultBanner from '../../images/defaultBanner.avif';
 
 export const njxData: StoreData = {
   staff: [
@@ -28,5 +29,5 @@ export const njxData: StoreData = {
     { id: 501, name: 'Cody Fisher', vehicle: '2023 Tesla Model Y', stage: 'Financing', rep: 'Sarah J.', socials: { instagram: '@cody.fish', whatsapp: '+1 555-0192' } },
     { id: 502, name: 'Bessie Cooper', vehicle: '2021 Toyota RAV4', stage: 'Negotiation', rep: 'Sarah J.' },
   ],
-  bannerUrl: 'https://di-uploads-pod47.dealerinspire.com/njautoxchange/uploads/2025/10/option1-desktop.jpg',
+  bannerUrl: defaultBanner,
 };

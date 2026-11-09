@@ -185,14 +185,14 @@ export default function Settings() {
                         onClick={() => playWoodBlockAlert()}
                         className="px-4 py-2 rounded-full bg-red-500/15 hover:bg-red-500/25 border border-red-500/35 text-xs font-bold text-red-300 cursor-pointer"
                       >
-                        Test WoodKnock + Vibration
+                        Test Warning
                       </button>
                       <button
                         type="button"
                         onClick={() => playSocialMediaChime()}
                         className="px-4 py-2 rounded-full bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/35 text-xs font-bold text-sky-300 cursor-pointer"
                       >
-                        Test SocialMediaChime
+                        Test Notification
                       </button>
                     </div>
                   </div>

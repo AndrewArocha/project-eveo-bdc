@@ -103,7 +103,7 @@ export default function LiveActivityDeck({
       },
       {
         key: 'ai',
-        label: 'EVEO AI',
+        label: 'E.V.E.',
         accent: 'text-purple-400',
         dot: 'bg-purple-500',
         icon: <Sparkles size={12} />,
@@ -322,7 +322,7 @@ export default function LiveActivityDeck({
               </div>
               <div className="flex items-center justify-between gap-1">
                 <Sparkles size={12} className="text-purple-400" />
-                <span className="hidden lg:inline text-gray-400 flex-1 ml-1">EVEO AI</span>
+                <span className="hidden lg:inline text-gray-400 flex-1 ml-1">E.V.E.</span>
                 <span className="font-mono font-black text-white">{summaryCounts.ai}</span>
               </div>
             </div>

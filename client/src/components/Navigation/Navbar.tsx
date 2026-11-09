@@ -39,11 +39,12 @@ export default function Navbar() {
   const devMenuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
 
-  const { role, setRole, signOut } = useAuth();
+  const { role, setRole, signOut, user } = useAuth();
   const { activeStoreId, setActiveStoreId, stores } = useStoreAppearance();
 
   const roleStr = String(role).toLowerCase();
-  const isSuperAdmin = import.meta.env.DEV || localStorage.getItem('eveo_dev') === 'true';
+  const roleOptions: UserRole[] = user && !user.demoMode ? ['bdc', 'sales', 'manager', 'owner'] : ['sales', 'manager', 'owner'];
+  const isSuperAdmin = !user || user.demoMode || import.meta.env.DEV || localStorage.getItem('eveo_dev') === 'true';
   const canSwitchStores =
     roleStr === 'bdc' || roleStr === 'bdc_manager' || roleStr === 'super_admin';
 
@@ -106,14 +107,9 @@ export default function Navbar() {
       <footer className="w-full md:w-auto shrink-0 px-3 py-2 sm:py-2.5 md:p-0 bg-gray-50/90 dark:bg-[#05080c]/90 md:bg-transparent dark:md:bg-transparent backdrop-blur-md md:backdrop-blur-none border-t border-gray-200/50 dark:border-white/5 md:border-none z-40">
         <nav className="md:fixed md:left-6 md:top-1/2 md:-translate-y-1/2 z-40 flex md:flex-col items-center justify-between md:justify-start gap-1 sm:gap-2.5 p-1.5 sm:p-2.5 rounded-4xl backdrop-blur-2xl bg-white/80 dark:bg-[#0a0f16]/85 border border-white/60 dark:border-white/15 shadow-[0_10px_30px_rgba(0,0,0,0.08),inset_0_1px_8px_rgba(255,255,255,0.6)] dark:shadow-[0_15px_40px_rgba(0,0,0,0.6),inset_0_1px_8px_rgba(255,255,255,0.1)] max-w-md sm:max-w-fit md:w-auto mx-auto select-none">
           {/* Top Logo (Desktop Only) */}
-          <button
-            type="button"
-            onClick={() => navigate('/app/hub')}
-            aria-label="Go to EVEO Hub"
-            className="hidden md:flex items-center justify-center w-11 h-11 rounded-2xl bg-orange-500/10 border border-orange-500/20 mb-1 shadow-inner shrink-0 hover:bg-orange-500/20 transition-colors cursor-pointer"
-          >
-            <img src={eveoSymbol} alt="EVEO Brand Symbol" className="w-6 h-6 dark:invert-0 invert opacity-90" />
-          </button>
+          {role === 'owner' ? <button type="button" onClick={() => navigate('/admin/portal')} aria-label="Go to EVEO admin dashboard" className="hidden md:flex items-center justify-center w-11 h-11 mb-1 shrink-0 cursor-pointer">
+            <img src={eveoSymbol} alt="EVEO" className="w-7 h-7 dark:invert-0 invert opacity-90" />
+          </button> : <div className="hidden md:flex items-center justify-center w-11 h-11 mb-1 shrink-0" aria-label="EVEO"><img src={eveoSymbol} alt="EVEO" className="w-7 h-7 dark:invert-0 invert opacity-90" /></div>}
 
           {/* Navigation Links + Inventory Modal Trigger */}
           <div className="flex md:flex-col items-center gap-1 sm:gap-2 w-full md:w-auto justify-around md:justify-start">
@@ -190,7 +186,7 @@ export default function Navbar() {
                       <div className="px-3 py-2 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 dark:border-white/10 mb-1">
                         Switch Role
                       </div>
-                      {(['bdc', 'sales', 'manager', 'owner'] as UserRole[]).map((r) => (
+                      {roleOptions.map((r) => (
                         <button
                           type="button"
                           key={r}

@@ -49,8 +49,7 @@ export default function SmartCalendar({
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [showMonthPicker, setShowMonthPicker] = useState(false);
 
-  // Expanded by default so users immediately see the color legend
-  const [showLegend, setShowLegend] = useState(true);
+  const [showLegend, setShowLegend] = useState(false);
 
   const CREATION_DATE = new Date(2026, 9, 1);
   const TODAY = new Date(today.getFullYear(), today.getMonth(), today.getDate());

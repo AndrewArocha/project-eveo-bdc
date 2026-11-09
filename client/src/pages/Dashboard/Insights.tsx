@@ -12,6 +12,8 @@ export default function Insights() {
   const { activeUser, cards, hubDigest, messages, isLoading, loadError, sendPrompt, markPreviewReviewed, clearThread } = useInsightsSuite(activeStoreId, role);
   const [chatInput, setChatInput] = useState('');
   const [flashKey, setFlashKey] = useState('');
+  const [showDemoActions, setShowDemoActions] = useState(false);
+  const isDemoWorkspace = !user || user.demoMode;
   const flashSequence = useRef(0);
   const endOfThreadRef = useRef<HTMLDivElement>(null);
 
@@ -29,6 +31,24 @@ export default function Insights() {
     void sendPrompt(chatInput);
     setChatInput('');
   };
+
+  const priorityCard = cards.find((card) => card.hasWarningPoint) || cards[0];
+  const demoActionCards = <div className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-3 sm:grid-cols-3">
+    {cards.map((card) => <button type="button" key={card.id} onClick={() => askAbout(card)} disabled={isLoading} className="group min-h-32 rounded-2xl border border-gray-200 bg-white/80 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-orange-500/40 hover:shadow-md disabled:cursor-wait disabled:opacity-70 dark:border-white/10 dark:bg-white/[0.035] dark:hover:bg-white/[0.06]">
+      <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-gray-900 dark:text-gray-100">{card.title}</span>{card.hasWarningPoint && <span className="h-2 w-2 rounded-full bg-orange-500" aria-label="Needs attention" />}</div>
+      <div className="mt-3 flex items-baseline gap-2"><span className="text-2xl font-semibold tracking-tight text-gray-950 dark:text-white">{card.metricValue}</span><span className="text-[11px] text-gray-500 dark:text-gray-400">{card.metricSublabel}</span></div>
+      <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-gray-500 dark:text-gray-400">{card.summary}</p>
+      <span className="mt-3 inline-flex text-[11px] font-semibold text-orange-600 transition group-hover:text-orange-500 dark:text-orange-400">{card.actionLabel} ↗</span>
+    </button>)}
+  </div>;
+  const demoQuickActions = <div className="mx-auto grid w-full max-w-4xl grid-cols-2 gap-2 sm:grid-cols-4">
+    {[
+      { label: 'Search inventory', prompt: 'Search inventory' },
+      { label: 'View reports', prompt: 'Show reports' },
+      { label: 'Agent KPIs', prompt: 'Show agent KPIs' },
+      { label: 'Recent activities', prompt: 'Show activities' },
+    ].map((action) => <button key={action.label} type="button" onClick={() => void sendPrompt(action.prompt)} className="min-h-11 rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-xs font-semibold text-gray-800 shadow-sm transition hover:border-orange-500/50 hover:text-orange-700 dark:border-white/10 dark:bg-[#0d121a] dark:text-gray-100 dark:hover:text-orange-300">{action.label}</button>)}
+  </div>;
 
   return (
     <main className="relative flex h-[calc(100dvh-4.5rem)] w-full flex-col overflow-hidden px-4 pb-4 pt-4 md:h-dvh md:pl-32 md:pr-8 md:pt-6">
@@ -49,7 +69,19 @@ export default function Insights() {
 
       <div className="mx-auto flex w-full max-w-5xl flex-1 min-h-0 flex-col overflow-hidden">
         <section className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-4">
-          <div className="relative mx-auto flex w-full max-w-4xl flex-col items-center gap-2 py-3 sm:py-5">
+          <div className={`relative mx-auto flex w-full max-w-4xl flex-col items-center gap-2 py-3 sm:py-5 ${isDemoWorkspace ? 'justify-center' : ''}`}>
+            {isDemoWorkspace ? <>
+              <div className="relative z-20 w-full max-w-xl rounded-2xl border border-gray-200 bg-white/95 p-4 text-center shadow-lg dark:border-white/10 dark:bg-[#0d121a]/95 sm:p-5">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Hi! I’m E.V.E. {priorityCard ? `I recommend starting with ${priorityCard.actionLabel.toLowerCase()}.` : 'Choose a demo function to explore.'}</p>
+              <p className="mt-1 text-xs leading-relaxed text-gray-600 dark:text-gray-300">Tap E.V.E. to explore the sample store, or choose a quick search below.</p>
+              <button type="button" onClick={() => setShowDemoActions((visible) => !visible)} className="mt-3 min-h-9 rounded-lg bg-orange-500 px-3 text-xs font-semibold text-white">{showDemoActions ? 'Hide demo options' : 'Explore demo'} ↗</button>
+              </div>
+              <motion.div initial={{ opacity: 0, y: 8, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="relative z-10 flex h-60 w-60 items-center justify-center sm:h-76 sm:w-76">
+                <div className="absolute inset-6 rounded-full bg-orange-500/15 blur-3xl" />
+                <Mascot mood={isLoading ? 'thinking' : 'idle'} allowSleep={false} flashAlertKey={flashKey} size="xl" onClick={() => setShowDemoActions((visible) => !visible)} className="relative !pt-0 cursor-pointer" />
+              </motion.div>
+              {showDemoActions && <div className="w-full space-y-3">{demoQuickActions}{demoActionCards}</div>}
+            </> : <>
             <motion.div
               initial={{ opacity: 0, y: 8, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -77,32 +109,12 @@ export default function Insights() {
                 Store tools run on EVEO records. Optional AI wording is separate; no customer messages or record changes are sent by these suggestions.
               </p>
             </div>
+            </>}
           </div>
 
           {loadError && <p role="alert" className="mx-auto mb-3 w-full max-w-2xl rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-800 dark:text-amber-200">{loadError}</p>}
 
-          <div className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-3 sm:grid-cols-3">
-            {cards.map((card) => (
-              <button
-                type="button"
-                key={card.id}
-                onClick={() => askAbout(card)}
-                disabled={isLoading}
-                className="group min-h-32 rounded-2xl border border-gray-200 bg-white/80 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-orange-500/40 hover:shadow-md disabled:cursor-wait disabled:opacity-70 dark:border-white/10 dark:bg-white/[0.035] dark:hover:bg-white/[0.06]"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">{card.title}</span>
-                  {card.hasWarningPoint && <span className="h-2 w-2 rounded-full bg-orange-500" aria-label="Needs attention" />}
-                </div>
-                <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-2xl font-semibold tracking-tight text-gray-950 dark:text-white">{card.metricValue}</span>
-                  <span className="text-[11px] text-gray-500 dark:text-gray-400">{card.metricSublabel}</span>
-                </div>
-                <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-gray-500 dark:text-gray-400">{card.summary}</p>
-                <span className="mt-3 inline-flex text-[11px] font-semibold text-orange-600 transition group-hover:text-orange-500 dark:text-orange-400">{card.actionLabel} ↗</span>
-              </button>
-            ))}
-          </div>
+          {!isDemoWorkspace && demoActionCards}
 
           {messages.length > 0 && (
             <div className="mx-auto mt-5 flex w-full max-w-4xl flex-col gap-3">

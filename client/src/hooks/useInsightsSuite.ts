@@ -8,6 +8,8 @@ import { teamRepository } from '../services/team/teamRepository';
 import { showroomRepository } from '../services/showroom';
 import { apiLiveActivityRepository } from '../services/liveActivity/apiLiveActivityRepository';
 import { eveoAgent } from '../services/eveoAgent';
+import { listLiveFeed } from '../services/liveActivity/liveActivityStore';
+import { getStoreDailyReports } from '../data/stores';
 import { useAuth } from '../contexts/AuthContext';
 
 export type InsightCategory = 'churn' | 'inventory' | 'staff' | 'sla';
@@ -78,7 +80,8 @@ function roleLabel(role: string) {
 }
 
 export function useInsightsSuite(storeId: string, roleOverride?: UserRole | string) {
-  const { user } = useAuth();
+  const { user: accountUser } = useAuth();
+  const user = accountUser?.demoMode ? null : accountUser;
   const [store, setStore] = useState<StoreData>(() => user ? EMPTY_STORE : getPersistentStoreData(storeId));
   const [readyInventoryCount, setReadyInventoryCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -248,6 +251,33 @@ export function useInsightsSuite(storeId: string, roleOverride?: UserRole | stri
     const userMessage: InsightChatMessage = { id: `usr_${Date.now()}`, role: 'user', content: trimmed, timestamp: 'Just now' };
     const optimistic = [...messages, userMessage];
     saveThread(optimistic);
+    if (!user) {
+      const greeting = /\b(hi|hello|hey|howdy|what(?:'s| is) up|good morning|good afternoon|good evening)\b/i.test(trimmed);
+      const query = trimmed.toLowerCase();
+      const demoData = getPersistentStoreData(storeId);
+      let localResult = '';
+      if (query.includes('inventory') || query.includes('vehicle') || query.includes('stock')) {
+        const units = demoData.inventory || [];
+        localResult = units.length
+          ? `Sample inventory for this store:\n${units.slice(0, 10).map((unit) => `• ${unit.vehicle} · $${unit.price.toLocaleString()} · ${unit.daysInStock} days · ${unit.status.replaceAll('_', ' ').toLowerCase()}`).join('\n')}`
+          : 'This sample store has no inventory units saved yet.';
+      } else if (query.includes('report')) {
+        const report = getStoreDailyReports(storeId)[0];
+        localResult = report ? `Latest sample report (${report.displayDate}): ${report.leadsMtd} leads MTD, ${report.appointmentsMtd} appointments MTD, ${report.carsDelivered} vehicles delivered MTD.` : 'There are no sample report snapshots for this store yet.';
+      } else if (query.includes('kpi') || query.includes('agent')) {
+        localResult = `Sample team KPIs:\n${demoData.staff.slice(0, 8).map((member) => `• ${member.name} (${member.role}) · target ${member.kpiTarget ?? 'not set'}`).join('\n') || 'No sample team KPI records are available.'}`;
+      } else if (query.includes('activit') || query.includes('activity')) {
+        const activities = listLiveFeed(storeId).slice(0, 5);
+        localResult = activities.length ? `Recent sample activity:\n${activities.map((item) => `• ${item.title} · ${item.agentName}`).join('\n')}` : 'There is no recent sample activity for this store.';
+      } else if (query.includes('lead') || query.includes('appointment')) {
+        localResult = `Sample pipeline: ${demoData.leads.length} leads, ${demoData.appointments.length} appointments, ${demoData.handoffs.length} showroom visits.`;
+      }
+      const content = greeting
+        ? 'Hi! Thank you for testing out our application, I’m looking forward to working with you in the future.\n\nI can search inventory, reports, agent KPIs, and activities using this demo’s saved sample information. And I’m able to do much more in the full version!'
+        : `${localResult ? `${localResult}\n\n` : ''}I can search inventory, reports, agent KPIs, and activities using this demo’s saved sample information. And I’m able to do much more in the full version!`;
+      saveThread([...optimistic, { id: `ai_${Date.now() + 1}`, role: 'assistant', content, timestamp: 'Just now', mode: 'preview' }]);
+      return;
+    }
     setIsLoading(true);
     try {
       const response = await eveoAgent.respond({
@@ -267,7 +297,7 @@ export function useInsightsSuite(storeId: string, roleOverride?: UserRole | stri
     } finally {
       setIsLoading(false);
     }
-  }, [activeUser.fullName, activeUser.roleBadge, messages, saveThread, storeId]);
+  }, [activeUser.fullName, activeUser.roleBadge, messages, saveThread, storeId, user]);
 
   const markPreviewReviewed = useCallback(async (messageId: string) => {
     const target = messages.find((message) => message.id === messageId);

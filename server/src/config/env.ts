@@ -19,6 +19,8 @@ export const env = {
   integrationEncryptionKey: process.env.INTEGRATION_ENCRYPTION_KEY?.trim() ?? '',
   openAiApiKey: process.env.OPENAI_API_KEY?.trim() ?? '',
   openAiModel: process.env.OPENAI_MODEL?.trim() || 'gpt-5-mini',
+  resendApiKey: process.env.RESEND_API_KEY?.trim() ?? '',
+  authEmailFrom: process.env.AUTH_EMAIL_FROM?.trim() ?? '',
   platformAdminEmails: (process.env.PLATFORM_ADMIN_EMAILS ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN?.trim() || DEFAULT_TOKEN_EXPIRY,
   clientOrigins: (process.env.CLIENT_ORIGIN ?? 'http://localhost:3000')

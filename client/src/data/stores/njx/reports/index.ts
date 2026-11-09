@@ -53,7 +53,7 @@ export const NJX_HISTORICAL_REPORTS: DailyBdcReportSnapshot[] = [
   {
     id: 'rpt_njx_2026_10_27',
     storeId: 'njx',
-    storeName: 'NJ Auto Xchange',
+    storeName: 'Sample Store East',
     dateISO: '2026-10-27',
     displayDate: 'October 27',
     leadsMtd: 909,
@@ -77,7 +77,7 @@ export const NJX_HISTORICAL_REPORTS: DailyBdcReportSnapshot[] = [
   {
     id: 'rpt_njx_2026_10_26',
     storeId: 'njx',
-    storeName: 'NJ Auto Xchange',
+    storeName: 'Sample Store East',
     dateISO: '2026-10-26',
     displayDate: 'October 26',
     leadsMtd: 884,
@@ -101,7 +101,7 @@ export const NJX_HISTORICAL_REPORTS: DailyBdcReportSnapshot[] = [
   {
     id: 'rpt_njx_2026_10_25',
     storeId: 'njx',
-    storeName: 'NJ Auto Xchange',
+    storeName: 'Sample Store East',
     dateISO: '2026-10-25',
     displayDate: 'October 25',
     leadsMtd: 851,

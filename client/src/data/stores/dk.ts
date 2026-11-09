@@ -2,6 +2,11 @@ import { type StoreData } from '../../types';
 import defaultBanner from '../../images/defaultBanner.avif';
 
 export const dkData: StoreData = {
+  inventory: [
+    { vin: 'WBA13BJ09PCL84926', vehicle: '2023 BMW 330i', daysInStock: 21, price: 34900, status: 'READY_FOR_SALE' },
+    { vin: 'WA1EAAFY9P2086147', vehicle: '2023 Audi Q5', daysInStock: 67, price: 32250, status: 'READY_FOR_SALE' },
+    { vin: '1FTFW1E87PFA41826', vehicle: '2023 Ford F-150 XLT', daysInStock: 104, price: 41900, status: 'PENDING' },
+  ],
   staff: [
     { id: 301, name: 'Carlos R.', initials: 'CR', role: 'sales', schedule: 'Mon - Fri', daysOff: 'Sat & Sun', kpiTarget: 14, wage: 3100, currency: 'USD', route: 'Standard ACH', assignedStoreIds: ['dk'], liveActivity: 'Showroom • Walk-around Porsche Macan' },
     { id: 302, name: 'valeria M.', initials: 'VM', role: 'bdc', schedule: 'Tue - Sat', daysOff: 'Sun & Mon', kpiTarget: 25, wage: 2600, currency: 'USD', route: 'Standard ACH', assignedStoreIds: ['dk'], liveActivity: 'In-House BDC • Confirming 4PM Appt' },

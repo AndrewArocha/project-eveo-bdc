@@ -3,9 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Activity, AlertCircle, ArrowLeft, CalendarClock, CalendarDays, CarFront, ChevronRight, DollarSign, ImagePlus, LoaderCircle,
-  Lock, MessageSquareText, Radio, ScanBarcode, Send, Sparkles, Trash2,
-  UserCheck, Users, Video, X, Zap
+  Activity, AlertCircle, ArrowLeft, CalendarClock, CalendarDays, CarFront, ChevronRight, DollarSign, ImagePlus,
+  MessageSquareText, Radio, ScanBarcode, Send, Sparkles, Trash2,
+  UserCheck, Users, Video, X
 } from 'lucide-react';
 import { CURRENT_USER, getStoreDataOrEmpty, getVisibleStoreRoster } from '../../data/mockDatabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -30,6 +30,7 @@ import { apiLiveActivityRepository } from '../../services/liveActivity/apiLiveAc
 import { apiOperationalRepository } from '../../services/operational/apiOperationalRepository';
 import { apiInventoryRepository, type ApiInventoryVehicle } from '../../services/inventory/apiInventoryRepository';
 import { teamRepository } from '../../services/team/teamRepository';
+import eveoSymbol from '../../images/logo/eveo-symbol.svg';
 import type { ApiTeamMember } from '../../services/apiClient';
 import { getMockShowroomMedia, saveMockShowroomMedia } from '../../services/showroomMedia/mockShowroomMediaStore';
 import { decodeVin } from '../../utils/nhtsaVinService';
@@ -38,7 +39,6 @@ import {
   listLiveFeed,
   publishLiveActivity,
   resolveAgentAvatar,
-  isValidUploadedAvatar,
   getInitials,
   type LiveFeedPost,
 } from '../../services/liveActivity/liveActivityStore';
@@ -103,7 +103,8 @@ type ExclusiveView = 'portal' | 'showroom' | 'activity' | 'visit';
 type StoreAppointment = Appointment & { appointmentId?: string; customerId?: string; leadId?: string; customerPhone?: string };
 
 export default function LiveShowroom() {
-  const { role, user } = useAuth();
+  const { role, user: accountUser } = useAuth();
+  const user = accountUser?.demoMode ? null : accountUser;
   const { activeStore, activeStoreId, activeStoreDomainId, cycleNextStore, stores, setActiveStoreId } = useStoreAppearance();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -168,13 +169,10 @@ export default function LiveShowroom() {
   const [mutationError, setMutationError] = useState<string | null>(null);
 
   const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [greetedPerson, setGreetedPerson] = useState('customer');
-  const [greetingPhotoFile, setGreetingPhotoFile] = useState<File | null>(null);
-  const [greetingPhotoPreview, setGreetingPhotoPreview] = useState<string | null>(null);
-  const [pendingAppointmentLink, setPendingAppointmentLink] = useState<{ appointmentId?: string; customerId?: string; leadId?: string } | null>(null);
+  const [greetedPerson, setGreetedPerson] = useState('themselves');
+  const [checkInStep, setCheckInStep] = useState(0);
+  const [relatedCustomerName, setRelatedCustomerName] = useState('');
   const [assignedRepId, setAssignedRepId] = useState('');
-  const [initialNotes, setInitialNotes] = useState('');
   const [vehicles, setVehicles] = useState<ShowroomVehicleSelection>(EMPTY_VEHICLES);
 
   // Visit Timeline Note + Staged Photo/Video State
@@ -191,6 +189,7 @@ export default function LiveShowroom() {
   // Smart Actionable "Log Live Activity" Modal State
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [composerType, setComposerType] = useState<'deal_desked' | 'new_inventory' | 'vip_appt' | 'lot_walk'>('deal_desked');
+  const [composerStep, setComposerStep] = useState(0);
   const [selectedCustomerPill, setSelectedCustomerPill] = useState('');
   const [dealGrossAmount, setDealGrossAmount] = useState('$3,850');
   const [composerVehicleDraft, setComposerVehicleDraft] = useState<ShowroomVehicleDraft | null>(null);
@@ -231,16 +230,6 @@ export default function LiveShowroom() {
     setStagedMediaPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [stagedMediaFile]);
-
-  useEffect(() => {
-    if (!greetingPhotoFile) {
-      setGreetingPhotoPreview(null);
-      return;
-    }
-    const url = URL.createObjectURL(greetingPhotoFile);
-    setGreetingPhotoPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [greetingPhotoFile]);
 
   const [, setAvatarTick] = useState(0);
   useEffect(() => {
@@ -456,6 +445,12 @@ export default function LiveShowroom() {
   const selectedOnlineUser = onlineUsersList[onlineCursorIdx % Math.max(1, onlineUsersList.length)] || null;
 
   useEffect(() => {
+    if (onlineUsersList.length < 2) return;
+    const rotation = window.setInterval(() => setOnlineCursorIdx((index) => (index + 1) % onlineUsersList.length), 5000);
+    return () => window.clearInterval(rotation);
+  }, [onlineUsersList.length]);
+
+  useEffect(() => {
     if (!user) {
       const demoStore = getStoreDataOrEmpty(storeId);
       const names = new Set<string>();
@@ -492,20 +487,37 @@ export default function LiveShowroom() {
       return;
     }
     const repObj = salespeople.find((s) => s.name === bubble.rep) || salespeople[0];
-    setCustomerName(bubble.customerName);
-    setCustomerPhone(bubble.customerPhone || '');
-    setPendingAppointmentLink({ appointmentId: bubble.appointmentId, customerId: bubble.customerId, leadId: bubble.leadId });
-    if (repObj) setAssignedRepId(String(repObj.id));
-    setInitialNotes(`Checked in from appointment (${bubble.vehicle}).`);
-    setGreetingPhotoFile(null);
+    if (!repObj) return;
     setMutationError(null);
-    setIsCheckInOpen(true);
+    setIsSubmitting(true);
+    try {
+      const created = await showroomRepository.createVisit(storeId, {
+        customerName: bubble.customerName,
+        customerPhone: bubble.customerPhone,
+        greetedPerson: 'customer',
+        appointmentId: bubble.appointmentId,
+        customerId: bubble.customerId,
+        leadId: bubble.leadId,
+        notes: `Visit started from scheduled appointment (${bubble.vehicle}).`,
+        assignedRepId: String(repObj.id),
+        assignedRepName: repObj.name,
+        checkedInById: actor.actorId,
+        checkedInByName: actor.actorName,
+        vehicles: EMPTY_VEHICLES,
+      });
+      setSnapshots((current) => [created, ...current.filter((item) => item.visit.id !== created.visit.id)]);
+      switchView('visit', created.visit.id);
+    } catch (cause) {
+      setMutationError(cause instanceof Error ? cause.message : 'Could not start the scheduled visit.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleMarkOverdueStrike = (bubble: FloorAppointmentBubble) => {
     setStrikesLog((prev) => ({ ...prev, [bubble.id]: bubble.rep }));
     void recordActivity({
-      agentName: user?.name || 'EVEO AI',
+      agentName: user?.name || 'E.V.E.',
       isAiAgent: !user,
       priority: 1,
       category: user ? 'showroom' : 'ai_high_intent',
@@ -523,23 +535,14 @@ export default function LiveShowroom() {
       setMutationError('Enter the customer’s name to start the visit.');
       return;
     }
-    if (!greetingPhotoFile) {
-      setMutationError('Add a photo of the car to document the greeting before starting this visit.');
-      return;
-    }
     const selectedRep = salespeople.find((person) => String(person.id) === assignedRepId) || salespeople[0];
     if (!selectedRep) return;
 
     setIsSubmitting(true);
     try {
-      const greetingMedia = await saveMockShowroomMedia(greetingPhotoFile, storeId);
       const created = await showroomRepository.createVisit(storeId, {
         customerName,
-        customerPhone,
-        greetedPerson,
-        greetingMedia,
-        ...pendingAppointmentLink,
-        notes: initialNotes,
+        greetedPerson: greetedPerson === 'themselves' ? 'the customer' : `${greetedPerson}: ${relatedCustomerName}`,
         assignedRepId: String(selectedRep.id),
         assignedRepName: selectedRep.name,
         checkedInById: actor.actorId,
@@ -560,12 +563,10 @@ export default function LiveShowroom() {
       });
 
       setCustomerName('');
-      setCustomerPhone('');
-      setGreetedPerson('customer');
-      setGreetingPhotoFile(null);
-      setPendingAppointmentLink(null);
-      setInitialNotes('');
+      setGreetedPerson('themselves');
       setVehicles(EMPTY_VEHICLES);
+      setRelatedCustomerName('');
+      setCheckInStep(0);
       setIsCheckInOpen(false);
       switchView('visit', created.visit.id);
     } catch (error) {
@@ -676,6 +677,10 @@ export default function LiveShowroom() {
 
   const handleSmartActivitySubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (composerStep < 2) {
+      setComposerStep((step) => step + 1);
+      return;
+    }
     setIsPostingActivity(true);
 
     try {
@@ -779,49 +784,12 @@ export default function LiveShowroom() {
 
       <div className="px-4 sm:px-6 md:px-10 max-w-6xl mx-auto">
 
-        {/* --- TOP-RIGHT "ONLINE NOW" BAR (Initials Orbs + Uploaded Avatar for AH) --- */}
+        {/* Rotating live status; the people avatars are intentionally omitted from the demo. */}
         {activeView !== 'portal' && onlineUsersList.length > 0 && selectedOnlineUser && (
-          <div className="flex justify-end mb-5">
-            <div className="inline-flex flex-col items-end gap-2 p-2.5 rounded-3xl bg-[#0a0f16]/85 backdrop-blur-2xl border border-white/15 shadow-[0_12px_30px_rgba(0,0,0,0.5)]">
-              <div className="flex items-center gap-3 pl-2">
-                <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-400">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.9)]" />
-                  {user ? `${onlineUsersList.length} Recent Contributors` : `${onlineUsersList.length} Online Now`}
-                </span>
-
-                <div className="flex items-center -space-x-1.5 pr-1">
-                  {onlineUsersList.map((u, idx) => {
-                    const isSelected = idx === onlineCursorIdx % onlineUsersList.length;
-                    return (
-                      <button
-                        type="button"
-                        key={u.name}
-                        onClick={() => setOnlineCursorIdx(idx)}
-                        title={u.name}
-                        className={`relative w-8 h-8 rounded-full font-black text-[10px] flex items-center justify-center transition-all cursor-pointer outline-none overflow-visible ${isSelected
-                            ? 'z-20 scale-110 bg-orange-500 text-white ring-2 ring-white shadow-[0_0_12px_rgba(249,115,22,0.8)]'
-                            : 'z-10 bg-slate-900 text-gray-200 border border-white/20 hover:bg-slate-800 hover:z-20'
-                          }`}
-                      >
-                        <div className="absolute top-0.5 left-1/2 -translate-x-1/2 w-[65%] h-[32%] bg-white/25 rounded-full pointer-events-none z-20" />
-                        {isValidUploadedAvatar(u.avatarUrl) ? (
-                          <img src={u.avatarUrl} alt={u.name} className="w-full h-full rounded-full object-cover relative z-10" />
-                        ) : (
-                          <span className="relative z-10">{u.initials}</span>
-                        )}
-                        <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0a0f16] z-30" />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="w-full flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-xs font-bold text-emerald-400">
-                <Radio size={12} className="shrink-0 animate-pulse" />
-                <span className="truncate max-w-60 sm:max-w-xs">
-                  <strong>{selectedOnlineUser.name}:</strong> {selectedOnlineUser.statusText}
-                </span>
-              </div>
+          <div className="mb-5 flex justify-end">
+            <div className="flex max-w-full items-center gap-2 text-xs text-gray-500 dark:text-gray-400" aria-live="polite">
+              <img src={eveoSymbol} alt="" className="h-6 w-6 opacity-70" />
+              <span className="truncate"><strong className="font-semibold text-gray-700 dark:text-gray-200">{selectedOnlineUser.name}</strong> · {selectedOnlineUser.statusText}</span>
             </div>
           </div>
         )}
@@ -870,7 +838,7 @@ export default function LiveShowroom() {
               scheduledCount={storeAppts.length}
               ongoingAppointmentBubbles={ongoingAppointmentBubbles}
               onSwitchToActivity={() => switchView('activity')}
-              onOpenCheckIn={() => { setIsCheckInOpen(true); setMutationError(null); }}
+              onOpenCheckIn={() => { setCheckInStep(0); setIsCheckInOpen(true); setMutationError(null); }}
               onExpandOngoingDash={() => setIsLobbyModalOpen(true)}
               onOpenOrStartVisit={(bubble) => void handleOpenOrStartVisit(bubble)}
               onMarkOverdueStrike={handleMarkOverdueStrike}
@@ -887,7 +855,7 @@ export default function LiveShowroom() {
               setFeedPosts={setFeedPosts}
               activeVisitCount={activeSnapshots.length}
               onSwitchToShowroom={() => switchView('showroom')}
-              onOpenNewActivity={() => setIsComposerOpen(true)}
+              onOpenNewActivity={() => { setComposerStep(0); setIsComposerOpen(true); }}
               onOpenVinScanner={() => setIsVinScannerOpen(true)}
               allowComments={!user}
             />
@@ -952,10 +920,8 @@ export default function LiveShowroom() {
         <div className="flex flex-col h-full min-h-0 p-5 sm:p-7 overflow-y-auto overscroll-contain">
           <div className="flex items-center justify-between pb-4 mb-5 border-b border-white/10">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-orange-400">
-                1-Tap Smart Telemetry
-              </span>
-              <h2 className="text-lg sm:text-xl font-black text-white">Log Live Activity</h2>
+              <span className="text-[10px] font-black uppercase tracking-widest text-orange-400">Step {composerStep + 1} of 3</span>
+              <h2 className="text-lg sm:text-xl font-black text-white">Activity</h2>
             </div>
             <button type="button" onClick={() => setIsComposerOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white cursor-pointer">
               <X size={16} />
@@ -963,13 +929,13 @@ export default function LiveShowroom() {
           </div>
 
           <form onSubmit={(e) => void handleSmartActivitySubmit(e)} className="space-y-5">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {composerStep === 0 && <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {(
                 [
                   { id: 'deal_desked', label: 'Deal Desked', icon: <DollarSign size={16} />, desc: 'VIN + Gross' },
                   { id: 'new_inventory', label: 'New Inventory', icon: <CarFront size={16} />, desc: 'Photo + VIN' },
                   { id: 'vip_appt', label: 'VIP Appt', icon: <CalendarDays size={16} />, desc: 'Confirm Show' },
-                  { id: 'lot_walk', label: 'Floor Check', icon: <Radio size={16} />, desc: 'Quick Status' },
+                  { id: 'lot_walk', label: 'Activity', icon: <Radio size={16} />, desc: 'Share a status' },
                 ] as const
               ).map((item) => (
                 <button
@@ -988,31 +954,17 @@ export default function LiveShowroom() {
                   </div>
                 </button>
               ))}
-            </div>
+            </div>}
 
-            {(composerType === 'deal_desked' || composerType === 'vip_appt') && (
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">
-                  1-Tap Select Customer
-                </span>
+            {composerStep === 1 && <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Choose a customer (optional)</span>
                 <div className="flex flex-wrap gap-1.5">
-                  {storePipelineCustomers.map((cName) => (
-                    <button
-                      type="button"
-                      key={cName}
-                      onClick={() => setSelectedCustomerPill(cName)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${selectedCustomerPill === cName
-                          ? 'bg-orange-500/20 border-orange-500 text-orange-400'
-                          : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'
-                        }`}
-                    >
-                      {cName}
-                    </button>
-                  ))}
+                  {storePipelineCustomers.map((cName) => <button type="button" key={cName} onClick={() => setSelectedCustomerPill(cName)} className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${selectedCustomerPill === cName ? 'bg-orange-500/20 border-orange-500 text-orange-400' : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'}`}>{cName}</button>)}
+                  {selectedCustomerPill && <button type="button" onClick={() => setSelectedCustomerPill('')} className="px-3 py-1.5 rounded-xl text-xs text-gray-400">Clear selection</button>}
                 </div>
-              </div>
-            )}
+              </div>}
 
+            {composerStep === 2 && <>
             {composerType === 'deal_desked' && (
               <div>
                 <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 block mb-2">
@@ -1117,6 +1069,7 @@ export default function LiveShowroom() {
                 {postMediaFile ? `Attached (4K WebP Ready): ${postMediaFile.name}` : 'Snap or Attach Vehicle / Deal Photo'}
               </button>
             </div>
+            {composerType === 'lot_walk' && <label className="block"><span className="mb-2 block text-xs font-semibold text-gray-300">What are you working on?</span><textarea value={composerQuickChip} onChange={(event) => setComposerQuickChip(event.target.value)} maxLength={240} rows={3} className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white" placeholder="Taking lunch, working older leads, or another status…" /></label>}
 
             <button
               type="submit"
@@ -1125,6 +1078,11 @@ export default function LiveShowroom() {
             >
               {isPostingActivity ? 'Broadcasting...' : 'Broadcast Live Activity'}
             </button>
+            </>}
+            <div className="flex gap-2">
+              {composerStep > 0 && <button type="button" onClick={() => setComposerStep((step) => step - 1)} className="min-h-11 flex-1 rounded-xl border border-white/15 text-sm font-semibold text-gray-200">Back</button>}
+              {composerStep < 2 && <button type="submit" className="min-h-11 flex-1 rounded-xl bg-orange-500 text-sm font-bold text-white">Continue</button>}
+            </div>
           </form>
         </div>
       </SwipeableModal>
@@ -1134,11 +1092,9 @@ export default function LiveShowroom() {
         <div className="flex flex-col h-full min-h-0 p-5 sm:p-6 overflow-y-auto overscroll-contain space-y-4">
           <div className="flex items-center justify-between gap-3 pb-3 border-b border-white/10 shrink-0">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-orange-500 block">
-                Instant Floor Onboarding
-              </span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-orange-500 block">Step {checkInStep + 1} of 4</span>
               <h2 className="text-lg font-black text-white flex items-center gap-2">
-                <UserCheck size={18} className="text-orange-500" /> Add Walk-In Visit
+                <UserCheck size={18} className="text-orange-500" /> Add Visit
               </h2>
             </div>
             <button type="button" onClick={() => setIsCheckInOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white cursor-pointer">
@@ -1146,57 +1102,21 @@ export default function LiveShowroom() {
             </button>
           </div>
 
-          <form onSubmit={handleCheckIn} className="space-y-4">
+          <form onSubmit={handleCheckIn} className="flex min-h-[20rem] flex-col justify-between space-y-4" aria-label="Add visit setup">
             {/* 1. Live Database Customer Query Input + "+ Create" Fallback */}
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-1.5">
-                Search Store Database or Create New Guest
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div hidden={checkInStep !== 0}>
+              <h3 className="mb-3 text-base font-semibold text-white">What’s the name of the customer?</h3>
+              <div>
                 <input
                   name="customer_name"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   required
                   maxLength={120}
-                  placeholder="Search or type guest name *"
-                  className={inputClasses}
-                />
-                <input
-                  name="customer_phone"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  maxLength={40}
-                  type="tel"
-                  placeholder="Phone (optional)"
+                  placeholder="Search customer name"
                   className={inputClasses}
                 />
               </div>
-              <label className="mt-3 block text-[10px] font-bold uppercase tracking-widest text-gray-400">Who did you greet?
-                <select value={greetedPerson} onChange={(event) => setGreetedPerson(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-white/10 bg-[#101722] px-3 text-sm text-white outline-none focus:border-orange-500">
-                  <option value="customer">The scheduled customer</option>
-                  <option value="spouse or partner">Their spouse or partner</option>
-                  <option value="friend">Their friend</option>
-                  <option value="family member">Another family member</option>
-                  <option value="other guest">Another guest</option>
-                </select>
-              </label>
-              <div className="mt-3 rounded-2xl border border-orange-500/25 bg-orange-500/5 p-3.5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-orange-500">Greeting photo · required</p>
-                    <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-300">Photograph the vehicle, not the customer. You can take a new photo or choose an inventory image.</p>
-                  </div>
-                  <input type="file" accept="image/*" capture="environment" aria-label="Take or choose a greeting vehicle photo" onChange={(event) => setGreetingPhotoFile(event.target.files?.[0] || null)} className="sr-only" id="showroom-greeting-photo" />
-                  <label htmlFor="showroom-greeting-photo" className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-xl bg-orange-500 px-3 text-xs font-bold text-white hover:bg-orange-600"><ImagePlus size={14} />{greetingPhotoFile ? 'Replace' : 'Add photo'}</label>
-                </div>
-                {greetingPhotoFile && <div className="mt-3 flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-2">
-                  {greetingPhotoPreview && <img src={greetingPhotoPreview} alt="Greeting vehicle preview" className="h-14 w-20 rounded-lg object-cover" />}
-                  <span className="min-w-0 flex-1 truncate text-xs text-gray-700 dark:text-gray-200">{greetingPhotoFile.name}</span>
-                  <button type="button" onClick={() => setGreetingPhotoFile(null)} aria-label="Remove greeting photo" className="rounded-lg p-2 text-gray-500 hover:text-red-500"><Trash2 size={15} /></button>
-                </div>}
-              </div>
-
               {/* Live Query Matches from Store Database OR "+ Create" Badge */}
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 {(() => {
@@ -1206,7 +1126,7 @@ export default function LiveShowroom() {
                   );
 
                   if (matches.length > 0) {
-                    return matches.slice(0, 4).map((name) => (
+                    return matches.slice(0, 10).map((name) => (
                       <button
                         type="button"
                         key={name}
@@ -1231,8 +1151,17 @@ export default function LiveShowroom() {
               </div>
             </div>
 
+            <div hidden={checkInStep !== 1} className="space-y-3">
+              <h3 className="text-base font-semibold text-white">Who’s the car for?</h3>
+              <select value={greetedPerson} onChange={(event) => setGreetedPerson(event.target.value)} className={inputClasses}>
+                <option value="themselves">Themselves</option><option value="spouse/partner">Spouse / Partner</option><option value="friend">Friend</option><option value="family">Family</option><option value="someone else">Someone Else</option>
+              </select>
+              {greetedPerson !== 'themselves' && <input value={relatedCustomerName} onChange={(event) => setRelatedCustomerName(event.target.value)} required maxLength={120} placeholder="What’s the name of the customer?" className={inputClasses} />}
+            </div>
+
             {/* 2. 1-Tap Sales Rep Pill Selector */}
-            <div>
+            <div hidden={checkInStep !== 2}>
+              <h3 className="mb-3 text-base font-semibold text-white">Who’s the sales rep assigned?</h3>
               <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-1.5">
                 Assign Floor Rep
               </span>
@@ -1261,7 +1190,8 @@ export default function LiveShowroom() {
             </div>
 
             {/* 3. 1-Tap Vehicle of Interest Pills + Prominent Custom VIN Button */}
-            <div>
+            <div hidden={checkInStep !== 3}>
+              <h3 className="mb-3 text-base font-semibold text-white">Select interested vehicle</h3>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
                   Vehicle of Interest (1-Tap NHTSA Decode)
@@ -1320,15 +1250,11 @@ export default function LiveShowroom() {
               </details>
             </div>
 
-            {mutationError && <p className="text-xs text-red-400">{mutationError}</p>}
-            <button
-              type="submit"
-              disabled={isSubmitting || !greetingPhotoFile}
-              className="w-full min-h-12 inline-flex items-center justify-center gap-2 rounded-2xl bg-orange-500 hover:bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg cursor-pointer active:scale-95 transition-all"
-            >
-              {isSubmitting ? <LoaderCircle size={16} className="animate-spin" /> : !greetingPhotoFile ? <Lock size={16} /> : <Zap size={16} />}
-              {isSubmitting ? 'Saving greeting…' : 'Save greeting & start visit'}
-            </button>
+            {mutationError && <p className="text-xs text-red-400" role="alert">{mutationError}</p>}
+            <div className="flex gap-2 border-t border-white/10 pt-3">
+              {checkInStep > 0 && <button type="button" onClick={() => setCheckInStep((step) => Math.max(0, step - 1))} className="min-h-11 flex-1 rounded-xl border border-white/15 px-4 text-sm font-semibold text-gray-300">Back</button>}
+              {checkInStep < 3 ? <button type="button" disabled={checkInStep === 0 && !customerName.trim() || checkInStep === 1 && greetedPerson !== 'themselves' && !relatedCustomerName.trim()} onClick={() => setCheckInStep((step) => Math.min(3, step + 1))} className="min-h-11 flex-1 rounded-xl bg-orange-500 px-4 text-sm font-bold text-white disabled:opacity-40">Continue</button> : <button type="submit" disabled={isSubmitting || !assignedRepId} className="min-h-11 flex-1 rounded-xl bg-orange-500 px-4 text-sm font-bold text-white disabled:opacity-40">{isSubmitting ? 'Starting visit…' : 'Start visit'}</button>}
+            </div>
           </form>
         </div>
       </SwipeableModal>
@@ -1361,6 +1287,7 @@ export default function LiveShowroom() {
                     decodedAt: new Date().toISOString(),
                   });
                   setComposerType('new_inventory');
+                  setComposerStep(0);
                   setIsComposerOpen(true);
                 }}
                 className="w-full p-3 rounded-xl bg-white/5 hover:bg-orange-500/15 border border-white/10 flex items-center justify-between text-left cursor-pointer"
@@ -1392,7 +1319,7 @@ const QUICK_CHIPS: Array<{ label: string; type: ShowroomEventType }> = [
   { label: '⚡ Requesting BDC Assist', type: 'handoff_requested' },
 ];
 
-const VISIT_STAGES = ['Greeting', 'Walkaround', 'Test drive', 'Desking', 'Drive-off'] as const;
+const VISIT_STAGES = ['Greeting', 'Walk around', 'Demo Drive', 'Desking', 'Sold'] as const;
 
 function VisitPostGallery({ snapshot }: { snapshot: ShowroomVisitSnapshot }) {
   const [slides, setSlides] = useState<Array<{ event: ShowroomEvent; url: string }>>([]);
@@ -1461,7 +1388,8 @@ function VisitStageWizard({
   onStageEvent: (type: ShowroomEventType, message: string, photo?: File, replyToEventId?: string) => Promise<boolean>;
 }) {
   const { visit, events } = snapshot;
-  const { user } = useAuth();
+  const { user: accountUser } = useAuth();
+  const user = accountUser?.demoMode ? null : accountUser;
   const [inventory, setInventory] = useState<ApiInventoryVehicle[]>([]);
   const [selectedCars, setSelectedCars] = useState<string[]>(() => {
     const initial = vehicleTitle(visit.vehicleOfInterest);
@@ -1479,7 +1407,7 @@ function VisitStageWizard({
   const hasDriveCompleted = events.some((event) => event.type === 'test_drive_completed');
   const deskEvent = events.find((event) => event.type === 'deal_desked' || event.type === 'handoff_requested');
   const isComplete = visit.status === 'completed';
-  const completed = [Boolean(greeting), hasWalkaround, hasDriveCompleted, Boolean(deskEvent), isComplete];
+  const completed = [Boolean(greeting?.media), Boolean(events.find((event) => event.type === 'walkaround_started')?.media), Boolean(events.find((event) => event.type === 'test_drive_completed')?.media), Boolean(deskEvent?.media), isComplete];
 
   useEffect(() => {
     if (!user) { setInventory([]); return; }
@@ -1508,16 +1436,17 @@ function VisitStageWizard({
   const impressions = ['Positive', 'Neutral', 'Negative'];
   const submitStep = async () => {
     if (stage === 0) {
+      if (!photo || !greeting) return;
       const trimmed = note.trim();
-      if (!trimmed) { setStage(1); return; }
-      if (!greeting) return;
-      if (await onStageEvent('note_added', `Greeting · ${trimmed}`, undefined, greeting.id)) { clearStep(); setStage(1); }
+      const detail = `Greeting proof${trimmed ? ` · ${trimmed}` : ''}`;
+      if (await onStageEvent('media_added', detail, photo, greeting.id)) { clearStep(); setStage(1); }
       return;
     }
     if (stage === 1) {
+      if (!photo) return;
       const viewedCars = [...new Set([...selectedCars, carsSeen.trim()].filter(Boolean))];
       const detail = [`Cars viewed: ${viewedCars.join(', ') || 'Not recorded'}`, `Impression: ${walkaroundImpression}`, note.trim() && `Notes: ${note.trim()}`].filter(Boolean).join(' · ');
-      if (await onStageEvent('walkaround_started', detail)) { clearStep(); setStage(2); }
+      if (await onStageEvent('walkaround_started', detail, photo)) { clearStep(); setStage(2); }
       return;
     }
     if (stage === 2) {
@@ -1525,6 +1454,7 @@ function VisitStageWizard({
         if (await onStageEvent('test_drive_started', `Test drive started.${note.trim() ? ` ${note.trim()}` : ''}`)) { clearStep(); }
         return;
       }
+      if (!photo) return;
       const detail = [`Customer impression: ${driveImpression}`, note.trim() && `Notes: ${note.trim()}`].filter(Boolean).join(' · ');
       if (await onStageEvent('test_drive_completed', detail, photo || undefined)) { clearStep(); setStage(3); }
       return;
@@ -1536,14 +1466,14 @@ function VisitStageWizard({
       if (await onStageEvent(type, detail, photo || undefined, deskEvent?.id)) { clearStep(); setStage(4); }
       return;
     }
-    const detail = `Customer drive-off${note.trim() ? ` · ${note.trim()}` : ''}`;
+    if (!photo) return;
+    const detail = `Customer delivery${note.trim() ? ` · ${note.trim()}` : ''}`;
     if (await onStageEvent('visit_completed', detail, photo || undefined)) { clearStep(); }
   };
 
   const stepTitle = VISIT_STAGES[stage];
-  const needsPhoto = stage === 3 && !deskEvent;
+  const needsPhoto = stage === 0 || stage === 1 || (stage === 2 && hasDriveStarted && !hasDriveCompleted) || stage === 3 || stage === 4;
   const driveAlreadyStarted = stage === 2 && hasDriveStarted && !hasDriveCompleted;
-  const canAdvance = true;
 
   return (
     <section className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0a0f16] sm:p-6" aria-labelledby="visit-step-title">
@@ -1559,7 +1489,7 @@ function VisitStageWizard({
       </nav>
 
       <div className="mt-5 space-y-4">
-        {stage === 0 && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/8 dark:text-emerald-200">Greeting saved for <strong>{visit.greetedPerson}</strong> with the required vehicle photo. Add context or continue.</div>}
+        {stage === 0 && <><div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/8 dark:text-emerald-200">Add a greeting photo or a photo of the vehicle to record this step.</div><PhotoPicker photo={photo} preview={photoPreview} onChange={setPhoto} label="Greeting photo · required" help="Take a photo of the vehicle or greeting moment. Respect the customer’s consent." /></>}
         {stage === 1 && <>
           <div>
             <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Cars the customer viewed</p>
@@ -1574,20 +1504,21 @@ function VisitStageWizard({
             <label className="mt-2 block text-xs font-medium text-gray-600 dark:text-gray-400">Add another model or stock number<input value={carsSeen} onChange={(event) => setCarsSeen(event.target.value)} placeholder="Optional" className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-base text-gray-900 outline-none focus:border-orange-500 dark:border-white/15 dark:bg-[#101722] dark:text-white" /></label>
             {user && inventory.length === 0 && <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">No ready inventory is available to select. Add a vehicle or enter the model above.</p>}
           </div>
+          <PhotoPicker photo={photo} preview={photoPreview} onChange={setPhoto} label="Walk-around photo · required" help="Show the customer viewing the vehicle or walking the lot." />
           <fieldset><legend className="text-xs font-semibold text-gray-700 dark:text-gray-300">Walkaround impression</legend><div className="mt-2 grid grid-cols-3 gap-2">{impressions.map((value) => <button key={value} type="button" aria-pressed={walkaroundImpression === value} onClick={() => setWalkaroundImpression(value)} className={`min-h-11 rounded-xl border text-sm font-semibold ${walkaroundImpression === value ? 'border-orange-500 bg-orange-500/10 text-orange-700 dark:text-orange-300' : 'border-gray-200 text-gray-600 dark:border-white/10 dark:text-gray-300'}`}>{value}</button>)}</div></fieldset>
         </>}
         {stage === 2 && <>
           <p className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-500/20 dark:bg-blue-500/8 dark:text-blue-200">{driveAlreadyStarted ? 'Test drive is in progress. Record the customer’s impression when they return.' : 'Start the test drive now. Finish this step after recording how the customer felt.'}</p>
           {driveAlreadyStarted && <fieldset><legend className="text-xs font-semibold text-gray-700 dark:text-gray-300">Customer driving impression</legend><div className="mt-2 grid grid-cols-3 gap-2">{impressions.map((value) => <button key={value} type="button" aria-pressed={driveImpression === value} onClick={() => setDriveImpression(value)} className={`min-h-11 rounded-xl border text-sm font-semibold ${driveImpression === value ? 'border-orange-500 bg-orange-500/10 text-orange-700 dark:text-orange-300' : 'border-gray-200 text-gray-600 dark:border-white/10 dark:text-gray-300'}`}>{value}</button>)}</div></fieldset>}
-          {driveAlreadyStarted && <PhotoPicker photo={photo} preview={photoPreview} onChange={setPhoto} label="Test-drive photo · optional" />}
+          {driveAlreadyStarted && <PhotoPicker photo={photo} preview={photoPreview} onChange={setPhoto} label="Demo-drive photo · required" help="Capture the customer seated in or driving the vehicle, with permission." />}
         </>}
-        {stage === 3 && <PhotoPicker photo={photo} preview={photoPreview} onChange={setPhoto} label={`Deal photo · ${needsPhoto ? 'required' : 'optional update'}`} help="Photograph the printed worksheet or deal screen. Do not include customer personal or financial information." />}
-        {stage === 4 && <PhotoPicker photo={photo} preview={photoPreview} onChange={setPhoto} label="Drive-off photo · optional" help="Capture the vehicle or delivery moment only with permission." />}
+        {stage === 3 && <PhotoPicker photo={photo} preview={photoPreview} onChange={setPhoto} label="Desking photo · required" help="Photograph the proposed deal. Do not include personal or financial information." />}
+        {stage === 4 && <PhotoPicker photo={photo} preview={photoPreview} onChange={setPhoto} label="Sold photo · required" help="Add a photo of the signed contract or vehicle handoff." />}
         {<label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Visit notes<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} placeholder={stage === 0 ? 'Add context to the greeting (optional)' : 'Add details for BDC or the next team member'} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-base text-gray-900 outline-none focus:border-orange-500 dark:border-white/15 dark:bg-[#101722] dark:text-white" /></label>}
         {mutationError && <div role="alert" className="flex items-start justify-between gap-3 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200"><span>{mutationError}</span><button type="button" onClick={onClearError} className="font-semibold">Dismiss</button></div>}
         <div className="flex flex-col-reverse gap-2 border-t border-gray-200 pt-4 dark:border-white/10 sm:flex-row sm:justify-between">
           <button type="button" disabled={stage === 0 || busyAction !== null} onClick={() => { clearStep(); setStage(stage - 1); }} className="min-h-11 rounded-xl border border-gray-300 px-4 text-sm font-semibold text-gray-700 disabled:opacity-40 dark:border-white/15 dark:text-gray-200">Previous step</button>
-          <button type="button" disabled={busyAction !== null || (!canAdvance && stage === 0) || (needsPhoto && !photo) || (isComplete && stage === 4)} onClick={() => void submitStep()} className="min-h-11 rounded-xl bg-orange-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-45">{busyAction ? 'Saving…' : stage === 2 && !hasDriveStarted ? 'Start test drive' : stage === 4 ? (isComplete ? 'Visit complete' : 'Complete visit') : stage === 0 ? (note.trim() ? 'Save note & continue' : 'Continue') : stage === 1 ? (hasWalkaround ? 'Save walkaround update' : 'Save walkaround & continue') : stage === 2 ? 'Finish test drive & continue' : (deskEvent ? 'Save desk update & continue' : 'Save deal photo & continue')}</button>
+          <button type="button" disabled={busyAction !== null || (needsPhoto && !photo) || (isComplete && stage === 4)} onClick={() => void submitStep()} className="min-h-11 rounded-xl bg-orange-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-45">{busyAction ? 'Saving…' : stage === 2 && !hasDriveStarted ? 'Start demo drive' : stage === 4 ? (isComplete ? 'Visit complete' : 'Complete sale') : stage === 0 ? 'Save greeting & continue' : stage === 1 ? 'Save walk-around & continue' : stage === 2 ? 'Save demo drive & continue' : 'Save desking & continue'}</button>
         </div>
       </div>
     </section>

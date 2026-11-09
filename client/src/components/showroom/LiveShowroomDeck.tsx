@@ -1,9 +1,10 @@
 // src/components/showroom/LiveShowroomDeck.tsx
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, ArrowRight, CheckCircle2, Plus, Users, Radio, Eye, Globe } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, Plus, Users, Radio, Eye } from 'lucide-react';
 import { MasterScheduleCard } from '../reports/ScheduleCards';
 import AppointmentModal from '../reports/AppointmentModal';
+import eveoSymbol from '../../images/logo/eveo-symbol.svg';
 
 const glassCardClasses = `
   backdrop-blur-2xl bg-white/5 dark:bg-[#0a0f16]/40
@@ -50,77 +51,9 @@ export function resolveLeadSourceForCustomer(customerName: string, explicitSourc
   return LEAD_SOURCE_SOURCES[hash % LEAD_SOURCE_SOURCES.length];
 }
 
-/** Crisp SVG / Brand Emblem for each Lead Source inside the 3D Showroom Orb */
+/** Floating EVEO mark identifies an appointment without exposing customer avatars. */
 function LeadSourceOrbGraphic({ source }: { source: LeadSourceBrand }) {
-  switch (source) {
-    case 'CarFax':
-      return (
-        <div className="flex flex-col items-center justify-center z-20">
-          <div className="flex items-center gap-0.5">
-            {['C', 'A', 'R', 'F', 'A', 'X'].map((ch, i) => (
-              <span
-                key={i}
-                className="w-3.5 h-4 sm:w-4 sm:h-4.5 bg-white text-black font-black text-[9px] sm:text-[10px] flex items-center justify-center rounded-xs shadow-xs"
-              >
-                {ch}
-              </span>
-            ))}
-          </div>
-          <span className="text-[8px] font-bold uppercase tracking-widest text-gray-300 mt-1.5">
-            Verified Lead
-          </span>
-        </div>
-      );
-    case 'CarGurus':
-      return (
-        <div className="flex flex-col items-center justify-center z-20">
-          <span className="text-sm sm:text-base font-black tracking-tight text-white drop-shadow-md">
-            Car<span className="text-sky-400">Gurus</span>
-          </span>
-          <span className="px-1.5 py-0.2 mt-1 rounded bg-sky-500/20 border border-sky-400/30 text-[7px] font-black uppercase tracking-widest text-sky-300">
-            Deal Rating
-          </span>
-        </div>
-      );
-    case 'TrueCar':
-      return (
-        <div className="flex flex-col items-center justify-center z-20">
-          <div className="w-6 h-6 rounded-lg bg-white/10 border border-white/25 flex items-center justify-center mb-0.5">
-            <span className="text-xs font-black text-white">TC</span>
-          </div>
-          <span className="text-xs sm:text-sm font-black tracking-wider uppercase text-white">
-            TrueCar
-          </span>
-        </div>
-      );
-    case 'AutoTrader':
-      return (
-        <div className="flex flex-col items-center justify-center z-20">
-          <span className="text-xs sm:text-sm font-black tracking-tight text-white">
-            Auto<span className="text-orange-400">trader</span>
-          </span>
-          <span className="w-8 h-1 rounded-full bg-linear-to-r from-orange-500 to-blue-500 mt-1" />
-        </div>
-      );
-    case 'CarZing':
-      return (
-        <div className="flex flex-col items-center justify-center z-20">
-          <span className="text-sm sm:text-base font-black italic tracking-tight text-white">
-            Car<span className="text-emerald-400">Zing</span>
-          </span>
-          <span className="text-[7px] font-bold uppercase tracking-widest text-emerald-300 mt-0.5">
-            Pre-Qual
-          </span>
-        </div>
-      );
-    default:
-      return (
-        <div className="flex flex-col items-center justify-center z-20 text-gray-200">
-          <Globe size={20} className="mb-1 text-gray-300" />
-          <span className="text-[10px] font-black uppercase tracking-widest">Other Source</span>
-        </div>
-      );
-  }
+  return <img src={eveoSymbol} alt="" data-lead-source={source} className="h-16 w-16 object-contain drop-shadow-[0_5px_16px_rgba(249,115,22,0.3)] transition-transform group-hover:-translate-y-1" />;
 }
 
 interface LiveShowroomDeckProps {
@@ -326,10 +259,8 @@ export default function LiveShowroomDeck({
                     type="button"
                     onClick={() => onOpenOrStartVisit(bubble)}
                     title={`Lead Source: ${sourceBrand}`}
-                    className={`relative w-24 h-24 sm:w-28 sm:h-28 rounded-full border-2 ${st.orbRing} bg-linear-to-b ${st.orbGrad} backdrop-blur-xl flex flex-col items-center justify-center text-white overflow-hidden transition-transform group-hover:scale-105 active:scale-95 cursor-pointer px-2`}
+                    className="relative flex h-20 w-20 items-center justify-center transition-transform active:scale-95 cursor-pointer"
                   >
-                    <div className="absolute inset-0 rounded-full bg-linear-to-tr from-white/5 to-transparent pointer-events-none z-10" />
-                    <div className="absolute top-2 right-4 w-8 h-4 bg-white/10 rounded-full blur-xs pointer-events-none -rotate-45 z-10" />
                     <LeadSourceOrbGraphic source={sourceBrand} />
                   </button>
 

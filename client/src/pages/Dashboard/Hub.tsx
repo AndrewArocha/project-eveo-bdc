@@ -1,5 +1,5 @@
 // src/pages/Dashboard/Hub.tsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, Users, Clock, CalendarDays, TrendingUp, DollarSign, AlertTriangle, Database } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -30,13 +30,38 @@ interface HomeProps {
 
 export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dealership' }: HomeProps) {
   const [now, setNow] = useState(0);
-  const { role, user } = useAuth();
+  const { role, user: accountUser } = useAuth();
+  const user = accountUser?.demoMode ? null : accountUser;
   const [expanded, setExpanded] = useState<ExpandedCard>(null);
   const [isSwitchingStore, setIsSwitchingStore] = useState(false);
-  const { getBanner, activeStore, activeStoreId, setActiveStoreId, stores } = useStoreAppearance();
+  const { getBanner, activeStore, activeStoreId, setActiveStoreId, stores, cycleNextStore } = useStoreAppearance();
   const activeStoreIdx = Math.max(0, stores.findIndex((store) => store.id === activeStore.id));
   const [isEveBubbleOpen, setIsEveBubbleOpen] = useState(false);
+  const eveCardRef = useRef<HTMLElement>(null);
+  const eveBubbleTimeoutRef = useRef<number | null>(null);
   const [seenPriorityIds, setSeenPriorityIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!isEveBubbleOpen) return;
+    const close = () => setIsEveBubbleOpen(false);
+    eveBubbleTimeoutRef.current = window.setTimeout(close, 750);
+    const onOutsideClick = (event: PointerEvent) => {
+      if (eveCardRef.current && !eveCardRef.current.contains(event.target as Node)) close();
+    };
+    document.addEventListener('pointerdown', onOutsideClick);
+    return () => {
+      if (eveBubbleTimeoutRef.current !== null) window.clearTimeout(eveBubbleTimeoutRef.current);
+      document.removeEventListener('pointerdown', onOutsideClick);
+    };
+  }, [isEveBubbleOpen]);
+
+  const keepEveBubbleOpen = () => {
+    if (eveBubbleTimeoutRef.current !== null) window.clearTimeout(eveBubbleTimeoutRef.current);
+  };
+  const dismissEveBubbleSoon = () => {
+    if (eveBubbleTimeoutRef.current !== null) window.clearTimeout(eveBubbleTimeoutRef.current);
+    eveBubbleTimeoutRef.current = window.setTimeout(() => setIsEveBubbleOpen(false), 750);
+  };
 
   const [storeData, setStoreData] = useState<StoreData>(() => user
     ? { staff: [], leads: [], handoffs: [], appointments: [], sold: [], pending: [], bannerUrl: '' }
@@ -123,7 +148,7 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
     try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch { /* storage may be blocked */ }
   };
 
-  const canChooseStore = (role === 'bdc' || role === 'bdc_manager') && stores.length > 1;
+  const canChooseStore = stores.length > 1 && (accountUser?.demoMode === true || role === 'bdc' || role === 'bdc_manager');
 
   return (
     <motion.div
@@ -162,7 +187,7 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
                 System Online &bull; {user?.name || CURRENT_USER}
               </span>
               <h1 className="text-xl sm:text-4xl lg:text-5xl font-black tracking-tight mb-0.5 sm:mb-2 text-white drop-shadow-lg leading-tight">
-                {role === 'bdc' ? 'BDC Command Center' : role === 'sales' ? 'Showroom Floor' : 'Dealership Overview'}
+                {role === 'bdc' ? 'BDC Command Center' : role === 'sales' ? 'Sales Hub' : role === 'manager' ? 'Manager Hub' : 'Store Hub'}
               </h1>
               <p className="text-gray-300 text-[11px] sm:text-sm font-medium drop-shadow-md leading-snug max-w-md line-clamp-2">
                 {role === 'bdc'
@@ -171,7 +196,7 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
               </p>
             </div>
 
-            <div className="relative flex items-center gap-2.5 sm:gap-3 rounded-2xl bg-black/35 px-3 py-2 backdrop-blur-xl">
+            <button type="button" onClick={canChooseStore ? cycleNextStore : undefined} aria-label={canChooseStore ? `Switch active store from ${activeStore.name}` : `${activeStore.name}`} className={`relative flex items-center gap-2.5 sm:gap-3 rounded-2xl bg-black/35 px-3 py-2 text-left backdrop-blur-xl ${canChooseStore ? 'cursor-pointer hover:bg-black/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400' : 'cursor-default'}`}>
               {homeBtnLogo && homeBtnLogo.trim().length > 0 ? (
                 <div className="flex h-8 w-12 shrink-0 items-center justify-center rounded-lg bg-white p-1 shadow-xs sm:h-10 sm:w-16">
                   <img src={homeBtnLogo} alt={`${dealershipName} Logo`} onError={(event) => { event.currentTarget.src = eveoSymbol; }} className="h-full w-full object-contain" />
@@ -182,7 +207,7 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
                 </div>
               )}
               <span className="max-w-40 truncate text-xs font-semibold text-white drop-shadow-xs sm:max-w-56 sm:text-sm">{activeStore.name}</span>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -238,7 +263,7 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
             borderGlow={liveHandoffCount > 0 ? 'bg-orange-500/5 dark:bg-orange-500/10 border-orange-500/30 dark:border-orange-500/20' : undefined}
             onClick={() => { markPrioritiesSeen('visit:'); setExpanded('handoffs'); }}
           />
-          <section className="relative min-h-28 overflow-visible rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm dark:border-white/10 dark:bg-[#0a0f16]/80 sm:min-h-40 sm:rounded-3xl sm:p-6" aria-label="E.V.E. assistant">
+          <section ref={eveCardRef} onMouseEnter={keepEveBubbleOpen} onMouseLeave={dismissEveBubbleSoon} className="relative min-h-28 overflow-visible rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm dark:border-white/10 dark:bg-[#0a0f16]/80 sm:min-h-40 sm:rounded-3xl sm:p-6" aria-label="E.V.E. assistant">
             {unreadPriorityIds.length > 0 && <span className="absolute right-3.5 top-3.5 flex h-2.5 w-2.5 sm:right-5 sm:top-5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" /></span>}
             <div className="flex h-full items-center gap-2 sm:gap-4">
               <EveoMascot size="sm" mood={unreadPriorityIds.length ? 'alert' : 'sleep'} flashAlertKey={unreadPriorityIds.join('|')} allowSleep onClick={() => setIsEveBubbleOpen((open) => !open)} className="shrink-0" />
@@ -246,7 +271,7 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
                 <p className="text-[9px] font-bold uppercase tracking-widest text-purple-600 dark:text-purple-400 sm:text-xs">AI Assistant · E.V.E.</p>
                 <p className="mt-1 text-xl font-semibold tracking-tight text-gray-900 dark:text-white sm:text-3xl">{unreadPriorityIds.length ? `${unreadPriorityIds.length} to review` : 'Resting'}</p>
                 <p className="mt-1 text-[10px] text-gray-600 dark:text-gray-400 sm:text-xs">{unreadPriorityIds.length ? 'New dealership priorities' : 'No priority updates'}</p>
-                {isEveBubbleOpen && <div className="absolute inset-x-3 bottom-full z-40 mb-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-xl dark:border-white/15 dark:bg-[#101722] sm:inset-x-5">
+                {isEveBubbleOpen && <div onMouseEnter={keepEveBubbleOpen} onMouseLeave={dismissEveBubbleSoon} className="absolute inset-x-3 bottom-full z-40 mb-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-xl dark:border-white/15 dark:bg-[#101722] sm:inset-x-5">
                   <p className="text-xs font-semibold text-gray-900 dark:text-white">{unreadPriorityIds.length ? 'I found new dealership activity.' : 'Everything important is up to date.'}</p>
                   <p className="mt-1 text-xs leading-relaxed text-gray-600 dark:text-gray-300">{unreadPriorityIds.length ? `${unreadLeads} unassigned leads · ${overdueHandleLeads} leads waiting over 1 minute · ${unreadAppointments} appointments to confirm · ${unreadHandoffs} showroom handoffs.` : 'I’ll wake when a new lead needs attention, an appointment needs confirmation, or a customer needs a handoff.'}</p>
                   <button type="button" onClick={() => { markPrioritiesSeen(); setIsEveBubbleOpen(false); navigate('/app/insights'); }} className="mt-2 min-h-9 rounded-xl bg-orange-600 px-3 text-xs font-semibold text-white">Review with E.V.E.</button>

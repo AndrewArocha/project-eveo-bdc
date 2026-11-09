@@ -8,6 +8,7 @@ declare global {
         role: UserRole;
         dealerAccountId: string;
         storeIds: string[];
+        demoMode: boolean;
       };
     }
   }

@@ -230,7 +230,7 @@ export const mockShowroomRepository: ShowroomRepository = {
       actorName: input.checkedInByName,
       occurredAt: now,
       message: `Greeted ${input.greetedPerson}. Live visit started.`,
-      media: input.greetingMedia,
+      ...(input.greetingMedia ? { media: input.greetingMedia } : {}),
     };
     const initialNoteEvent: ShowroomEvent | null = input.notes?.trim()
       ? {

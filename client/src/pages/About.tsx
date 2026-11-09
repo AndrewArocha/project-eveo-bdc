@@ -22,7 +22,7 @@ const eveoJourney = [
   { phase: "2021 / The Spark", title: "A Two-Computer Start", img: Startup, desc: "EVEO Inc. was born as a small operation in Medellín. Founded by Erick Espin, it began as a lean telemarketing operation with just two computers and a vision for social media management." },
   { phase: "2022 / The Pivot", title: "The BDC Inception", img: Automotive, desc: "The trajectory changed when an automotive client requested something beyond social media: direct customer follow-ups. We took on the challenge, officially birthing EVEO's Business Development Center (BDC) operation." },
   { phase: "2023 / The Architecture", title: "Scripting the Floor", img: Scripting, desc: "To survive the automotive space, we had to systematize. We revolutionized our workflows by introducing rigorous sales pipelines, robust closing scripts, and rigid operational architecture." },
-  { phase: "2024 / The Expansion", title: "Outscaling the Competition", img: Scaling, desc: "The systems worked. EVEO rapidly scaled its physical operations, managing 9 dealerships simultaneously. At our peak, we ran a multi-tenant operation strictly handling volume for titans like Northstar Kia." },
+  { phase: "2024 / The Expansion", title: "Outscaling the Competition", img: Scaling, desc: "The systems worked. EVEO rapidly scaled its physical operations, managing multiple dealerships simultaneously through a multi-tenant BDC operation." },
   { phase: "2025 / The Evolution", title: "Physical to Digital", img: Digitalization, desc: "Realizing that human effort alone couldn't outpace technological bottlenecks, we translated our battle-tested physical workflows into code. EVEO transitioned from a service agency into a proprietary SaaS platform." }
 ];
 

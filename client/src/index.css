@@ -81,6 +81,24 @@ html.light textarea[class*="bg-black"]::placeholder {
   color: #6b7280 !important;
 }
 
+html.light .eveo-report-chart [class*="text-white"],
+html.light .eveo-report-chart [class*="text-gray-100"],
+html.light .eveo-report-chart [class*="text-gray-200"],
+html.light .eveo-report-chart [class*="text-gray-300"] {
+  color: #111827 !important;
+}
+
+html.light .eveo-report-chart [class*="text-gray-400"],
+html.light .eveo-report-chart [class*="text-gray-500"],
+html.light .eveo-report-chart [class*="text-gray-600"] {
+  color: #4b5563 !important;
+}
+
+html.light .eveo-report-chart [class*="bg-white/5"],
+html.light .eveo-report-chart [class*="bg-white/7"] {
+  background-color: #e5e7eb !important;
+}
+
 /* 
   ========================================
   CUSTOM "TINY PILL" SCROLLBAR

@@ -30,6 +30,7 @@ export const authenticate: RequestHandler = asyncHandler(async (request, _respon
 
   const user = await User.findOne({ _id: sub, active: true });
   if (!user) throw new AppError(401, API_MESSAGES.unauthorized, 'UNAUTHORIZED');
+  if (!user.emailVerifiedAt) throw new AppError(403, 'Verify your email address before using EVEO.', 'EMAIL_NOT_VERIFIED');
   const account = await DealerAccount.findById(user.dealerAccountId).select('status');
   if (!account || account.status === 'suspended') {
     throw new AppError(403, API_MESSAGES.forbidden, 'ACCOUNT_SUSPENDED');
@@ -39,6 +40,7 @@ export const authenticate: RequestHandler = asyncHandler(async (request, _respon
     role: user.role,
     dealerAccountId: user.dealerAccountId.toString(),
     storeIds: user.storeIds.map((storeId) => storeId.toString()),
+    demoMode: user.demoMode === true,
   };
   next();
 });

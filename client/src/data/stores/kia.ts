@@ -2,8 +2,13 @@ import { type StoreData } from '../../types';
 import defaultBanner from '../../images/defaultBanner.avif';
 
 export const kiaData: StoreData = {
+  inventory: [
+    { vin: '5XYRKDLF8SG201482', vehicle: '2025 Kia Sorento SX', daysInStock: 14, price: 38995, status: 'READY_FOR_SALE' },
+    { vin: 'KNDNE5KA7S6129340', vehicle: '2025 Kia Carnival EX', daysInStock: 41, price: 36750, status: 'READY_FOR_SALE' },
+    { vin: '5XYP5DGC7SG112507', vehicle: '2025 Kia Telluride SX', daysInStock: 96, price: 45200, status: 'PENDING' },
+  ],
   staff: [
-    { id: 401, name: 'Jason K.', initials: 'JK', role: 'sales', schedule: 'Mon - Fri', daysOff: 'Sat & Sun', kpiTarget: 18, wage: 3400, currency: 'USD', route: 'Standard ACH', assignedStoreIds: ['kia'], liveActivity: 'Delivering 2025 Kia EV9' },
+    { id: 401, name: 'Jordan K.', initials: 'JK', role: 'sales', schedule: 'Mon - Fri', daysOff: 'Sat & Sun', kpiTarget: 18, wage: 3400, currency: 'USD', route: 'Standard ACH', assignedStoreIds: ['kia'], liveActivity: 'Delivering 2025 Kia EV9' },
     { id: 402, name: 'Rachel Z.', initials: 'RZ', role: 'sales', schedule: 'Wed - Sun', daysOff: 'Mon & Tue', kpiTarget: 16, wage: 3400, currency: 'USD', route: 'Standard ACH', assignedStoreIds: ['kia'], liveActivity: 'Floor Lobby • Ready for Ups' },
     { id: 403, name: 'Harvey S.', initials: 'HS', role: 'manager', schedule: 'Mon - Fri', daysOff: 'Sat & Sun', wage: 6000, currency: 'USD', route: 'Standard ACH', assignedStoreIds: ['kia'], liveActivity: 'F&I Desk • Closing Deal #421' }
   ],

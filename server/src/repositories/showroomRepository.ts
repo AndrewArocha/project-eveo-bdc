@@ -81,7 +81,7 @@ export async function createShowroomVisit(input: Record<string, unknown>, userId
     assignedUserId: assignedUser._id, assignedRepName: assignedUser.name, checkedInByUserId: userId, checkedInByName: actor.name,
     customerNameSnapshot: customerName, greetedPerson: String(input.greetedPerson), phoneSnapshot: phone || customer.phone, notes: input.notes || '',
     vehicleOfInterest: input.vehicleOfInterest || null, tradeIn: input.tradeIn || null,
-    events: [{ type: 'customer_greeted', actorUserId: userId, actorName: actor.name, occurredAt: new Date(), message: `Greeted ${String(input.greetedPerson)}.`, media: input.greetingMedia }],
+    events: [{ type: 'customer_greeted', actorUserId: userId, actorName: actor.name, occurredAt: new Date(), message: `Greeted ${String(input.greetedPerson)}.`, ...(input.greetingMedia ? { media: input.greetingMedia } : {}) }],
   });
   await ActivityEvent.create({ dealerAccountId, storeId, actorUserId: userId, actorName: actor.name, category: 'showroom', title: `Customer checked in • ${customerName}`, description: 'Showroom visit started.', entityType: 'showroom_visit', entityId: visit.id });
   return visit;

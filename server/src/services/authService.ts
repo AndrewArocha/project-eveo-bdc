@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { env } from '../config/env.js';
@@ -13,14 +13,19 @@ import { toSafeUser } from '../utils/safeUser.js';
 
 const PASSWORD_SALT_ROUNDS = 12;
 
-export async function createOwnerAccount(input: { name: string; businessName: string; phone: string; email: string; password: string }) {
+export async function createOwnerAccount(input: { name: string; businessName: string; phone: string; email: string; password: string; promotionalConsent?: boolean }) {
   if (!env.jwtSecret || env.jwtSecret.length < 32) {
     throw new AppError(503, 'Authentication is not configured on this server.', 'AUTH_NOT_CONFIGURED');
   }
   if (await User.exists({ email: input.email })) {
     throw new AppError(409, 'An account already uses this email address. Please sign in or reset your password.', 'EMAIL_IN_USE');
   }
+  if (!env.resendApiKey || !env.authEmailFrom) {
+    throw new AppError(503, 'Email verification is not configured yet. Please try again later.', 'EMAIL_NOT_CONFIGURED');
+  }
   const passwordHash = await bcrypt.hash(input.password, PASSWORD_SALT_ROUNDS);
+  const verificationToken = randomBytes(32).toString('base64url');
+  const verificationTokenHash = createHash('sha256').update(verificationToken).digest('hex');
   const session = await mongoose.startSession();
   let createdUser: UserDocument | null = null;
   try {
@@ -55,6 +60,10 @@ export async function createOwnerAccount(input: { name: string; businessName: st
         dealerAccountId,
         storeIds: [storeId],
         active: true,
+        emailVerificationTokenHash: verificationTokenHash,
+        emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        promotionalConsent: input.promotionalConsent === true,
+        demoMode: true,
       }], { session });
       createdUser = user as UserDocument;
     });
@@ -62,7 +71,51 @@ export async function createOwnerAccount(input: { name: string; businessName: st
     await session.endSession();
   }
   if (!createdUser) throw new AppError(500, 'The EVEO account could not be created.', 'SIGNUP_FAILED');
-  return issueSession(createdUser);
+  const verifyUrl = new URL('/verify-email', env.clientOrigins[0] || 'http://localhost:3000');
+  verifyUrl.searchParams.set('token', verificationToken);
+  const emailResponse = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.resendApiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: env.authEmailFrom,
+      to: [input.email],
+      subject: 'Verify your EVEO email address',
+      html: `<p>Hi ${escapeHtml(input.name)},</p><p>Verify your email to open the EVEO demo workspace.</p><p><a href="${verifyUrl.toString()}">Verify email</a></p><p>This link expires in 24 hours. If you did not request an account, you can ignore this email.</p>`,
+    }),
+  }).catch(() => null);
+  if (!emailResponse?.ok) {
+    throw new AppError(502, 'Your account request was saved, but the verification email could not be sent. Contact EVEO support to finish setup.', 'VERIFICATION_EMAIL_FAILED');
+  }
+  return { verificationRequired: true, email: input.email };
+}
+
+export async function verifyOwnerEmail(token: string) {
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const user = await User.findOne({ emailVerificationTokenHash: tokenHash, emailVerificationExpiresAt: { $gt: new Date() }, active: true }).select('+emailVerificationTokenHash +emailVerificationExpiresAt');
+  if (!user) throw new AppError(400, 'This verification link is invalid or expired. Request a new one to continue.', 'EMAIL_VERIFICATION_INVALID');
+  user.emailVerifiedAt = new Date();
+  user.emailVerificationTokenHash = undefined;
+  user.emailVerificationExpiresAt = undefined;
+  await user.save();
+  return issueSession(user);
+}
+
+export async function resendOwnerVerification(input: { email: string; password: string }) {
+  const user = await User.findOne({ email: input.email, active: true }).select('+passwordHash');
+  if (!user || !(await bcrypt.compare(input.password, user.passwordHash)) || user.emailVerifiedAt) return { requested: true };
+  if (!env.resendApiKey || !env.authEmailFrom) throw new AppError(503, 'Email verification is not configured yet. Please try again later.', 'EMAIL_NOT_CONFIGURED');
+  const token = randomBytes(32).toString('base64url');
+  user.emailVerificationTokenHash = createHash('sha256').update(token).digest('hex');
+  user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  await user.save();
+  const verifyUrl = new URL('/verify-email', env.clientOrigins[0] || 'http://localhost:3000');
+  verifyUrl.searchParams.set('token', token);
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST', headers: { Authorization: `Bearer ${env.resendApiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: env.authEmailFrom, to: [input.email], subject: 'Verify your EVEO email address', html: `<p>Hi ${escapeHtml(user.name)},</p><p>Use this secure link to verify your EVEO email address:</p><p><a href="${verifyUrl.toString()}">Verify email</a></p><p>This link expires in 24 hours.</p>` }),
+  }).catch(() => null);
+  if (!response?.ok) throw new AppError(502, 'The verification email could not be sent. Please try again later.', 'VERIFICATION_EMAIL_FAILED');
+  return { requested: true };
 }
 
 export async function signIn(email: string, password: string) {
@@ -74,8 +127,13 @@ export async function signIn(email: string, password: string) {
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     throw new AppError(401, API_MESSAGES.invalidCredentials, 'INVALID_CREDENTIALS');
   }
+  if (!user.emailVerifiedAt) throw new AppError(403, 'Verify your email before signing in. Check your inbox for the EVEO verification link.', 'EMAIL_NOT_VERIFIED');
 
   return issueSession(user);
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] ?? character);
 }
 
 export async function acceptUserInvitation(input: { token: string; name: string; password: string }) {
@@ -97,6 +155,7 @@ export async function acceptUserInvitation(input: { token: string; name: string;
         email: invitation.email,
         passwordHash,
         role: invitation.role,
+        emailVerifiedAt: new Date(),
         dealerAccountId: invitation.dealerAccountId,
         storeIds: invitation.storeIds,
         active: true,

@@ -118,6 +118,7 @@ export interface StoreData {
   appointments: Appointment[];
   sold: DealRecord[];
   pending: DealRecord[];
+  inventory?: Array<{ vin: string; vehicle: string; daysInStock: number; price: number; status: 'READY_FOR_SALE' | 'PENDING' | 'SOLD' | 'DELIVERED' }>;
   bannerUrl: string;
 }
 

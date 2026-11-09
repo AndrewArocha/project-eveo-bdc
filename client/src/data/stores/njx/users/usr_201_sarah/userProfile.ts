@@ -19,7 +19,7 @@ export const userProfile: ExclusiveUserProfile = {
   storeId: 'njx',
   name: 'Sarah J.',
   initials: 'SJ',
-  email: 'sarah@njautoxchange.com',
+  email: 'sarah@example.test',
   role: 'sales',
   liveActivity: 'Showroom • With Marcus Johnson',
 };

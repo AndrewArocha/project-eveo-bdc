@@ -15,6 +15,7 @@ export const revokeUserInvitationSchema = z.object({});
 export const updateMyProfileSchema = z.object({
   name: z.string().trim().min(1).max(100),
   phone: z.string().trim().max(40).optional(),
+  workPhone: z.string().trim().max(40).optional(),
 });
 
 const shift = z.object({ start: z.string().trim().min(1).max(20), end: z.string().trim().min(1).max(20) });

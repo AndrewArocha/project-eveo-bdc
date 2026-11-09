@@ -8,6 +8,7 @@ import Footer from '../components/Layout/Footer';
 import Pricing from '../pages/Pricing';
 import Register from '../pages/Auth/Register';
 import AcceptInvitation from '../pages/Auth/AcceptInvitation';
+import VerifyEmail from '../pages/Auth/VerifyEmail';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function PublicRoutes() {
@@ -31,6 +32,7 @@ export default function PublicRoutes() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/invite" element={<AcceptInvitation />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

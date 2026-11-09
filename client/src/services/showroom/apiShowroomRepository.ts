@@ -48,7 +48,7 @@ export const apiShowroomRepository: ShowroomRepository = {
   async createVisit(storeId, input: CreateShowroomVisitInput) {
     const record = await apiRequest<ApiVisit>('/showroom', { method: 'POST', body: JSON.stringify({
       storeId, customerId: input.customerId, customerName: input.customerName, customerPhone: input.customerPhone,
-      greetedPerson: input.greetedPerson, greetingMedia: input.greetingMedia,
+      greetedPerson: input.greetedPerson, ...(input.greetingMedia ? { greetingMedia: input.greetingMedia } : {}),
       leadId: input.leadId, appointmentId: input.appointmentId,
       assignedUserId: input.assignedRepId, notes: input.notes,
       vehicleOfInterest: input.vehicles.vehicleOfInterest, tradeIn: input.vehicles.tradeIn,

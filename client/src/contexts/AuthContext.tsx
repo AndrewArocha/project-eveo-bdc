@@ -8,7 +8,8 @@ interface AuthContextType {
   user: ApiUser | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (input: { name: string; businessName: string; phone: string; email: string; password: string }) => Promise<void>;
+  signUp: (input: { name: string; businessName: string; phone: string; email: string; password: string; promotionalConsent: boolean }) => Promise<void>;
+  verifyEmail: (token: string) => Promise<void>;
   acceptInvitation: (input: { token: string; name: string; password: string }) => Promise<void>;
   refreshUser: () => Promise<ApiUser>;
   signOut: () => void;
@@ -22,7 +23,7 @@ interface SessionResponse {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [role, setRoleState] = useState<UserRole>(() => (localStorage.getItem('eveo_role') as UserRole) || 'bdc');
+  const [role, setRoleState] = useState<UserRole>(() => localStorage.getItem('eveo_token') ? ((localStorage.getItem('eveo_role') as UserRole) || 'bdc') : 'owner');
   const [user, setUser] = useState<ApiUser | null>(null);
   const [isLoading, setIsLoading] = useState(() => localStorage.getItem('eveo_token') !== null);
 
@@ -66,10 +67,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     acceptSession(session);
   }, [acceptSession]);
 
-  const signUp = useCallback(async (input: { name: string; businessName: string; phone: string; email: string; password: string }) => {
-    const session = await apiRequest<SessionResponse>('/auth/signup', {
+  const signUp = useCallback(async (input: { name: string; businessName: string; phone: string; email: string; password: string; promotionalConsent: boolean }) => {
+    await apiRequest<{ verificationRequired: boolean; email: string }>('/auth/signup', {
       method: 'POST', body: JSON.stringify(input),
     });
+  }, []);
+
+  const verifyEmail = useCallback(async (token: string) => {
+    const session = await apiRequest<SessionResponse>('/auth/verify-email', { method: 'POST', body: JSON.stringify({ token }) });
     acceptSession(session);
   }, [acceptSession]);
 
@@ -96,13 +101,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(() => {
     localStorage.removeItem('eveo_token');
     localStorage.removeItem('eveo_role');
+    for (const key of Object.keys(sessionStorage)) if (key.startsWith('eveo_demo_customer')) sessionStorage.removeItem(key);
     setUser(null);
-    setRoleState('bdc');
+    setRoleState('owner');
   }, []);
 
   const value = useMemo(
-    () => ({ role, setRole, user, isLoading, signIn, signUp, acceptInvitation, refreshUser, signOut }),
-    [role, setRole, user, isLoading, signIn, signUp, acceptInvitation, refreshUser, signOut],
+    () => ({ role, setRole, user, isLoading, signIn, signUp, verifyEmail, acceptInvitation, refreshUser, signOut }),
+    [role, setRole, user, isLoading, signIn, signUp, verifyEmail, acceptInvitation, refreshUser, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

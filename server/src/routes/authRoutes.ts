@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
-import { acceptInvitation, signin, signup } from '../controllers/authController.js';
+import { acceptInvitation, resendVerification, signin, signup, verifyEmail } from '../controllers/authController.js';
 import { validateBody } from '../validators/validate.js';
-import { acceptInvitationSchema, signinSchema, signupSchema } from '../validators/auth.js';
+import { acceptInvitationSchema, resendVerificationSchema, signinSchema, signupSchema, verifyEmailSchema } from '../validators/auth.js';
 
 export const authRoutes = Router();
 
@@ -15,5 +15,7 @@ const authLimiter = rateLimit({
 });
 
 authRoutes.post('/signup', authLimiter, validateBody(signupSchema), signup);
+authRoutes.post('/verify-email', authLimiter, validateBody(verifyEmailSchema), verifyEmail);
+authRoutes.post('/resend-verification', authLimiter, validateBody(resendVerificationSchema), resendVerification);
 authRoutes.post('/signin', authLimiter, validateBody(signinSchema), signin);
 authRoutes.post('/accept-invitation', authLimiter, validateBody(acceptInvitationSchema), acceptInvitation);

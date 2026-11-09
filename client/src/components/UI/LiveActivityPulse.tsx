@@ -86,7 +86,7 @@ const CATEGORY_META: Record<
     iconColor: 'text-purple-300',
     orbRing: 'border-purple-400 shadow-[0_0_18px_rgba(168,85,247,0.7)]',
     badgeBg: 'bg-red-500',
-    priorityLabel: 'P1 • EVEO AI Match',
+    priorityLabel: 'P1 • E.V.E. Matched Unit',
   },
 
   // --- PRIORITY 2 (Lead & Account Updates) ---
@@ -132,7 +132,7 @@ const CATEGORY_META: Record<
     iconColor: 'text-purple-400',
     orbRing: 'border-purple-500/50 shadow-[0_0_12px_rgba(168,85,247,0.35)]',
     badgeBg: 'bg-purple-500',
-    priorityLabel: 'P3 • EVEO AI Scan',
+    priorityLabel: 'P3 • E.V.E. Scan',
   },
 };
 
@@ -229,7 +229,7 @@ export default function LiveActivityPulse() {
     // 1. EVEO AI AGENT (High-Intent P1 Match + Background P3 Scan)
     events.push({
       id: `${activeStoreId}-ai-p1`,
-      agentName: 'EVEO AI',
+          agentName: 'E.V.E.',
       initials: 'AI',
       isAiAgent: true,
       priority: 1,

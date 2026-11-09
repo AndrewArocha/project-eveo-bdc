@@ -34,6 +34,7 @@ export function ProfileForm() {
   const persistedStore = registeredStores.find((store) => store.id === activeStore.id);
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
+  const [workPhone, setWorkPhone] = useState(user?.workPhone || '');
   const [storeName, setStoreName] = useState(activeStore.name || '');
   const [storePhone, setStorePhone] = useState(activeStore.phone || '');
   const [website, setWebsite] = useState(activeStore.websiteUrl || '');
@@ -45,7 +46,8 @@ export function ProfileForm() {
   useEffect(() => {
     setName(user?.name || '');
     setPhone(user?.phone || '');
-  }, [user?.id, user?.name, user?.phone]);
+    setWorkPhone(user?.workPhone || '');
+  }, [user?.id, user?.name, user?.phone, user?.workPhone]);
 
   useEffect(() => {
     setStoreName(activeStore.name || '');
@@ -60,7 +62,7 @@ export function ProfileForm() {
     setFeedback('');
     setIsSaving(true);
     try {
-      await apiRequest('/users/me', { method: 'PATCH', body: JSON.stringify({ name, phone }) });
+      await apiRequest('/users/me', { method: 'PATCH', body: JSON.stringify({ name, phone, workPhone }) });
       await refreshUser();
       if (role === 'owner' && activeStore.id) {
         await apiRequest(`/stores/${encodeURIComponent(activeStore.id)}`, {
@@ -90,9 +92,8 @@ export function ProfileForm() {
         <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Sign-in email
           <input value={user?.email || ''} readOnly className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-200 bg-gray-100 px-3 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-400" />
         </label>
-        <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Your phone
-          <input value={phone} onChange={(event) => setPhone(event.target.value)} maxLength={40} autoComplete="tel" className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-orange-500 dark:border-white/15 dark:bg-[#0a0f16] dark:text-white" />
-        </label>
+        <PhoneNumberField label="Personal phone" value={phone} onChange={setPhone} />
+        <PhoneNumberField label="Work phone" value={workPhone} onChange={setWorkPhone} />
       </div>
       {role === 'owner' && <section className="border-t border-gray-200 pt-5 dark:border-white/10">
         <h3 className="text-base font-semibold text-gray-900 dark:text-white">Store profile</h3>
@@ -116,6 +117,27 @@ export function ProfileForm() {
       <button type="submit" disabled={isSaving} className="min-h-11 w-full rounded-xl bg-orange-500 px-5 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:opacity-60 sm:w-auto">{isSaving ? 'Saving…' : 'Save changes'}</button>
     </form>
   );
+}
+
+const PHONE_COUNTRIES = [
+  { code: '+1', flag: '🇺🇸', name: 'United States / Canada' },
+  { code: '+44', flag: '🇬🇧', name: 'United Kingdom' },
+  { code: '+52', flag: '🇲🇽', name: 'Mexico' },
+];
+
+function PhoneNumberField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const match = value.match(/^\+(\d{1,3})\s*(.*)$/);
+  const countryCode = match ? `+${match[1]}` : '+1';
+  const localNumber = match ? match[2] : value;
+  const country = PHONE_COUNTRIES.find((item) => item.code === countryCode) ?? PHONE_COUNTRIES[0];
+  return <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">{label}
+    <span className="mt-1.5 flex min-h-11 overflow-hidden rounded-xl border border-gray-300 bg-white focus-within:border-orange-500 dark:border-white/15 dark:bg-[#0a0f16]">
+      <select aria-label={`${label} country code`} value={country.code} onChange={(event) => onChange(`${event.target.value} ${localNumber}`)} className="w-28 shrink-0 border-r border-gray-200 bg-transparent px-2 text-sm text-gray-900 outline-none dark:border-white/10 dark:text-white">
+        {PHONE_COUNTRIES.map((item) => <option key={item.code} value={item.code}>{item.flag} {item.code}</option>)}
+      </select>
+      <input type="tel" value={localNumber} onChange={(event) => onChange(`${country.code} ${event.target.value}`)} maxLength={32} autoComplete="tel-national" aria-label={label} className="min-w-0 flex-1 bg-transparent px-3 text-sm text-gray-900 outline-none dark:text-white" />
+    </span>
+  </label>;
 }
 
 // ==========================================
@@ -905,6 +927,9 @@ export function SecurityForm() {
   const inputClass = 'mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-orange-500 dark:border-white/15 dark:bg-[#0a0f16] dark:text-white';
   return <form onSubmit={(event) => void changePassword(event)} className="relative z-10 flex max-w-xl flex-col gap-4">
     <div><h3 className="text-base font-semibold text-gray-900 dark:text-white">Account security</h3><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Change your password. EVEO checks your current password before saving.</p></div>
+    <section className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5">
+      <div className="flex items-center justify-between gap-4"><div><h4 className="text-sm font-semibold text-gray-900 dark:text-white">Two-factor authentication</h4><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Authenticator app setup is not available yet.</p></div><button type="button" disabled className="min-h-10 cursor-not-allowed rounded-xl border border-gray-300 px-4 text-xs font-semibold text-gray-400 opacity-70 dark:border-white/10">Set up 2FA · Coming soon</button></div>
+    </section>
     <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Current password<input type="password" autoComplete="current-password" required value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className={inputClass} /></label>
     <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">New password<input type="password" autoComplete="new-password" minLength={12} required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className={inputClass} /><span className="mt-1 block font-normal text-gray-500">Use at least 12 characters.</span></label>
     <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Confirm new password<input type="password" autoComplete="new-password" minLength={12} required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className={inputClass} /></label>

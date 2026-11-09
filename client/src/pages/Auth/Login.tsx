@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import eveoSymbol from '../../images/logo/eveo-symbol.svg';
 import { useAuth } from '../../contexts/AuthContext';
+import { apiRequest } from '../../services/apiClient';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -10,21 +11,41 @@ export default function Login() {
   const { signIn } = useAuth();
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [verificationNotice, setVerificationNotice] = useState('');
+  const [isResending, setIsResending] = useState(false);
 
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
+    setNeedsVerification(false);
+    setVerificationNotice('');
     setIsSubmitting(true);
     const form = new FormData(e.currentTarget);
     try {
-      await signIn(String(form.get('email')), String(form.get('password')));
+      await signIn(email || String(form.get('email')), password || String(form.get('password')));
       const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
       navigate(destination?.startsWith('/app/') ? destination : '/app/hub', { replace: true });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Sign-in failed. Please try again.');
+      const message = cause instanceof Error ? cause.message : 'Sign-in failed. Please try again.';
+      setError(message);
+      if (message.toLowerCase().includes('verify your email')) setNeedsVerification(true);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const resendVerification = async () => {
+    setIsResending(true);
+    setVerificationNotice('');
+    try {
+      await apiRequest('/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email, password }) });
+      setVerificationNotice('If this account needs verification, a fresh link has been sent to its email address.');
+    } catch (cause) {
+      setVerificationNotice(cause instanceof Error ? cause.message : 'A verification email could not be sent.');
+    } finally { setIsResending(false); }
   };
 
   const inputClasses = "w-full min-h-12 px-4 py-3 rounded-xl bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all text-base sm:text-sm text-gray-900 dark:text-white";
@@ -54,11 +75,11 @@ export default function Login() {
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Email address</label>
-              <input id="email" name="email" type="email" autoComplete="email" required className={inputClasses} placeholder="admin@dealership.com" />
+              <input id="email" name="email" value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" required className={inputClasses} placeholder="admin@dealership.com" />
             </div>
             <div>
               <label htmlFor="password" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 ml-1 mb-1.5">Password</label>
-            <input id="password" name="password" type="password" autoComplete="current-password" required minLength={12} className={inputClasses} placeholder="••••••••" />
+            <input id="password" name="password" value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" required minLength={12} className={inputClasses} placeholder="••••••••" />
             </div>
           </div>
 
@@ -75,6 +96,8 @@ export default function Login() {
           <button type="submit" className="w-full min-h-13 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-base sm:text-sm transition-all shadow-lg hover:shadow-orange-500/25 cursor-pointer">
             {isSubmitting ? 'Signing in…' : 'Sign in'}
           </button>
+          {needsVerification && <button type="button" onClick={() => void resendVerification()} disabled={isResending || !email || !password} className="w-full min-h-10 rounded-xl border border-orange-500/30 px-4 text-xs font-semibold text-orange-700 disabled:opacity-50 dark:text-orange-300">{isResending ? 'Sending…' : 'Resend verification email'}</button>}
+          {verificationNotice && <p role="status" className="text-xs text-gray-600 dark:text-gray-400">{verificationNotice}</p>}
         </form>
       </motion.div>
     </div>

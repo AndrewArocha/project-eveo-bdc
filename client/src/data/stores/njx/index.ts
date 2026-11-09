@@ -4,12 +4,13 @@ import { NJX_USERS_DIRECTORY, njxStaffList, getNjxUserById } from './users';
 import { njxInventory } from './inventory';
 import { njxIntegrations } from './integrations';
 import { NJX_HISTORICAL_REPORTS } from './reports';
+import defaultBanner from '../../../images/defaultBanner.avif';
 
 export const njxStoreModule = {
   id: 'njx',
-  name: 'NJ Auto Xchange',
-  logoText: 'NJX',
-  websiteUrl: 'www.njautoxchange.com',
+  name: 'Sample Store East',
+  logoText: 'EAST',
+  websiteUrl: '',
   phone: '(555) 123-4567',
   users: NJX_USERS_DIRECTORY,
   getUserById: getNjxUserById,
@@ -19,6 +20,7 @@ export const njxStoreModule = {
 };
 
 export const njxData: StoreData = {
+  inventory: njxInventory.units,
   staff: njxStaffList,
   leads: [
     { id: 1, name: 'Sarah Connor', vehicle: '2024 Tesla Model 3', status: 'Contacted', time: '10 mins ago', assignee: 'Sarah J.', notes: 'Looking to trade in a 2018 Camry.' },
@@ -42,5 +44,5 @@ export const njxData: StoreData = {
     { id: 501, name: 'Cody Fisher', vehicle: '2023 Tesla Model Y', stage: 'Financing', rep: 'Sarah J.', socials: { instagram: '@cody.fish', whatsapp: '+1 555-0192' } },
     { id: 502, name: 'Bessie Cooper', vehicle: '2021 Toyota RAV4', stage: 'Negotiation', rep: 'Sarah J.' },
   ],
-  bannerUrl: 'https://di-uploads-pod47.dealerinspire.com/njautoxchange/uploads/2025/10/option1-desktop.jpg',
+  bannerUrl: defaultBanner,
 };

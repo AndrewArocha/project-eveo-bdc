@@ -192,7 +192,7 @@ export function checkAndAlertIfVehicleSold(
 
 /**
  * Global Progressive Website Inventory Synchronizer for ANY Dealership Store!
- * Connects to the store's configured website URL (e.g. https://www.njautoxchange.com/used-vehicles/),
+ * Connects to the store's configured website URL,
  * progressively ingests new units, and marks removed website units as DELIVERED (Sold).
  */
 export async function syncStoreWebsiteInventoryProgressively(

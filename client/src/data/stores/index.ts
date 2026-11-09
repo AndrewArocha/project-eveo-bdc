@@ -61,7 +61,7 @@ const DEFAULT_STORE_REPORTS: Record<string, DailyBdcReportSnapshot[]> = {
     {
       id: 'rpt_kia_2026_10_27',
       storeId: 'kia',
-      storeName: 'Northstar Kia',
+      storeName: 'Sample Store West',
       dateISO: '2026-10-27',
       displayDate: 'October 27',
       leadsMtd: 1120,
@@ -85,7 +85,7 @@ const DEFAULT_STORE_REPORTS: Record<string, DailyBdcReportSnapshot[]> = {
     {
       id: 'rpt_kia_2026_10_26',
       storeId: 'kia',
-      storeName: 'Northstar Kia',
+      storeName: 'Sample Store West',
       dateISO: '2026-10-26',
       displayDate: 'October 26',
       leadsMtd: 1092,
@@ -111,7 +111,7 @@ const DEFAULT_STORE_REPORTS: Record<string, DailyBdcReportSnapshot[]> = {
     {
       id: 'rpt_dk_2026_10_27',
       storeId: 'dk',
-      storeName: 'DK Auto Imports',
+      storeName: 'Sample Store Central',
       dateISO: '2026-10-27',
       displayDate: 'October 27',
       leadsMtd: 640,

@@ -18,7 +18,7 @@ export const createShowroomVisitSchema = z.object({
   customerName: z.string().trim().min(1).max(160),
   customerPhone: z.string().trim().max(40).optional(),
   greetedPerson: z.string().trim().min(1).max(80),
-  greetingMedia: media.extend({ kind: z.literal('image') }),
+  greetingMedia: media.extend({ kind: z.literal('image') }).optional(),
   leadId: objectId.optional(),
   appointmentId: objectId.optional(),
   assignedUserId: objectId,

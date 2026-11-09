@@ -144,7 +144,7 @@ const REPORT_META: Record<ReportId, ReportStaticMeta> = {
 
 export default function Reports() {
   const { user } = useAuth();
-  return user ? <LiveReports /> : <DemoReports />;
+  return user && !user.demoMode ? <LiveReports /> : <DemoReports />;
 }
 
 function DemoReports() {

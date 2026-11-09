@@ -21,7 +21,7 @@ export const getCurrentUser: RequestHandler = asyncHandler(async (request, respo
 export const updateCurrentUser: RequestHandler = asyncHandler(async (request, response) => {
   const user = await User.findOneAndUpdate(
     { _id: request.auth?.userId, active: true },
-    { $set: { name: request.body.name, phone: request.body.phone ?? '' } },
+    { $set: { name: request.body.name, phone: request.body.phone ?? '', workPhone: request.body.workPhone ?? '' } },
     { new: true, runValidators: true },
   );
   if (!user) throw new AppError(401, 'The account is no longer active.', 'UNAUTHORIZED');
