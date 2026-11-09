@@ -5,6 +5,7 @@ import Footer from '../components/Layout/Footer';
 import AdminPortal from '../pages/Admin/AdminPortal';
 import StorePortal from '../pages/Admin/StorePortal';
 import PaymentPortal from '../pages/Admin/PaymentPortal';
+import Customers from '../pages/Dashboard/Customers';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function AdminRoutes() {
@@ -20,6 +21,7 @@ export default function AdminRoutes() {
         <Routes>
           <Route index element={<Navigate to="portal" replace />} />
           <Route path="portal" element={<AdminPortal />} />
+          <Route path="customers" element={<div className="pt-20"><Customers /></div>} />
           <Route path="store" element={<StorePortal />} />
           <Route path="checkout" element={<PaymentPortal />} />
         </Routes>

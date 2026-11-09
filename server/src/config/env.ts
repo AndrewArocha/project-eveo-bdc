@@ -24,8 +24,8 @@ export const env = {
   authEmailVerificationRequired: (process.env.AUTH_EMAIL_VERIFICATION_REQUIRED?.trim().toLowerCase() ?? (nodeEnv === 'production' ? 'true' : 'false')) !== 'false',
   platformAdminEmails: (process.env.PLATFORM_ADMIN_EMAILS ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN?.trim() || DEFAULT_TOKEN_EXPIRY,
-  clientOrigins: (process.env.CLIENT_ORIGIN ?? 'http://localhost:3000')
-    .split(',')
+  clientOrigins: [process.env.CLIENT_ORIGIN ?? 'http://localhost:3000', process.env.ADDITIONAL_CLIENT_ORIGINS ?? '']
+    .flatMap((origins) => origins.split(','))
     .map((origin) => origin.trim())
     .filter(Boolean),
   // Render terminates TLS in front of the Node process. Trust exactly its

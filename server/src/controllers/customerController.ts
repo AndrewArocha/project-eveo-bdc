@@ -20,7 +20,8 @@ function customerId(request: Request): string {
 export const listOwnCustomers: RequestHandler = asyncHandler(async (request, response) => {
   const storeId = typeof request.query.storeId === 'string' ? request.query.storeId : undefined;
   const search = typeof request.query.search === 'string' ? request.query.search : undefined;
-  const customers = await listCustomers(request.auth!.dealerAccountId, { storeId, search });
+  const { dealerAccountId, userId } = request.auth!;
+  const customers = await listCustomers(dealerAccountId, userId, { storeId, search });
   response.json({ data: customers });
 });
 

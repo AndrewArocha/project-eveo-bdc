@@ -16,10 +16,11 @@ async function assertStoreBelongsToAccount(storeId: unknown, dealerAccountId: st
 
 export async function listCustomers(
   dealerAccountId: string,
+  ownerId: string,
   filters: { storeId?: string; search?: string } = {},
 ) {
   if (filters.storeId) await assertStoreBelongsToAccount(filters.storeId, dealerAccountId);
-  const query: Record<string, unknown> = { dealerAccountId };
+  const query: Record<string, unknown> = { dealerAccountId, ownerId };
   const conditions: Record<string, unknown>[] = [];
   if (filters.storeId) conditions.push({ $or: [{ storeId: filters.storeId }, { sharedStoreIds: filters.storeId }] });
   if (filters.search?.trim()) {
@@ -49,6 +50,9 @@ export async function createCustomer(
   const email = typeof input.email === 'string' ? input.email.trim().toLowerCase() : '';
   const mergeMissingDetails = async (existing: HydratedDocument<ICustomer> | null) => {
     if (!existing) return null;
+    if (existing.ownerId.toString() !== ownerId) {
+      throw new AppError(409, 'A customer with this email already exists in your dealership account.', 'DUPLICATE_CUSTOMER');
+    }
     if (existing.storeId && input.storeId && existing.storeId.toString() !== String(input.storeId)) {
       throw new AppError(409, 'A customer with this email already belongs to another store. Use an approved cross-store sharing workflow.', 'CUSTOMER_IN_ANOTHER_STORE');
     }

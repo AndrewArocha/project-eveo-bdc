@@ -2,6 +2,13 @@
 
 EVEO is a dealership operations platform with a React client and an independently runnable TypeScript API. The API uses MongoDB/Mongoose, bcrypt password hashing, and JWT sessions. New dealership registrations create a pending application; account activation and billing are separate steps.
 
+## Etapa 2 review deployment
+
+- Frontend on Vercel: [EVEO registration](https://project-eveo-bdc-stage.vercel.app/register)
+- API on Render: [API base URL](https://project-eveo-bdc.onrender.com/api) and [health check](https://project-eveo-bdc.onrender.com/api/health)
+
+Register with a test account, sign in, then choose **My Customers** in Store Administration. Create a fictional customer, reload to confirm it was saved in MongoDB, then delete it. The Customers screen lists records you own in the active store. The **Demo** workspace uses temporary sample data.
+
 ## Requirements
 
 - Node.js 20 or later
@@ -36,9 +43,9 @@ Or run both processes together with `npm run dev`. The client listens on port 30
 - `GET /api/stores` lists all stores for an owner and only assigned stores for other employees.
 - `POST /api/stores` creates a store under the signed-in owner's dealer account.
 - `PATCH /api/stores/:id` updates only a store owned by that dealer account.
-- `GET /api/customers?search=...&storeId=...` queries customers within an assigned store.
-- `POST /api/customers` creates a customer or returns the matching dealership record when its email already exists. Owners can explicitly grant/remove cross-store access with `PATCH /api/customers/:id/sharing`.
-- `GET|PATCH|DELETE /api/customers/:id` reads or changes records only within the signed-in user's assigned store.
+- `GET /api/customers?search=...&storeId=...` queries the signed-in user's customer records in an authorized store.
+- `POST /api/customers` assigns ownership to the signed-in user. An existing email can match a record the caller owns. An email on another user's record returns `409`.
+- `GET|PATCH|DELETE /api/customers/:id` enforces individual ownership and store access. Attempts to delete another user's record return `403`. Dealership owners can set cross-store links on their own customer records through `PATCH /api/customers/:id/sharing`.
 - `GET /api/inventory?storeId=...&status=...&search=...` lists vehicles for a store in the signed-in user's dealer account.
 - `POST /api/inventory` creates an inventory vehicle; repeated VINs in the same store are idempotent, while an existing VIN in another store returns a conflict for reconciliation.
 - `POST /api/inventory/imports/csv` imports up to 500 vehicles from a CSV (800 KB max); existing VINs are recorded as observations and disagreements are flagged rather than overwritten. `GET /api/inventory/imports?storeId=...` lists import jobs and row errors. Owners and managers can upload.

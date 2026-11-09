@@ -131,16 +131,19 @@ export default function AdminPortal() {
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight">Store Administration</h1>
           <p className="text-gray-400 text-sm sm:text-base mt-1 font-medium">Manage store details, team access, and membership status.</p>
         </div>
-        {user?.demoMode === false && <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3 sm:gap-4">
-          <button
+        <div className="flex flex-wrap gap-3 sm:gap-4">
+          <button type="button" onClick={() => navigate('/admin/customers')} className="min-h-11 rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 text-xs font-bold text-white hover:bg-white/15 sm:text-sm">
+            My Customers
+          </button>
+          {user?.demoMode === false && <button
             type="button"
             onClick={() => navigate('/app/hub')}
             className="min-h-11 px-4 sm:px-5 py-2.5 bg-white/10 hover:bg-white/15 active:scale-[0.98] text-white text-xs sm:text-sm font-bold rounded-xl transition-all border border-white/10 flex items-center justify-center gap-2 group outline-none cursor-pointer"
           >
             <span>App</span>
             <ExternalLink size={15} className="text-orange-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform shrink-0" />
-          </button>
-        </div>}
+          </button>}
+        </div>
       </div>
 
       <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-6 md:gap-8">

@@ -127,7 +127,7 @@ export default function Customers() {
         <header>
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-orange-500">Dealership workspace</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-gray-900 dark:text-white">Customers</h1>
-          <p className="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-400">Customer records are scoped to your active store and dealership account.</p>
+          <p className="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-400">Manage the customer records you own in your active store.</p>
           {isDemoWorkspace && <p className="mt-2 text-xs text-orange-700 dark:text-orange-300">Demo entries are temporary and limited to 10 per minute. They stay in this browser tab only.</p>}
         </header>
 
