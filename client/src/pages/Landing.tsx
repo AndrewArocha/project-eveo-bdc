@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { motion, type Variants } from 'framer-motion';
 import { Activity, Shield, CheckCircle2, PlayCircle, Calendar, X, Sparkles, ChevronDown } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
 import SwipeableModal from '../components/UI/SwipeableModal';
 
@@ -14,9 +15,17 @@ import bgEntrance from '../images/landing/eveo-entrance.jpeg';
 import bgRoster from '../images/landing/agent-roster-view.png';
 
 export default function Landing() {
-  const [showcaseOpen, setShowcaseOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const showcaseOpen = searchParams.get('showcase') === 'video';
   const [demoOpen, setDemoOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
+
+  const setShowcaseOpen = (open: boolean) => {
+    const next = new URLSearchParams(searchParams);
+    if (open) next.set('showcase', 'video');
+    else next.delete('showcase');
+    setSearchParams(next, { replace: !open });
+  };
 
   const fadeUp: Variants = {
     hidden: { opacity: 0, y: 24 },

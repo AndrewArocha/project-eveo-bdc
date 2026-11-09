@@ -13,7 +13,8 @@ services:
       - key: TRUST_PROXY
         value: "1"
       - key: CLIENT_ORIGIN
-        value: https://project-eveo-bdc-stage-ha-ndrew-dev.vercel.app
+        # Keep the staging branch URL first so account emails use the stable alias.
+        value: https://project-eveo-bdc-stage-git-stage-fullstack-ha-ndrew-dev.vercel.app,https://project-eveo-bdc-stage-ha-ndrew-dev.vercel.app
       - key: JWT_SECRET
         generateValue: true
       - key: MONGODB_URI

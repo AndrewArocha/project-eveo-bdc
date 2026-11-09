@@ -4,27 +4,24 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
 import { Menu, X, LogOut, UserCircle, Package, ArrowRight } from 'lucide-react';
 import eveoSymbol from '../../images/logo/eveo-symbol.svg';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const { scrollY } = useScroll();
+  const { user, isLoading, signOut } = useAuth();
+  const isAuthenticated = !isLoading && Boolean(user?.emailVerifiedAt);
 
   const [hidden, setHidden] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    () => localStorage.getItem('eveo_token') !== null
-  );
 
   useEffect(() => {
-    setIsAuthenticated(localStorage.getItem('eveo_token') !== null);
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
   const handleLogout = () => {
-    localStorage.removeItem('eveo_token');
-    localStorage.removeItem('eveo_role');
-    setIsAuthenticated(false);
+    signOut();
     setIsMobileMenuOpen(false);
     navigate('/login', { replace: true });
   };
@@ -134,7 +131,6 @@ export default function Header() {
         <div className="hidden md:flex items-center gap-3">
           {!isAuthenticated ? (
             <>
-              <button type="button" onClick={() => navigate('/app/hub')} className="min-h-10 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-300 hover:text-white active:scale-95 transition-all outline-none cursor-pointer">App</button>
               <button
                 type="button"
                 onClick={() => navigate('/login')}
@@ -224,13 +220,6 @@ export default function Header() {
                   >
                     Products
                   </NavLink>
-                  <button
-                    type="button"
-                    onClick={() => { setIsMobileMenuOpen(false); navigate('/app/hub'); }}
-                    className="py-5 text-left text-2xl font-black text-orange-500 transition-colors border-b border-white/5 cursor-pointer"
-                  >
-                    App &rarr;
-                  </button>
                   <button
                     type="button"
                     onClick={() => {

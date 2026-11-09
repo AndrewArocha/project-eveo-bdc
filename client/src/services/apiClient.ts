@@ -84,7 +84,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   try {
     response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, signal: init.signal ?? AbortSignal.timeout(20_000) });
   } catch {
-    throw new ApiError('The request timed out or the EVEO server could not be reached. Check the API URL and try again.', 0);
+    throw new ApiError('Request timed out', 0);
   }
 
   if (response.status === 204) return undefined as T;

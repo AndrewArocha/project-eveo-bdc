@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Activity, ArrowUpRight, BarChart3, CarFront, ShieldCheck, Users, Zap } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import eveoSymbol from '../../images/logo/eveo-symbol.svg';
 
 const highlights = [
@@ -31,7 +32,7 @@ export function AuthSplitLayout({ children }: { children: ReactNode }) {
       <div className="absolute -right-24 bottom-0 h-96 w-96 rounded-full bg-blue-400/20 blur-3xl" />
       <div className="relative z-10 w-full max-w-xl text-center">
         <img src={eveoSymbol} alt="" className="mx-auto mb-10 h-14 w-14 object-contain" />
-        <p className="text-xs font-bold uppercase tracking-[0.24em] text-blue-200">EVEO dealership workspace</p>
+        <p className="text-xs font-bold uppercase tracking-[0.24em] text-blue-200">Workspace</p>
         <h2 className="mt-4 text-3xl font-bold tracking-tight">Designed for a more connected showroom.</h2>
         <div className="relative mt-12 min-h-56 rounded-3xl border border-white/15 bg-white/[0.08] p-8 text-left shadow-2xl backdrop-blur-xl">
           <AnimatePresence mode="wait">
@@ -39,9 +40,11 @@ export function AuthSplitLayout({ children }: { children: ReactNode }) {
               <div className="flex items-center gap-3 text-blue-200"><span className="grid h-10 w-10 place-items-center rounded-xl bg-white/10"><Icon size={19} /></span><span className="text-[10px] font-bold tracking-[0.18em]">{item.eyebrow}</span></div>
               <h3 className="mt-6 text-2xl font-semibold leading-snug">{item.title}</h3>
               <p className="mt-3 text-sm leading-relaxed text-blue-100/75">{item.body}</p>
-              <span className="mt-5 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-blue-200/70">Illustrative product preview <ArrowUpRight size={12} /></span>
             </motion.div>
           </AnimatePresence>
+          <Link to="/?showcase=video" className="mt-5 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-blue-200 hover:text-white hover:underline">
+            Video Preview <ArrowUpRight size={12} aria-hidden="true" />
+          </Link>
         </div>
         <div className="mt-6 flex justify-center gap-2" aria-label={`Highlight ${active + 1} of ${highlights.length}`}>
           {highlights.map((highlight, index) => <button key={highlight.eyebrow} type="button" aria-label={`Show ${highlight.eyebrow.toLowerCase()} highlight`} aria-current={index === active ? 'true' : undefined} onClick={() => setActive(index)} className={`h-2 rounded-full transition-all ${index === active ? 'w-7 bg-white' : 'w-2 bg-white/35 hover:bg-white/65'}`} />)}
