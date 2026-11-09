@@ -145,6 +145,7 @@ export interface Appointment {
   status: ApptStatus | string;
   phone?: string;
   notes?: string;
+  leadSource?: string;
 }
 
 export interface Lead {

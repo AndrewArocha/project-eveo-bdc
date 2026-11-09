@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useLocation } from 'react-router-dom';
 import { apiRequest, type CustomerRecord } from '../../services/apiClient';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { demoStorage } from '../../services/demo/demoSession';
 
 interface PageState {
   notice?: string;
@@ -10,8 +10,7 @@ interface PageState {
 
 export default function Customers() {
   const location = useLocation();
-  const { activeStoreId } = useStoreAppearance();
-  const { user } = useAuth();
+  const { activeStoreId, isDemoWorkspace } = useStoreAppearance();
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -28,8 +27,8 @@ export default function Customers() {
     setIsLoading(true);
     setError('');
     try {
-      if (user?.demoMode) {
-        const saved = sessionStorage.getItem(`eveo_demo_customer_records_${activeStoreId}`);
+      if (isDemoWorkspace) {
+        const saved = demoStorage.getItem(`eveo_demo_customer_records_${activeStoreId}`);
         const records = saved ? JSON.parse(saved) as CustomerRecord[] : [];
         const normalizedQuery = query.trim().toLowerCase();
         setCustomers(records.filter((item) => !normalizedQuery || `${item.name} ${item.email} ${item.phone}`.toLowerCase().includes(normalizedQuery)));
@@ -44,7 +43,7 @@ export default function Customers() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeStoreId, user]);
+  }, [activeStoreId, isDemoWorkspace]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadCustomers(search), 250);
@@ -58,17 +57,17 @@ export default function Customers() {
     setError('');
     try {
       const isEditing = Boolean(editingId);
-      if (user?.demoMode) {
+      if (isDemoWorkspace) {
         const now = Date.now();
-        const rateKey = `eveo_demo_customer_rate_${user.id}`;
-        const recentCreates = (JSON.parse(sessionStorage.getItem(rateKey) || '[]') as number[]).filter((timestamp) => now - timestamp < 60_000);
+        const rateKey = 'eveo_demo_customer_rate';
+        const recentCreates = (JSON.parse(demoStorage.getItem(rateKey) || '[]') as number[]).filter((timestamp) => now - timestamp < 60_000);
         if (!isEditing && recentCreates.length >= 10) throw new Error('Demo limit reached. Try again in a minute.');
-        if (!isEditing) sessionStorage.setItem(rateKey, JSON.stringify([...recentCreates, now]));
+        if (!isEditing) demoStorage.setItem(rateKey, JSON.stringify([...recentCreates, now]));
         const storageKey = `eveo_demo_customer_records_${activeStoreId}`;
-        const current = JSON.parse(sessionStorage.getItem(storageKey) || '[]') as CustomerRecord[];
+        const current = JSON.parse(demoStorage.getItem(storageKey) || '[]') as CustomerRecord[];
         const customer: CustomerRecord = { _id: editingId || `demo_${crypto.randomUUID()}`, storeId: activeStoreId, name: name.trim(), email: email.trim(), phone: phone.trim(), notes: notes.trim(), createdAt: new Date().toISOString() };
         const next = [customer, ...current.filter((item) => item._id !== customer._id)];
-        sessionStorage.setItem(storageKey, JSON.stringify(next));
+        demoStorage.setItem(storageKey, JSON.stringify(next));
         setCustomers(next);
         setName(''); setEmail(''); setPhone(''); setNotes(''); setEditingId('');
         setNotice(isEditing ? 'Temporary demo customer updated.' : 'Temporary demo customer added. It will be cleared when you sign out or close this tab.');
@@ -106,10 +105,10 @@ export default function Customers() {
     setNotice('');
     setError('');
     try {
-      if (user?.demoMode) {
+      if (isDemoWorkspace) {
         const storageKey = `eveo_demo_customer_records_${activeStoreId}`;
-        const next = (JSON.parse(sessionStorage.getItem(storageKey) || '[]') as CustomerRecord[]).filter((item) => item._id !== customer._id);
-        sessionStorage.setItem(storageKey, JSON.stringify(next));
+        const next = (JSON.parse(demoStorage.getItem(storageKey) || '[]') as CustomerRecord[]).filter((item) => item._id !== customer._id);
+        demoStorage.setItem(storageKey, JSON.stringify(next));
         setCustomers(next);
         setNotice(`${customer.name} was removed from this tab's demo data.`);
         return;
@@ -129,7 +128,7 @@ export default function Customers() {
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-orange-500">Dealership workspace</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-gray-900 dark:text-white">Customers</h1>
           <p className="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-400">Customer records are scoped to your active store and dealership account.</p>
-          {user?.demoMode && <p className="mt-2 text-xs text-orange-700 dark:text-orange-300">Demo entries are temporary and limited to 10 per minute. They stay in this browser tab only.</p>}
+          {isDemoWorkspace && <p className="mt-2 text-xs text-orange-700 dark:text-orange-300">Demo entries are temporary and limited to 10 per minute. They stay in this browser tab only.</p>}
         </header>
 
         {notice && <p role="status" className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">{notice}</p>}

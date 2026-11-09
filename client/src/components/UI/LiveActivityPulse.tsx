@@ -13,9 +13,9 @@ import {
   UserCog,
   Flame,
 } from 'lucide-react';
-import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
+import { useStoreAppearance, useWorkspaceUser } from '../../contexts/StoreAppereanceContext';
 import { getStoreDataOrEmpty, CURRENT_USER, getVisibleStoreRoster } from '../../data/mockDatabase';
-import { useAuth } from '../../contexts/AuthContext';
+
 import { apiLiveActivityRepository } from '../../services/liveActivity/apiLiveActivityRepository';
 
 export type ActivityPriority = 1 | 2 | 3;
@@ -146,8 +146,8 @@ export default function LiveActivityPulse() {
   const location = useLocation();
   const navigate = useNavigate();
   const { activeStoreId } = useStoreAppearance();
-  const { user } = useAuth();
-  const isAuthenticated = Boolean(user || localStorage.getItem('eveo_token'));
+  const user = useWorkspaceUser();
+  const isAuthenticated = Boolean(user);
 
   const isAccountPage = location.pathname.includes('/app/account');
 

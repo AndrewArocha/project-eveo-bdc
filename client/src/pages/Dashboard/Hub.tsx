@@ -1,9 +1,10 @@
+import { demoStorage } from '../../services/demo/demoSession';
 // src/pages/Dashboard/Hub.tsx
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, Users, Clock, CalendarDays, TrendingUp, DollarSign, AlertTriangle, Database } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
+import { useStoreAppearance, useWorkspaceUser } from '../../contexts/StoreAppereanceContext';
 import defaultBanner from '../../images/defaultBanner.avif';
 import DashboardCard from '../../components/UI/DashboardCard';
 import ProgressCard from '../../components/UI/ProgressCard';
@@ -16,7 +17,7 @@ import { CURRENT_USER } from '../../data/mockDatabase';
 import { getPersistentStoreData } from '../../services/liveActivity/liveActivityStore';
 import type { StoreData } from '../../types';
 import { apiOperationalRepository } from '../../services/operational/apiOperationalRepository';
-import { showroomRepository } from '../../services/showroom';
+import { getShowroomRepository } from '../../services/showroom';
 import eveoSymbol from '../../images/logo/eveo-symbol.svg';
 import EveoMascot from '../../components/insights/EveoMascot';
 
@@ -30,8 +31,9 @@ interface HomeProps {
 
 export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dealership' }: HomeProps) {
   const [now, setNow] = useState(0);
-  const { role, user: accountUser } = useAuth();
-  const user = accountUser?.demoMode ? null : accountUser;
+  const { role } = useAuth();
+  const user = useWorkspaceUser();
+  const showroomRepository = getShowroomRepository(!user);
   const [expanded, setExpanded] = useState<ExpandedCard>(null);
   const [isSwitchingStore, setIsSwitchingStore] = useState(false);
   const { getBanner, activeStore, activeStoreId, setActiveStoreId, stores, cycleNextStore } = useStoreAppearance();
@@ -88,7 +90,7 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
     } catch {
       setStoreData({ staff: [], leads: [], handoffs: [], appointments: [], sold: [], pending: [], bannerUrl: '' });
     }
-  }, [activeStore.id, activeStoreId, user]);
+  }, [activeStore.id, activeStoreId, showroomRepository, user]);
 
   useEffect(() => {
     void refreshStoreData();
@@ -123,10 +125,10 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
   const seenKey = `eveo-seen-priorities:${user?.id || 'demo'}:${activeStore.id}`;
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(seenKey);
+      const stored = (user ? localStorage : demoStorage).getItem(seenKey);
       setSeenPriorityIds(stored ? JSON.parse(stored) as string[] : []);
     } catch { setSeenPriorityIds([]); }
-  }, [seenKey]);
+  }, [seenKey, user]);
 
   const priorityIds = [
     ...storeData.leads.filter((lead) => !lead.assignee).map((lead) => `lead:${lead.id}`),
@@ -145,10 +147,10 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
     const ids = prefix ? priorityIds.filter((id) => id.startsWith(prefix)) : priorityIds;
     const next = [...new Set([...seenPriorityIds, ...ids])];
     setSeenPriorityIds(next);
-    try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch { /* storage may be blocked */ }
+    try { (user ? localStorage : demoStorage).setItem(seenKey, JSON.stringify(next)); } catch { /* storage may be blocked */ }
   };
 
-  const canChooseStore = stores.length > 1 && (accountUser?.demoMode === true || role === 'bdc' || role === 'bdc_manager');
+  const canChooseStore = stores.length > 1 && (!user || role === 'bdc' || role === 'bdc_manager');
 
   return (
     <motion.div

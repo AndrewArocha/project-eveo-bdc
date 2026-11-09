@@ -1,14 +1,17 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { clearConversations } from '../services/eveoAgent/conversations';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useLayoutEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import type { Store } from '../types';
 import type { StoreRecord } from '../types/domain';
 import { useAuth } from './AuthContext';
 import { ApiError, apiRequest, type ApiStore } from '../services/apiClient';
 import { eveoDomainRepository } from '../services/repositories';
+import { resetDemoSession } from '../services/demo/demoSession';
 import defaultBanner from '../images/defaultBanner.avif';
 import eveoSymbol from '../images/logo/eveo-symbol.svg';
 
 interface StoreAppearanceContextType {
+  isDemoWorkspace: boolean;
   banners: Record<string, string>;
   getBanner: (storeId: string) => string | undefined;
   setBanner: (storeId: string, url: string) => void;
@@ -67,7 +70,23 @@ const StoreAppearanceContext = createContext<StoreAppearanceContextType | undefi
 export function StoreAppearanceProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const location = useLocation();
-  const useDemoStores = !user || (user.demoMode && location.pathname.startsWith('/app'));
+  const useDemoStores = Boolean(user?.demoMode && /^\/app(?:\/|$)/.test(location.pathname));
+  const storeScope = user ? `${user.id}:${useDemoStores ? 'demo' : 'live'}` : '';
+  const demoOwner = useDemoStores ? user?.id : undefined;
+  const previousDemoOwner = useRef(demoOwner);
+  useLayoutEffect(() => {
+    const clearDemo = () => { resetDemoSession(); clearConversations(true); };
+    if (previousDemoOwner.current && previousDemoOwner.current !== demoOwner) clearDemo();
+    previousDemoOwner.current = demoOwner;
+    if (!demoOwner) return;
+    const restore = (event: PageTransitionEvent) => { if (event.persisted) window.location.reload(); };
+    window.addEventListener('pagehide', clearDemo);
+    window.addEventListener('pageshow', restore);
+    return () => {
+      window.removeEventListener('pagehide', clearDemo);
+      window.removeEventListener('pageshow', restore);
+    };
+  }, [demoOwner]);
   const [banners, setBanners] = useState<Record<string, string>>(() => {
     try {
       const saved = localStorage.getItem('eveo_store_banners');
@@ -76,35 +95,42 @@ export function StoreAppearanceProvider({ children }: { children: React.ReactNod
       return {};
     }
   });
+  const [demoBanners, setDemoBanners] = useState<Record<string, string>>({});
   const [registeredStores, setRegisteredStores] = useState<ApiStore[]>([]);
   const [demoStores, setDemoStores] = useState<Store[]>([]);
   const [storesLoading, setStoresLoading] = useState(false);
+  const [loadedScope, setLoadedScope] = useState('');
+  const requestId = useRef(0);
   const [storesError, setStoresError] = useState('');
-  const [activeStoreId, setActiveStoreIdState] = useState(() => localStorage.getItem('eveo_active_store_id') || '');
+  const [selectedLiveStore, setSelectedLiveStore] = useState(() => localStorage.getItem('eveo_active_store_id') || '');
+  const [selectedDemoStore, setSelectedDemoStore] = useState('');
   const stores = useMemo(() => useDemoStores ? demoStores : registeredStores.map(toAppearanceStore), [useDemoStores, registeredStores, demoStores]);
+  const selectedStore = useDemoStores ? selectedDemoStore : selectedLiveStore;
+  const activeStoreId = (stores.find((store) => store.id === selectedStore)?.id ?? stores[0]?.id) || '';
 
   const refreshStores = useCallback(async () => {
-    if (useDemoStores) {
+    const request = ++requestId.current;
+    if (!storeScope) {
       setRegisteredStores([]);
+      setStoresError('');
+      setStoresLoading(false);
+      setLoadedScope('');
+      return;
+    }
+    if (useDemoStores) {
       setStoresError('');
       setStoresLoading(true);
       try {
         const records = await eveoDomainRepository.listStores();
+        if (request !== requestId.current) return;
         const nextStores = records.filter((store) => store.isDemoData).map(toDemoAppearanceStore);
         setDemoStores(nextStores);
-        setActiveStoreIdState((current) => {
-          const next = nextStores.find((store) => store.id === current || store.domainId === current || store.legacyDataKey === current)?.id
-            ?? nextStores[0]?.id
-            ?? '';
-          if (next) localStorage.setItem('eveo_active_store_id', next);
-          else localStorage.removeItem('eveo_active_store_id');
-          return next;
-        });
       } catch (cause) {
+        if (request !== requestId.current) return;
         setDemoStores([]);
         setStoresError(cause instanceof Error ? cause.message : 'Could not load the demo store registry.');
       } finally {
-        setStoresLoading(false);
+        if (request === requestId.current) { setLoadedScope(storeScope); setStoresLoading(false); }
       }
       return;
     }
@@ -112,24 +138,24 @@ export function StoreAppearanceProvider({ children }: { children: React.ReactNod
     setStoresError('');
     try {
       const records = await apiRequest<ApiStore[]>('/stores');
+      if (request !== requestId.current) return;
       setRegisteredStores(records);
-      setDemoStores([]);
-      setActiveStoreIdState((current) => {
-        const next = records.some((store) => store.id === current) ? current : (records[0]?.id ?? '');
-        if (next) localStorage.setItem('eveo_active_store_id', next);
-        else localStorage.removeItem('eveo_active_store_id');
-        return next;
-      });
     } catch (cause) {
+      if (request !== requestId.current) return;
       setStoresError(cause instanceof ApiError ? cause.message : 'Could not load your store registry.');
     } finally {
-      setStoresLoading(false);
+      if (request === requestId.current) { setLoadedScope(storeScope); setStoresLoading(false); }
     }
-  }, [useDemoStores]);
+  }, [useDemoStores, storeScope]);
 
   useEffect(() => {
     void refreshStores();
-    if (!useDemoStores) return;
+    if (!useDemoStores) {
+      setDemoStores([]);
+      setDemoBanners({});
+      setSelectedDemoStore('');
+      return;
+    }
     return eveoDomainRepository.subscribe(() => { void refreshStores(); });
   }, [refreshStores, useDemoStores]);
 
@@ -141,10 +167,13 @@ export function StoreAppearanceProvider({ children }: { children: React.ReactNod
     if (stores.some((store) => store.id === storeId || store.domainId === storeId || store.legacyDataKey === storeId)) {
       const selectedStore = stores.find((store) => store.id === storeId || store.domainId === storeId || store.legacyDataKey === storeId)!;
       const selectedId = selectedStore.id;
-      setActiveStoreIdState(selectedId);
-      localStorage.setItem('eveo_active_store_id', selectedId);
+      if (useDemoStores) setSelectedDemoStore(selectedId);
+      else {
+        setSelectedLiveStore(selectedId);
+        localStorage.setItem('eveo_active_store_id', selectedId);
+      }
     }
-  }, [stores]);
+  }, [stores, useDemoStores]);
 
   const cycleNextStore = useCallback(() => {
     if (stores.length === 0) return;
@@ -155,13 +184,17 @@ export function StoreAppearanceProvider({ children }: { children: React.ReactNod
   const activeStore = stores.find((store) => store.id === activeStoreId) || EMPTY_STORE;
   const activeStoreDomainId = activeStore.domainId || '';
   const activeStoreDataKey = activeStore.legacyDataKey || activeStore.id;
-  const getBanner = useCallback((storeId: string) => banners[storeId], [banners]);
-  const setBanner = useCallback((storeId: string, url: string) => setBanners((prev) => ({ ...prev, [storeId]: url })), []);
+  const visibleBanners = useDemoStores ? demoBanners : banners;
+  const getBanner = useCallback((storeId: string) => visibleBanners[storeId], [visibleBanners]);
+  const setBanner = useCallback((storeId: string, url: string) => {
+    const update = useDemoStores ? setDemoBanners : setBanners;
+    update((prev) => ({ ...prev, [storeId]: url }));
+  }, [useDemoStores]);
 
   const value = useMemo(() => ({
-    banners, getBanner, setBanner, activeStoreId, activeStoreDomainId, activeStoreDataKey, setActiveStoreId, activeStore,
-    stores, registeredStores, storesLoading, storesError, refreshStores, cycleNextStore,
-  }), [banners, getBanner, setBanner, activeStoreId, activeStoreDomainId, activeStoreDataKey, setActiveStoreId, activeStore, stores, registeredStores, storesLoading, storesError, refreshStores, cycleNextStore]);
+    isDemoWorkspace: useDemoStores, banners: visibleBanners, getBanner, setBanner, activeStoreId, activeStoreDomainId, activeStoreDataKey, setActiveStoreId, activeStore,
+    stores, registeredStores, storesLoading: storesLoading || storeScope !== loadedScope, storesError, refreshStores, cycleNextStore,
+  }), [useDemoStores, visibleBanners, getBanner, setBanner, activeStoreId, activeStoreDomainId, activeStoreDataKey, setActiveStoreId, activeStore, stores, registeredStores, storesLoading, storeScope, loadedScope, storesError, refreshStores, cycleNextStore]);
 
   return <StoreAppearanceContext.Provider value={value}>{children}</StoreAppearanceContext.Provider>;
 }
@@ -171,3 +204,8 @@ export const useStoreAppearance = () => {
   if (!context) throw new Error('useStoreAppearance must be used within a StoreAppearanceProvider');
   return context;
 };
+
+export function useWorkspaceUser() {
+  const { user } = useAuth();
+  return useStoreAppearance().isDemoWorkspace ? null : user;
+}

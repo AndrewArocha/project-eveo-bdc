@@ -1,15 +1,16 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import type { StoreData, UserRole } from '../types';
 import { CURRENT_USER } from '../data/mockDatabase';
 import { getPersistentStoreData } from '../services/liveActivity/liveActivityStore';
 import { apiOperationalRepository } from '../services/operational/apiOperationalRepository';
 import { apiInventoryRepository } from '../services/inventory/apiInventoryRepository';
 import { teamRepository } from '../services/team/teamRepository';
-import { showroomRepository } from '../services/showroom';
+import { getShowroomRepository } from '../services/showroom';
 import { apiLiveActivityRepository } from '../services/liveActivity/apiLiveActivityRepository';
 import { eveoAgent } from '../services/eveoAgent';
-import { listLiveFeed } from '../services/liveActivity/liveActivityStore';
-import { getStoreDailyReports } from '../data/stores';
+import { answerDemoInsight } from '../services/eveoAgent/demoInsights';
+import { conversationLifetime, readConversations, saveConversation, type InsightConversation } from '../services/eveoAgent/conversations';
+import { useWorkspaceUser } from '../contexts/StoreAppereanceContext';
 import { useAuth } from '../contexts/AuthContext';
 
 export type InsightCategory = 'churn' | 'inventory' | 'staff' | 'sla';
@@ -62,26 +63,13 @@ export interface ResolvedInsightUser {
 }
 
 const EMPTY_STORE: StoreData = { staff: [], leads: [], handoffs: [], appointments: [], sold: [], pending: [], bannerUrl: '' };
-const INSIGHTS_THREAD_PREFIX = 'eveo_insights_thread_v3_';
-
-function readInsightThread(key: string): InsightChatMessage[] {
-  try {
-    const saved = localStorage.getItem(key);
-    const parsed = saved ? JSON.parse(saved) as InsightChatMessage[] : [];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map((message) => ({ ...message, actionReviewed: message.actionReviewed ?? message.actionExecuted ?? false }));
-  } catch {
-    return [];
-  }
-}
-
 function roleLabel(role: string) {
   return ({ owner: 'Dealership owner', manager: 'Store manager', bdc: 'BDC specialist', sales: 'Sales team member' } as Record<string, string>)[role] || 'Dealership team member';
 }
 
 export function useInsightsSuite(storeId: string, roleOverride?: UserRole | string) {
   const { user: accountUser } = useAuth();
-  const user = accountUser?.demoMode ? null : accountUser;
+  const user = useWorkspaceUser();
   const [store, setStore] = useState<StoreData>(() => user ? EMPTY_STORE : getPersistentStoreData(storeId));
   const [readyInventoryCount, setReadyInventoryCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -111,7 +99,7 @@ export function useInsightsSuite(storeId: string, roleOverride?: UserRole | stri
         apiOperationalRepository.listAppointments(storeId),
         apiInventoryRepository.list(storeId),
         teamRepository.listMembers(storeId),
-        showroomRepository.listVisits(storeId),
+        getShowroomRepository(false).listVisits(storeId),
       ]);
       const namesById = new Map(team.map((member) => [member.id, member.name]));
       setStore({
@@ -236,82 +224,65 @@ export function useInsightsSuite(storeId: string, roleOverride?: UserRole | stri
     };
   }, [cards, hasLoaded, isLoading, loadError, pendingAppointments.length, unassignedLeads.length, user]);
 
-  const threadStorageKey = `${INSIGHTS_THREAD_PREFIX}${storeId}_${user?.id || 'demo'}_${activeUser.role}`;
-  const [messages, setMessages] = useState<InsightChatMessage[]>(() => readInsightThread(threadStorageKey));
-  useEffect(() => setMessages(readInsightThread(threadStorageKey)), [threadStorageKey]);
+  const scope = `${user ? 'live' : 'demo'}:${accountUser?.id ?? ''}:${storeId}`;
+  const [conversations, setConversations] = useState(() => readConversations(scope));
+  const [activeConversation, selectConversation] = useState<string | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const inFlight = useRef(false);
+  const messages = conversations.find(({ id }) => id === activeConversation)?.messages ?? [];
 
-  const saveThread = useCallback((nextMessages: InsightChatMessage[]) => {
-    setMessages(nextMessages);
-    try { localStorage.setItem(threadStorageKey, JSON.stringify(nextMessages)); } catch { /* Ignore browser storage limits. */ }
-  }, [threadStorageKey]);
+  useEffect(() => {
+    const nextExpiry = Math.min(...conversations.map(({ expiresAt }) => expiresAt));
+    if (!Number.isFinite(nextExpiry)) return;
+    const timer = window.setTimeout(() => setConversations(readConversations(scope)), Math.max(0, nextExpiry - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [conversations, scope]);
 
   const sendPrompt = useCallback(async (promptText: string, matchedCard?: InsightCardSchema) => {
-    const trimmed = promptText.trim();
-    if (!trimmed) return;
-    const userMessage: InsightChatMessage = { id: `usr_${Date.now()}`, role: 'user', content: trimmed, timestamp: 'Just now' };
-    const optimistic = [...messages, userMessage];
-    saveThread(optimistic);
-    if (!user) {
-      const greeting = /\b(hi|hello|hey|howdy|what(?:'s| is) up|good morning|good afternoon|good evening)\b/i.test(trimmed);
-      const query = trimmed.toLowerCase();
-      const demoData = getPersistentStoreData(storeId);
-      let localResult = '';
-      if (query.includes('inventory') || query.includes('vehicle') || query.includes('stock')) {
-        const units = demoData.inventory || [];
-        localResult = units.length
-          ? `Sample inventory for this store:\n${units.slice(0, 10).map((unit) => `• ${unit.vehicle} · $${unit.price.toLocaleString()} · ${unit.daysInStock} days · ${unit.status.replaceAll('_', ' ').toLowerCase()}`).join('\n')}`
-          : 'This sample store has no inventory units saved yet.';
-      } else if (query.includes('report')) {
-        const report = getStoreDailyReports(storeId)[0];
-        localResult = report ? `Latest sample report (${report.displayDate}): ${report.leadsMtd} leads MTD, ${report.appointmentsMtd} appointments MTD, ${report.carsDelivered} vehicles delivered MTD.` : 'There are no sample report snapshots for this store yet.';
-      } else if (query.includes('kpi') || query.includes('agent')) {
-        localResult = `Sample team KPIs:\n${demoData.staff.slice(0, 8).map((member) => `• ${member.name} (${member.role}) · target ${member.kpiTarget ?? 'not set'}`).join('\n') || 'No sample team KPI records are available.'}`;
-      } else if (query.includes('activit') || query.includes('activity')) {
-        const activities = listLiveFeed(storeId).slice(0, 5);
-        localResult = activities.length ? `Recent sample activity:\n${activities.map((item) => `• ${item.title} · ${item.agentName}`).join('\n')}` : 'There is no recent sample activity for this store.';
-      } else if (query.includes('lead') || query.includes('appointment')) {
-        localResult = `Sample pipeline: ${demoData.leads.length} leads, ${demoData.appointments.length} appointments, ${demoData.handoffs.length} showroom visits.`;
-      }
-      const content = greeting
-        ? 'Hi! Thank you for testing out our application, I’m looking forward to working with you in the future.\n\nI can search inventory, reports, agent KPIs, and activities using this demo’s saved sample information. And I’m able to do much more in the full version!'
-        : `${localResult ? `${localResult}\n\n` : ''}I can search inventory, reports, agent KPIs, and activities using this demo’s saved sample information. And I’m able to do much more in the full version!`;
-      saveThread([...optimistic, { id: `ai_${Date.now() + 1}`, role: 'assistant', content, timestamp: 'Just now', mode: 'preview' }]);
-      return;
-    }
-    setIsLoading(true);
+    const prompt = promptText.trim().slice(0, 2000);
+    if (!prompt || !storeId || inFlight.current) return;
+    const existing = readConversations(scope).find(({ id }) => id === activeConversation);
+    const thread: InsightConversation = existing ?? { id: crypto.randomUUID(), title: prompt.slice(0, 80), expiresAt: Date.now() + conversationLifetime, messages: [] };
+    const userMessage: InsightChatMessage = { id: crypto.randomUUID(), role: 'user', content: prompt, timestamp: 'Just now' };
+    selectConversation(thread.id);
+    setConversations(saveConversation(scope, { ...thread, messages: [...thread.messages, userMessage] }));
+    inFlight.current = true;
+    setPendingId(thread.id);
     try {
-      const response = await eveoAgent.respond({
-        prompt: trimmed, storeId, user: { name: activeUser.fullName, role: activeUser.roleBadge },
+      const response = user ? await eveoAgent.respond({
+        prompt, storeId, user: { name: activeUser.fullName, role: activeUser.roleBadge },
         selectedInsight: matchedCard ? { title: matchedCard.title, summary: matchedCard.summary, actionLabel: matchedCard.actionLabel, targetCount: matchedCard.actionPayload.targetCount } : undefined,
-      });
-      saveThread([...optimistic, {
-        id: `ai_${Date.now() + 1}`, role: 'assistant', content: response.content, timestamp: 'Just now',
-        draftSnippet: response.draftSnippet, actionLabel: response.actionLabel, actionReviewed: false, mode: response.mode,
-      }]);
+      }) : { content: answerDemoInsight(storeId, prompt), mode: 'preview' as const };
+      const current = readConversations(scope).find(({ id }) => id === thread.id);
+      if (current) {
+        const message: InsightChatMessage = { id: crypto.randomUUID(), role: 'assistant', timestamp: 'Just now', ...response };
+        setConversations(saveConversation(scope, { ...current, messages: [...current.messages, message] }));
+      }
     } catch {
-      saveThread([...optimistic, {
-        id: `ai_${Date.now() + 1}`, role: 'assistant',
-        content: 'I could not read the live records just now. No dealership data was changed. Please try again.',
-        timestamp: 'Just now', mode: 'preview',
-      }]);
+      const current = readConversations(scope).find(({ id }) => id === thread.id);
+      if (current) {
+        const message: InsightChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: 'E.V.E. could not read the store records just now. Please try again.', timestamp: 'Just now' };
+        setConversations(saveConversation(scope, { ...current, messages: [...current.messages, message] }));
+      }
     } finally {
-      setIsLoading(false);
+      inFlight.current = false;
+      setPendingId(null);
     }
-  }, [activeUser.fullName, activeUser.roleBadge, messages, saveThread, storeId, user]);
+  }, [activeConversation, activeUser.fullName, activeUser.roleBadge, scope, storeId, user]);
 
   const markPreviewReviewed = useCallback(async (messageId: string) => {
-    const target = messages.find((message) => message.id === messageId);
-    saveThread(messages.map((message) => message.id === messageId ? { ...message, actionReviewed: true } : message));
-    if (!target || !user || !storeId) return;
+    const current = readConversations(scope).find(({ id }) => id === activeConversation);
+    const target = current?.messages.find(({ id }) => id === messageId);
+    if (!current || !target) return;
+    setConversations(saveConversation(scope, { ...current, messages: current.messages.map((message) => message.id === messageId ? { ...message, actionReviewed: true } : message) }));
+    if (!user || !storeId) return;
     try {
       await apiLiveActivityRepository.create({
-        storeId, category: 'ai_high_intent', title: `E.V.E. suggestion reviewed`,
+        storeId, category: 'ai_high_intent', title: 'E.V.E. suggestion reviewed',
         description: target.actionLabel || target.content.slice(0, 300), entityId: messageId,
       });
     } catch { /* Chat review remains available even if activity logging is offline. */ }
-  }, [messages, saveThread, storeId, user]);
+  }, [activeConversation, scope, storeId, user]);
 
-  const clearThread = useCallback(() => saveThread([]), [saveThread]);
-
-  return { activeUser, cards, hubDigest, messages, isLoading, loadError, sendPrompt, markPreviewReviewed, clearThread };
+  return { activeUser, cards, hubDigest, messages, isLoading, pendingId, loadError, sendPrompt, markPreviewReviewed, conversations, activeConversation, selectConversation };
 }

@@ -1,3 +1,4 @@
+import { demoStorage } from '../services/demo/demoSession';
 // src/data/mainDatabase.ts
 import * as type from '../types';
 import { STORE_DATA, resolveLegacyStoreDataKey } from './stores';
@@ -9,8 +10,8 @@ export const CURRENT_USER = 'Andres Hernandez';
 
 export function isSuperAdminAccount(): boolean {
   if (typeof window === 'undefined') return true;
-  const user = localStorage.getItem('eveo_user_name') || CURRENT_USER;
-  return user === SUPER_ADMIN_USER || localStorage.getItem('eveo_super_admin') !== 'false';
+  const user = demoStorage.getItem('eveo_user_name') || CURRENT_USER;
+  return user === SUPER_ADMIN_USER || demoStorage.getItem('eveo_super_admin') !== 'false';
 }
 
 export const generateDefaultUser = (
@@ -140,26 +141,29 @@ const DEFAULT_EVEO_GLOBAL_TEAM: type.GlobalUser[] = [
   },
 ];
 
-export const EVEO_GLOBAL_TEAM: type.GlobalUser[] = (() => {
+export function getDemoTeam(): type.GlobalUser[] {
   if (typeof window === 'undefined') return DEFAULT_EVEO_GLOBAL_TEAM;
   try {
-    const saved = localStorage.getItem(BDC_ROSTER_KEY);
+    const saved = demoStorage.getItem(BDC_ROSTER_KEY);
     if (saved) return JSON.parse(saved);
   } catch {
     // Fallback
   }
-  return DEFAULT_EVEO_GLOBAL_TEAM;
-})();
+  return structuredClone(DEFAULT_EVEO_GLOBAL_TEAM);
+}
+
+export const EVEO_GLOBAL_TEAM = DEFAULT_EVEO_GLOBAL_TEAM;
 
 export function updateEveoBdcStoreAssignment(agentId: number, storeId: string) {
-  const agent = EVEO_GLOBAL_TEAM.find((u) => u.id === agentId);
+  const team = getDemoTeam();
+  const agent = team.find((u) => u.id === agentId);
   if (!agent) return;
   const current = agent.assignedStoreIds || [];
   agent.assignedStoreIds = current.includes(storeId)
     ? current.filter((id) => id !== storeId)
     : [...current, storeId];
   if (typeof window !== 'undefined') {
-    localStorage.setItem(BDC_ROSTER_KEY, JSON.stringify(EVEO_GLOBAL_TEAM));
+    demoStorage.setItem(BDC_ROSTER_KEY, JSON.stringify(team));
     window.dispatchEvent(new CustomEvent('eveo:bdc-roster-updated'));
   }
 }
@@ -179,7 +183,7 @@ export function getOrSeedAgentCalendar(
 ): Record<string, type.ShiftDayRecord> {
   const key = getCalendarStorageKey(storeId, agentName);
   try {
-    const saved = localStorage.getItem(key);
+    const saved = demoStorage.getItem(key);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed && typeof parsed === 'object') return parsed;
@@ -246,7 +250,7 @@ export function getOrSeedAgentCalendar(
   }
 
   try {
-    localStorage.setItem(key, JSON.stringify(seeded));
+    demoStorage.setItem(key, JSON.stringify(seeded));
   } catch {
     // Ignore storage quota errors
   }
@@ -260,7 +264,7 @@ export function saveAgentCalendarRecords(
 ): void {
   const key = getCalendarStorageKey(storeId, agentName);
   try {
-    localStorage.setItem(key, JSON.stringify(records));
+    demoStorage.setItem(key, JSON.stringify(records));
     window.dispatchEvent(new CustomEvent('eveo:calendar-updated', { detail: { storeId, agentName } }));
   } catch {
     // Ignore storage errors
@@ -270,7 +274,7 @@ export function saveAgentCalendarRecords(
 export function getVisibleStoreRoster(storeId: string): Array<type.GlobalUser | type.StoreStaff> {
   const compatibilityStoreId = resolveLegacyStoreDataKey(storeId);
   const localStaff = STORE_DATA[compatibilityStoreId]?.staff ?? [];
-  const globalAgentsForStore = EVEO_GLOBAL_TEAM.filter(
+  const globalAgentsForStore = getDemoTeam().filter(
     (u) => !u.isExecutiveHidden && (!u.assignedStoreIds || u.assignedStoreIds.includes(storeId) || u.assignedStoreIds.includes(compatibilityStoreId))
   );
   return [...localStaff.filter((s) => !s.isExecutiveHidden), ...globalAgentsForStore];

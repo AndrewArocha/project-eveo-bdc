@@ -6,6 +6,7 @@ import { CreditCard, Users, Settings, Copy, ExternalLink, LoaderCircle, UserPlus
 import { ApiError, apiRequest, type ApiEmployeeRole, type ApiTeamMember, type ApiUserInvitation } from '../../services/apiClient';
 import { teamRepository } from '../../services/team/teamRepository';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 import StoreRegistryManager from '../../components/Admin/StoreRegistryManager';
 import IntegrationConnectionsPanel from '../../components/Admin/IntegrationConnectionsPanel';
@@ -16,6 +17,7 @@ export default function AdminPortal() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('settings');
   const { registeredStores, activeStoreId } = useStoreAppearance();
+  const { user, refreshUser } = useAuth();
   const [teamStoreId, setTeamStoreId] = useState('');
   const [teamMembers, setTeamMembers] = useState<ApiTeamMember[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<ApiUserInvitation[]>([]);
@@ -45,6 +47,12 @@ export default function AdminPortal() {
       .catch((cause) => { if (active) setBillingError(cause instanceof ApiError ? cause.message : 'Membership status could not be loaded.'); });
     return () => { active = false; };
   }, []);
+
+  const membershipStatus = account?.subscriptionStatus;
+  const ownerDemoMode = user?.demoMode;
+  useEffect(() => {
+    if (membershipStatus && ownerDemoMode !== (membershipStatus !== 'active')) void refreshUser().catch(() => {});
+  }, [membershipStatus, ownerDemoMode, refreshUser]);
 
   useEffect(() => {
     if (!teamStoreId) return;
@@ -123,7 +131,7 @@ export default function AdminPortal() {
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight">Store Administration</h1>
           <p className="text-gray-400 text-sm sm:text-base mt-1 font-medium">Manage store details, team access, and membership status.</p>
         </div>
-        <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3 sm:gap-4">
+        {user?.demoMode === false && <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3 sm:gap-4">
           <button
             type="button"
             onClick={() => navigate('/app/hub')}
@@ -132,7 +140,7 @@ export default function AdminPortal() {
             <span>App</span>
             <ExternalLink size={15} className="text-orange-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform shrink-0" />
           </button>
-        </div>
+        </div>}
       </div>
 
       <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-6 md:gap-8">

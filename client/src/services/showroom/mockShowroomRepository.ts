@@ -1,3 +1,4 @@
+import { demoStorage } from '../demo/demoSession';
 // src/services/showroom/mockShowroomRepository.ts
 import type {
   AppendShowroomEventInput,
@@ -18,9 +19,6 @@ interface PersistedState {
 
 const STORAGE_PREFIX = 'eveo_showroom_v2_';
 const CHANGE_EVENT = 'eveo:showroom-updated';
-const MOCK_LATENCY_MS = 120;
-
-const wait = (ms = MOCK_LATENCY_MS) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
 function createId(prefix: string): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -123,7 +121,7 @@ function seedFromStoreHandoffs(storeId: string): PersistedState {
 
   const seeded = { visits, events };
   try {
-    localStorage.setItem(getStorageKey(storeId), JSON.stringify(seeded));
+    demoStorage.setItem(getStorageKey(storeId), JSON.stringify(seeded));
   } catch {
     // Ignore quota errors on initial seed
   }
@@ -147,7 +145,7 @@ function readState(storeId: string): PersistedState {
 
 function writeState(storeId: string, state: PersistedState): void {
   try {
-    localStorage.setItem(getStorageKey(storeId), JSON.stringify(state));
+    demoStorage.setItem(getStorageKey(storeId), JSON.stringify(state));
   } catch (error) {
     throw new Error(
       error instanceof Error
@@ -179,7 +177,6 @@ function applyEventStatus(visit: ShowroomVisitRecord, type: ShowroomEventType): 
 
 export const mockShowroomRepository: ShowroomRepository = {
   async listVisits(storeId) {
-    await wait();
     const state = readState(storeId);
     return [...state.visits]
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -187,14 +184,12 @@ export const mockShowroomRepository: ShowroomRepository = {
   },
 
   async getVisit(storeId, visitId) {
-    await wait();
     const state = readState(storeId);
     const visit = state.visits.find((item) => item.id === visitId);
     return visit ? snapshotFor(state, visit) : null;
   },
 
   async createVisit(storeId, input: CreateShowroomVisitInput) {
-    await wait();
     const customerName = input.customerName.trim();
     if (!customerName) throw new Error('Customer name is required.');
     if (!input.assignedRepName.trim() || !input.assignedRepId.trim()) {
@@ -254,7 +249,6 @@ export const mockShowroomRepository: ShowroomRepository = {
   },
 
   async appendEvent(storeId, visitId, input: AppendShowroomEventInput) {
-    await wait();
     const state = readState(storeId);
     const visitIndex = state.visits.findIndex((item) => item.id === visitId);
     if (visitIndex < 0) throw new Error('This showroom visit could not be found.');
@@ -297,7 +291,6 @@ export const mockShowroomRepository: ShowroomRepository = {
   },
 
   async assignVisit(storeId, visitId, input: AssignShowroomVisitInput) {
-    await wait();
     const state = readState(storeId);
     const index = state.visits.findIndex((item) => item.id === visitId);
     if (index < 0) throw new Error('This showroom visit could not be found.');

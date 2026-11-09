@@ -1,10 +1,9 @@
 // src/components/showroom/LiveShowroomDeck.tsx
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, ArrowRight, CheckCircle2, Plus, Users, Radio, Eye } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, Globe, Plus, Users, Radio, Eye } from 'lucide-react';
 import { MasterScheduleCard } from '../reports/ScheduleCards';
 import AppointmentModal from '../reports/AppointmentModal';
-import eveoSymbol from '../../images/logo/eveo-symbol.svg';
 
 const glassCardClasses = `
   backdrop-blur-2xl bg-white/5 dark:bg-[#0a0f16]/40
@@ -14,8 +13,7 @@ const glassCardClasses = `
   rounded-3xl relative overflow-hidden transition-transform duration-300 hover:-translate-y-1 cursor-pointer group
 `;
 
-export type SlaBubbleState = 'overdue_red' | 'due_soon_yellow' | 'ongoing_orange' | 'completed_green';
-export type LeadSourceBrand = 'CarFax' | 'CarGurus' | 'TrueCar' | 'AutoTrader' | 'CarZing' | 'Other';
+export type SlaBubbleState = 'scheduled' | 'overdue_red' | 'due_soon_yellow' | 'ongoing_orange' | 'completed_green';
 
 export interface FloorAppointmentBubble {
   id: string;
@@ -30,30 +28,18 @@ export interface FloorAppointmentBubble {
   timeLabel: string;
   slaState: SlaBubbleState;
   badgeText: string;
-  leadSource?: LeadSourceBrand;
+  leadSource?: string;
 }
 
-const LEAD_SOURCE_SOURCES: LeadSourceBrand[] = [
-  'CarGurus',
-  'CarFax',
-  'TrueCar',
-  'AutoTrader',
-  'CarZing',
-  'Other',
-];
+const leadSourceLogos = new Map([
+  ['carfax', 'CarFaxLogo.png'], ['cargurus', 'CarGurusLogo.png'], ['truecar', 'TrueCarLogo.jpg'],
+  ['autotrader', 'AutoTraderLogo.png'], ['carzing', 'CarZingLogo.png'],
+]);
 
-export function resolveLeadSourceForCustomer(customerName: string, explicitSource?: LeadSourceBrand): LeadSourceBrand {
-  if (explicitSource) return explicitSource;
-  let hash = 0;
-  for (let i = 0; i < customerName.length; i++) {
-    hash = (hash * 31 + customerName.charCodeAt(i)) % 997;
-  }
-  return LEAD_SOURCE_SOURCES[hash % LEAD_SOURCE_SOURCES.length];
-}
-
-/** Floating EVEO mark identifies an appointment without exposing customer avatars. */
-function LeadSourceOrbGraphic({ source }: { source: LeadSourceBrand }) {
-  return <img src={eveoSymbol} alt="" data-lead-source={source} className="h-16 w-16 object-contain drop-shadow-[0_5px_16px_rgba(249,115,22,0.3)] transition-transform group-hover:-translate-y-1" />;
+function LeadSourceOrbGraphic({ source }: { source: string }) {
+  const logo = leadSourceLogos.get(source.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  const classes = 'h-16 w-16 object-contain transition-transform group-hover:-translate-y-1';
+  return logo ? <img src={`/logo/${logo}`} alt="" className={classes} /> : <Globe aria-hidden="true" className={`${classes} text-orange-400`} strokeWidth={1.3} />;
 }
 
 interface LiveShowroomDeckProps {
@@ -207,12 +193,18 @@ export default function LiveShowroomDeck({
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-5 pt-3">
             {ongoingAppointmentBubbles.map((bubble) => {
-              const sourceBrand = resolveLeadSourceForCustomer(bubble.customerName, bubble.leadSource);
+              const sourceBrand = bubble.leadSource?.trim() || 'Other';
 
               const orbStyles: Record<
                 SlaBubbleState,
                 { badgeBorder: string; dot: string; orbRing: string; orbGrad: string }
               > = {
+                scheduled: {
+                  badgeBorder: 'border-gray-400/50 text-gray-300',
+                  dot: 'bg-gray-400',
+                  orbRing: 'border-gray-400/50',
+                  orbGrad: 'from-gray-500/20 to-[#0a0f16]/90',
+                },
                 overdue_red: {
                   badgeBorder: 'border-red-500/50 text-red-400',
                   dot: 'bg-red-500 animate-ping',

@@ -6,7 +6,7 @@ interface ApiEvent {
   _id: string; type: ShowroomEventType; actorUserId: string; actorName: string; occurredAt: string; message: string; media?: ShowroomMediaAsset; replyToEventId?: string | null;
 }
 interface ApiVisit {
-  _id: string; storeId: string; customerId: string; customerNameSnapshot: string; greetedPerson?: string; phoneSnapshot: string;
+  _id: string; storeId: string; customerId: string; leadId?: string; customerNameSnapshot: string; greetedPerson?: string; phoneSnapshot: string;
   assignedUserId: string; assignedRepName: string; checkedInByUserId: string; checkedInByName: string;
   status: ShowroomVisitSnapshot['visit']['status']; vehicleOfInterest?: ShowroomVisitSnapshot['visit']['vehicleOfInterest'];
   tradeIn?: ShowroomVisitSnapshot['visit']['tradeIn']; notes: string; createdAt: string; updatedAt: string; events: ApiEvent[];
@@ -16,7 +16,7 @@ function mapVisit(record: ApiVisit): ShowroomVisitSnapshot {
   const storeId = record.storeId;
   return {
     visit: {
-      id: record._id, storeId, customerName: record.customerNameSnapshot, greetedPerson: record.greetedPerson || 'customer', customerPhone: record.phoneSnapshot || null,
+      id: record._id, storeId, leadId: record.leadId, customerName: record.customerNameSnapshot, greetedPerson: record.greetedPerson || 'customer', customerPhone: record.phoneSnapshot || null,
       notes: record.notes || null, assignedRepId: record.assignedUserId, assignedRepName: record.assignedRepName,
       checkedInById: record.checkedInByUserId, checkedInByName: record.checkedInByName, status: record.status,
       vehicleOfInterest: record.vehicleOfInterest || null, tradeIn: record.tradeIn || null,

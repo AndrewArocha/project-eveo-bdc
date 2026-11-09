@@ -1,10 +1,11 @@
+import { demoStorage } from '../../services/demo/demoSession';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, ChevronLeft, ChevronRight, X, ChevronDown, Clock, User, Car, Plus, Save } from 'lucide-react';
 // 🌟 FIXED: Added the missing import
-import { saveAppointments, type Appointment as DemoAppointment } from '../../utils/appointmentManager';
+import { getAppointmentsByDate, saveAppointments, type Appointment as DemoAppointment } from '../../utils/appointmentManager';
 import { SleekPillButton } from '../UI/SleekButtons';
-import { useAuth } from '../../contexts/AuthContext';
+import { useWorkspaceUser } from '../../contexts/StoreAppereanceContext';
 import { apiOperationalRepository, type ApiAppointment } from '../../services/operational/apiOperationalRepository';
 import { teamRepository } from '../../services/team/teamRepository';
 import type { ApiTeamMember } from '../../services/apiClient';
@@ -27,7 +28,7 @@ interface Appointment {
 }
 
 export default function AppointmentModal({ isOpen, onClose, storeId }: AppointmentModalProps) {
-  const { user } = useAuth();
+  const user = useWorkspaceUser();
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -47,7 +48,7 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
 
   const dbKey = `eveo_appointments_${storeId}`;
   const [appointmentsDb, setAppointmentsDb] = useState<{ [key: string]: Appointment[] }>(() => {
-    const saved = localStorage.getItem(dbKey);
+    const saved = user ? null : demoStorage.getItem(dbKey);
     return saved ? JSON.parse(saved) : {};
   });
 
@@ -126,7 +127,7 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
     }
 
     const dateKey = `${currentYear}-${currentMonth}-${selectedDay}`;
-    const currentDayAppts = appointmentsDb[dateKey] || [];
+    const currentDayAppts = getAppointmentsByDate(storeId, dateKey);
 
     const createdAppt: Appointment = {
       id: Date.now().toString(),
@@ -193,14 +194,14 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
         status,
       };
     })
-    : appointmentsDb[selectedDateKey] || [];
+    : appointmentsDb[selectedDateKey] ?? getAppointmentsByDate(storeId, selectedDateKey);
   const appointmentsForDay = (day: number) => user
     ? apiAppointments.filter((appointment) => {
       if (!appointment.scheduledAt) return false;
       const date = new Date(appointment.scheduledAt);
       return date.getFullYear() === currentYear && date.getMonth() === currentMonth && date.getDate() === day;
     })
-    : appointmentsDb[`${currentYear}-${currentMonth}-${day}`] || [];
+    : appointmentsDb[`${currentYear}-${currentMonth}-${day}`] ?? getAppointmentsByDate(storeId, `${currentYear}-${currentMonth}-${day}`);
 
   return (
     <AnimatePresence>

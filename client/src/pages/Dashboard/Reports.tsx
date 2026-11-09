@@ -46,7 +46,7 @@ import LiveReports from './LiveReports';
 
 import { CURRENT_USER, getVisibleStoreRoster, type Store } from '../../data/mockDatabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
+import { useStoreAppearance, useWorkspaceUser } from '../../contexts/StoreAppereanceContext';
 import {
   playCardScroll,
   playGalleryClick,
@@ -143,8 +143,8 @@ const REPORT_META: Record<ReportId, ReportStaticMeta> = {
 };
 
 export default function Reports() {
-  const { user } = useAuth();
-  return user && !user.demoMode ? <LiveReports /> : <DemoReports />;
+  const user = useWorkspaceUser();
+  return user ? <LiveReports /> : <DemoReports />;
 }
 
 function DemoReports() {

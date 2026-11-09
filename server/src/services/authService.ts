@@ -74,7 +74,7 @@ export async function createOwnerAccount(input: { name: string; businessName: st
     await session.endSession();
   }
   if (!createdUser) throw new AppError(500, 'The EVEO account could not be created.', 'SIGNUP_FAILED');
-  if (!env.authEmailVerificationRequired) return { verificationRequired: false, email: input.email, session: issueSession(createdUser) };
+  if (!env.authEmailVerificationRequired) return { verificationRequired: false, email: input.email, session: await issueSession(createdUser) };
   const verifyUrl = new URL('/verify-email', env.clientOrigins[0] || 'http://localhost:3000');
   verifyUrl.searchParams.set('token', verificationToken);
   const emailResponse = await fetch('https://api.resend.com/emails', {
@@ -183,7 +183,7 @@ export async function acceptUserInvitation(input: { token: string; name: string;
   return issueSession(acceptedUser);
 }
 
-function issueSession(user: UserDocument) {
+async function issueSession(user: UserDocument) {
   if (!env.jwtSecret || env.jwtSecret.length < 32) {
     throw new AppError(503, 'Authentication is not configured on this server.', 'AUTH_NOT_CONFIGURED');
   }
@@ -192,5 +192,6 @@ function issueSession(user: UserDocument) {
     env.jwtSecret,
     { subject: user.id, expiresIn: env.jwtExpiresIn as SignOptions['expiresIn'] },
   );
-  return { token, user: toSafeUser(user) };
+  const paidOwner = user.role === 'owner' && await DealerAccount.exists({ _id: user.dealerAccountId, subscriptionStatus: 'active' });
+  return { token, user: toSafeUser(user, user.role === 'owner' && !paidOwner) };
 }

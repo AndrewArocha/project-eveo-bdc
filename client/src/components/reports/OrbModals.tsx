@@ -1,3 +1,4 @@
+import { demoStorage } from '../../services/demo/demoSession';
 // src/components/reports/OrbModals.tsx
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -65,10 +66,10 @@ const LIVE_ACTIVITY_MAP_KEY = 'eveo_dynamic_user_activity_v1';
 // ============================================================================
 export function setAgentLiveActivity(storeId: string, agentName: string, taskDescription: string) {
   try {
-    const raw = localStorage.getItem(LIVE_ACTIVITY_MAP_KEY);
+    const raw = demoStorage.getItem(LIVE_ACTIVITY_MAP_KEY);
     const map: Record<string, string> = raw ? JSON.parse(raw) : {};
     map[`${storeId}_${agentName}`] = taskDescription;
-    localStorage.setItem(LIVE_ACTIVITY_MAP_KEY, JSON.stringify(map));
+    demoStorage.setItem(LIVE_ACTIVITY_MAP_KEY, JSON.stringify(map));
 
     const storeStaff = getStoreDataOrEmpty(storeId).staff;
     if (storeStaff) {
@@ -90,7 +91,7 @@ export function setAgentLiveActivity(storeId: string, agentName: string, taskDes
 
 export function getAgentLiveActivity(storeId: string, agentName: string, fallback: string): string {
   try {
-    const raw = localStorage.getItem(LIVE_ACTIVITY_MAP_KEY);
+    const raw = demoStorage.getItem(LIVE_ACTIVITY_MAP_KEY);
     if (raw) {
       const map = JSON.parse(raw) as Record<string, string>;
       if (map[`${storeId}_${agentName}`]) return map[`${storeId}_${agentName}`];
@@ -390,7 +391,7 @@ export function resolveActiveReportAuthor(storeId: string, role?: string): Repor
 
 export function getGrantedExportAgents(storeId: string): string[] {
   try {
-    const raw = localStorage.getItem(`${PERMISSIONS_KEY_PREFIX}${storeId}`);
+    const raw = demoStorage.getItem(`${PERMISSIONS_KEY_PREFIX}${storeId}`);
     return raw ? (JSON.parse(raw) as string[]) : [];
   } catch {
     return [];
@@ -403,7 +404,7 @@ export function toggleAgentExportPermission(storeId: string, agentName: string):
     ? current.filter((n) => n !== agentName)
     : [...current, agentName];
   try {
-    localStorage.setItem(`${PERMISSIONS_KEY_PREFIX}${storeId}`, JSON.stringify(next));
+    demoStorage.setItem(`${PERMISSIONS_KEY_PREFIX}${storeId}`, JSON.stringify(next));
     window.dispatchEvent(new CustomEvent('eveo:report-permissions-updated', { detail: { storeId } }));
   } catch {
     // Ignore
@@ -536,14 +537,14 @@ function seedInitialArchivedReports(storeId: string): ArchivedReportRecord[] {
 export function getStoreArchivedReports(storeId: string): ArchivedReportRecord[] {
   if (typeof window === 'undefined') return seedInitialArchivedReports(storeId);
   try {
-    const raw = localStorage.getItem(`${ARCHIVE_KEY_PREFIX}${storeId}`);
+    const raw = demoStorage.getItem(`${ARCHIVE_KEY_PREFIX}${storeId}`);
     if (raw) return JSON.parse(raw) as ArchivedReportRecord[];
   } catch {
     // Fallback
   }
   const seeded = seedInitialArchivedReports(storeId);
   try {
-    localStorage.setItem(`${ARCHIVE_KEY_PREFIX}${storeId}`, JSON.stringify(seeded));
+    demoStorage.setItem(`${ARCHIVE_KEY_PREFIX}${storeId}`, JSON.stringify(seeded));
   } catch {
     // Ignore
   }
@@ -591,7 +592,7 @@ export function createArchivedReportSnapshot(
   const existing = getStoreArchivedReports(storeId);
   const updated = [newRecord, ...existing];
   try {
-    localStorage.setItem(`${ARCHIVE_KEY_PREFIX}${storeId}`, JSON.stringify(updated));
+    demoStorage.setItem(`${ARCHIVE_KEY_PREFIX}${storeId}`, JSON.stringify(updated));
     window.dispatchEvent(
       new CustomEvent('eveo:archive-updated', { detail: { storeId, record: newRecord } })
     );
@@ -1393,7 +1394,7 @@ export async function executeReportShare(
     };
   });
   try {
-    localStorage.setItem(`${ARCHIVE_KEY_PREFIX}${record.storeId}`, JSON.stringify(updated));
+    demoStorage.setItem(`${ARCHIVE_KEY_PREFIX}${record.storeId}`, JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent('eveo:archive-updated', { detail: { storeId: record.storeId } }));
   } catch {
     // Ignore

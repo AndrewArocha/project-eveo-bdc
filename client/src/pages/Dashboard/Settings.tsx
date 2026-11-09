@@ -6,7 +6,7 @@ import TabButton from '../../components/account/TabButton';
 import { AppearanceForm, NotificationsForm, IntegrationsForm } from '../../components/settings/SettingsForms';
 import { useAuth } from '../../contexts/AuthContext';
 import LiquidVolumeSlider from '../../components/settings/LiquidVolumeSlider';
-import { EVEO_GLOBAL_TEAM, resolveLegacyStoreDataKey, updateEveoBdcStoreAssignment } from '../../data/mockDatabase';
+import { getDemoTeam, resolveLegacyStoreDataKey, updateEveoBdcStoreAssignment } from '../../data/mockDatabase';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 import {
   getAudioPreferences,
@@ -21,13 +21,13 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
   const [, setTick] = useState(0);
   const { role } = useAuth();
-  const { stores } = useStoreAppearance();
+  const { stores, isDemoWorkspace } = useStoreAppearance();
   const [audioPrefs, setAudioPrefs] = useState(() => getAudioPreferences());
 
   const roleStr = String(role).toLowerCase();
-  const showIntegrations = roleStr === 'owner' || roleStr === 'super_admin';
-  const showSuperBdcPortal = roleStr === 'super_admin';
-  const bdcAgents = EVEO_GLOBAL_TEAM.filter((u) => u.role === 'bdc');
+  const showIntegrations = !isDemoWorkspace && (roleStr === 'owner' || roleStr === 'super_admin');
+  const showSuperBdcPortal = isDemoWorkspace && roleStr === 'super_admin';
+  const bdcAgents = showSuperBdcPortal ? getDemoTeam().filter((u) => u.role === 'bdc') : [];
 
   useEffect(() => {
     const refreshRosterAndStores = () => setTick((tick) => tick + 1);

@@ -1,3 +1,4 @@
+import { demoStorage } from '../demo/demoSession';
 import { createLegacyDemoSeed } from '../../data/demo/legacyDemoSeed';
 import type {
   ActivityEventRecord,
@@ -61,13 +62,6 @@ export interface DomainStorageLike {
   removeItem(key: string): void;
 }
 
-class MemoryDomainStorage implements DomainStorageLike {
-  private readonly values = new Map<string, string>();
-  getItem(key: string): string | null { return this.values.get(key) ?? null; }
-  setItem(key: string, value: string): void { this.values.set(key, value); }
-  removeItem(key: string): void { this.values.delete(key); }
-}
-
 export class DomainRepositoryError extends Error {
   readonly code: 'NOT_FOUND' | 'VALIDATION_ERROR' | 'CONFLICT' | 'FORBIDDEN' | 'STORAGE_CORRUPT' | 'UNSUPPORTED_SCHEMA';
 
@@ -112,14 +106,7 @@ function toLowerEmail(value: string): string {
   return requireText(value, 'Email').toLowerCase();
 }
 
-function safeStorage(): DomainStorageLike {
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
-  } catch {
-    // Storage can be blocked by browser privacy settings; use memory for this session.
-  }
-  return new MemoryDomainStorage();
-}
+
 
 function ensureSchema(value: unknown): EveoDomainSnapshot {
   if (!value || typeof value !== 'object') {
@@ -163,7 +150,7 @@ function assertBelongsToStore<T extends { id: MongoId; storeId: MongoId }>(
 }
 
 
-export function createMockEveoRepository(storage: DomainStorageLike = safeStorage()): EveoDomainRepository {
+export function createMockEveoRepository(storage: DomainStorageLike = demoStorage): EveoDomainRepository {
   const listeners = new Set<(snapshot: EveoDomainSnapshot) => void>();
   repositoryInstanceCounter += 1;
   const instanceId = `domain_repository_${repositoryInstanceCounter}`;

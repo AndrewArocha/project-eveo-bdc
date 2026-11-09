@@ -8,12 +8,11 @@ import {
 } from 'lucide-react';
 import { MOCK_FOLLOWUPS, CURRENT_USER, getStoreDataOrEmpty, type UserRole, type DealRecord } from '../../data/mockDatabase';
 import type { StoreData } from '../../types';
-import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useStoreAppearance, useWorkspaceUser } from '../../contexts/StoreAppereanceContext';
 import { StatBox } from '../reports/ReportStats';
 import { hydrateStorePipeline, createStoreLeadAsync, confirmStoreAppointmentAsync, getPersistentStoreData } from '../../services/liveActivity/liveActivityStore';
 import { apiOperationalRepository } from '../../services/operational/apiOperationalRepository';
-import { showroomRepository } from '../../services/showroom';
+import { getShowroomRepository } from '../../services/showroom';
 import { teamRepository } from '../../services/team/teamRepository';
 
 function emptyStoreData(): StoreData {
@@ -28,7 +27,8 @@ interface HubModalsProps {
 }
 
 export default function HubModals({ expanded, role, onClose, onOpenShowroom }: HubModalsProps) {
-  const { user } = useAuth();
+  const user = useWorkspaceUser();
+  const showroomRepository = getShowroomRepository(!user);
   const [kpiView, setKpiView] = useState<'overview' | 'sold' | 'pending'>('overview');
   const [leadSearch, setLeadSearch] = useState('');
   const [isAddingLead, setIsAddingLead] = useState(false);
@@ -84,7 +84,7 @@ export default function HubModals({ expanded, role, onClose, onOpenShowroom }: H
       setActiveStoreData(emptyStoreData());
       setMutationError(cause instanceof Error ? cause.message : 'Store records could not be loaded.');
     }
-  }, [activeStoreId, user]);
+  }, [activeStoreId, showroomRepository, user]);
 
   useEffect(() => {
     void refreshStoreData();

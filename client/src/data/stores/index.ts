@@ -1,3 +1,4 @@
+import { demoStorage } from '../../services/demo/demoSession';
 // src/data/stores/index.ts
 import { type StoreData } from '../../types';
 import { dkData } from './dk';
@@ -33,13 +34,13 @@ export function readStoreScopedStorage(prefix: string, storeId: string): string 
   if (typeof window === 'undefined') return null;
   try {
     const canonicalKey = `${prefix}${storeId}`;
-    const current = window.localStorage.getItem(canonicalKey);
+    const current = demoStorage.getItem(canonicalKey);
     if (current !== null) return current;
     const legacyStoreKey = resolveLegacyStoreDataKey(storeId);
     if (legacyStoreKey === storeId) return null;
     const legacyKey = `${prefix}${legacyStoreKey}`;
-    const legacyValue = window.localStorage.getItem(legacyKey);
-    if (legacyValue !== null) window.localStorage.setItem(canonicalKey, legacyValue);
+    const legacyValue = demoStorage.getItem(legacyKey);
+    if (legacyValue !== null) demoStorage.setItem(canonicalKey, legacyValue);
     return legacyValue;
   } catch {
     return null;
@@ -151,7 +152,7 @@ export function saveStoreDailyReport(storeId: string, snapshot: DailyBdcReportSn
   const existing = getStoreDailyReports(storeId).filter((r) => r.dateISO !== snapshot.dateISO);
   const updated = [snapshot, ...existing];
   if (typeof window !== 'undefined') {
-    localStorage.setItem(`${REPORTS_STORAGE_KEY}_${storeId}`, JSON.stringify(updated));
+    demoStorage.setItem(`${REPORTS_STORAGE_KEY}_${storeId}`, JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent('eveo:daily-reports-updated', { detail: { storeId } }));
   }
   return updated;

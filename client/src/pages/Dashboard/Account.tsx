@@ -1,3 +1,4 @@
+import { demoSessionVersion, demoStorage } from '../../services/demo/demoSession';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Shield, Calendar, DollarSign, Building2, Camera } from 'lucide-react';
@@ -11,26 +12,29 @@ type AccountTab = 'profile' | 'security' | 'schedule' | 'payroll';
 export default function Account() {
   const [activeTab, setActiveTab] = useState<AccountTab>('profile');
   const { role, user } = useAuth();
-  const { activeStore } = useStoreAppearance();
+  const { activeStore, isDemoWorkspace } = useStoreAppearance();
+  const avatarStorage = isDemoWorkspace ? demoStorage : localStorage;
   const avatarStorageKey = user ? `eveo_avatar:${user.id}` : 'eveo_avatar';
-  const [avatarImg, setAvatarImg] = useState<string | null>(() => localStorage.getItem(avatarStorageKey));
+  const [avatarImg, setAvatarImg] = useState<string | null>(() => avatarStorage.getItem(avatarStorageKey));
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const handleAvatarUpdate = () => setAvatarImg(localStorage.getItem(avatarStorageKey));
+    const handleAvatarUpdate = () => setAvatarImg(avatarStorage.getItem(avatarStorageKey));
     handleAvatarUpdate();
     window.addEventListener('avatarUpdated', handleAvatarUpdate);
     return () => window.removeEventListener('avatarUpdated', handleAvatarUpdate);
-  }, [avatarStorageKey]);
+  }, [avatarStorage, avatarStorageKey]);
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const session = demoSessionVersion;
     const reader = new FileReader();
     reader.onloadend = () => {
+      if (isDemoWorkspace && session !== demoSessionVersion) return;
       const result = reader.result as string;
       setAvatarImg(result);
-      localStorage.setItem(avatarStorageKey, result);
+      avatarStorage.setItem(avatarStorageKey, result);
       window.dispatchEvent(new Event('avatarUpdated'));
     };
     reader.readAsDataURL(file);

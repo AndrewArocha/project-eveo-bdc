@@ -1,3 +1,4 @@
+import { demoStorage } from '../demo/demoSession';
 // src/services/inventory/storeInventorySync.ts
 import {
   njxInventory,
@@ -87,7 +88,7 @@ export function getStoreInventory(storeId: string): StoreInventorySummary {
   }
   const seeded = buildDefaultStoreInventory(storeId);
   try {
-    localStorage.setItem(`${INVENTORY_STORAGE_PREFIX}${storeId}`, JSON.stringify(seeded));
+    demoStorage.setItem(`${INVENTORY_STORAGE_PREFIX}${storeId}`, JSON.stringify(seeded));
   } catch {
     // Ignore
   }
@@ -96,7 +97,7 @@ export function getStoreInventory(storeId: string): StoreInventorySummary {
 
 export function saveStoreInventory(storeId: string, summary: StoreInventorySummary) {
   try {
-    localStorage.setItem(`${INVENTORY_STORAGE_PREFIX}${storeId}`, JSON.stringify(summary));
+    demoStorage.setItem(`${INVENTORY_STORAGE_PREFIX}${storeId}`, JSON.stringify(summary));
     window.dispatchEvent(
       new CustomEvent('eveo:store-inventory-updated', { detail: { storeId, summary } })
     );

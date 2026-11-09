@@ -1,6 +1,7 @@
+import { demoStorage } from '../demo/demoSession';
 // src/services/notifications/notificationCenterStore.ts
 import { playWoodBlockAlert, playSocialMediaChime } from '../../utils/soundEngine';
-import { readStoreScopedStorage } from '../../data/mockDatabase';
+import { readStoreScopedStorage, resolveLegacyStoreDataKey, STORE_DATA } from '../../data/mockDatabase';
 
 export interface StoreNotificationItem {
   id: string;
@@ -17,6 +18,7 @@ export interface StoreNotificationItem {
 const NOTIFICATIONS_KEY_PREFIX = 'eveo_store_notifications_v2_';
 
 function seedNotificationsForStore(storeId: string): StoreNotificationItem[] {
+  if (!Object.hasOwn(STORE_DATA, resolveLegacyStoreDataKey(storeId))) return [];
   return [
     {
       id: `notif_${storeId}_sla_1`,
@@ -64,7 +66,7 @@ export function getStoreNotifications(storeId: string): StoreNotificationItem[] 
   }
   const seeded = seedNotificationsForStore(storeId);
   try {
-    localStorage.setItem(`${NOTIFICATIONS_KEY_PREFIX}${storeId}`, JSON.stringify(seeded));
+    demoStorage.setItem(`${NOTIFICATIONS_KEY_PREFIX}${storeId}`, JSON.stringify(seeded));
   } catch {
     // Ignore
   }
@@ -90,7 +92,7 @@ export function pushStoreNotification(
   const existing = getStoreNotifications(payload.storeId);
   const updated = [item, ...existing].slice(0, 40);
   try {
-    localStorage.setItem(`${NOTIFICATIONS_KEY_PREFIX}${payload.storeId}`, JSON.stringify(updated));
+    demoStorage.setItem(`${NOTIFICATIONS_KEY_PREFIX}${payload.storeId}`, JSON.stringify(updated));
     window.dispatchEvent(
       new CustomEvent('eveo:store-notifications-updated', { detail: { storeId: payload.storeId } })
     );
@@ -103,7 +105,7 @@ export function pushStoreNotification(
 export function markAllStoreNotificationsRead(storeId: string) {
   const updated = getStoreNotifications(storeId).map((n) => ({ ...n, read: true }));
   try {
-    localStorage.setItem(`${NOTIFICATIONS_KEY_PREFIX}${storeId}`, JSON.stringify(updated));
+    demoStorage.setItem(`${NOTIFICATIONS_KEY_PREFIX}${storeId}`, JSON.stringify(updated));
     window.dispatchEvent(
       new CustomEvent('eveo:store-notifications-updated', { detail: { storeId } })
     );

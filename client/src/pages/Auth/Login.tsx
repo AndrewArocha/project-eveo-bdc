@@ -26,9 +26,9 @@ export default function Login() {
     setIsSubmitting(true);
     const form = new FormData(e.currentTarget);
     try {
-      await signIn(email || String(form.get('email')), password || String(form.get('password')));
+      const user = await signIn(email || String(form.get('email')), password || String(form.get('password')));
       const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
-      navigate(destination?.startsWith('/app/') ? destination : '/app/hub', { replace: true });
+      navigate(user.role === 'owner' ? '/admin/portal' : destination?.startsWith('/app/') ? destination : '/app/hub', { replace: true });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Sign-in failed. Please try again.';
       setError(message);

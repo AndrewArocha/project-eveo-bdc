@@ -1,3 +1,4 @@
+import { demoStorage } from '../../services/demo/demoSession';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -13,7 +14,7 @@ import GlassActionOrb from '../UI/GlassActionOrb';
 import { apiRequest } from '../../services/apiClient';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
+import { useStoreAppearance, useWorkspaceUser } from '../../contexts/StoreAppereanceContext';
 
 import {
   CURRENT_USER,
@@ -29,12 +30,13 @@ import {
 // 1. PROFILE FORM (Clean, Uncluttered, Zero DevTools Warnings)
 // ==========================================
 export function ProfileForm() {
-  const { user, refreshUser, role } = useAuth();
+  const { refreshUser, role } = useAuth();
+  const user = useWorkspaceUser();
   const { activeStore, registeredStores, refreshStores } = useStoreAppearance();
   const persistedStore = registeredStores.find((store) => store.id === activeStore.id);
-  const [name, setName] = useState(user?.name || '');
-  const [phone, setPhone] = useState(user?.phone || '');
-  const [workPhone, setWorkPhone] = useState(user?.workPhone || '');
+  const [name, setName] = useState(user?.name || demoStorage.getItem('eveo_demo_profile_name') || '');
+  const [phone, setPhone] = useState(user?.phone || demoStorage.getItem('eveo_demo_profile_phone') || '');
+  const [workPhone, setWorkPhone] = useState(user?.workPhone || demoStorage.getItem('eveo_demo_profile_workPhone') || '');
   const [storeName, setStoreName] = useState(activeStore.name || '');
   const [storePhone, setStorePhone] = useState(activeStore.phone || '');
   const [website, setWebsite] = useState(activeStore.websiteUrl || '');
@@ -44,9 +46,9 @@ export function ProfileForm() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    setName(user?.name || '');
-    setPhone(user?.phone || '');
-    setWorkPhone(user?.workPhone || '');
+    setName(user?.name || demoStorage.getItem('eveo_demo_profile_name') || '');
+    setPhone(user?.phone || demoStorage.getItem('eveo_demo_profile_phone') || '');
+    setWorkPhone(user?.workPhone || demoStorage.getItem('eveo_demo_profile_workPhone') || '');
   }, [user?.id, user?.name, user?.phone, user?.workPhone]);
 
   useEffect(() => {
@@ -62,6 +64,13 @@ export function ProfileForm() {
     setFeedback('');
     setIsSaving(true);
     try {
+      if (!user) {
+        demoStorage.setItem('eveo_demo_profile_name', name);
+        demoStorage.setItem('eveo_demo_profile_phone', phone);
+        demoStorage.setItem('eveo_demo_profile_workPhone', workPhone);
+        setFeedback('Demo profile saved for this visit.');
+        return;
+      }
       await apiRequest('/users/me', { method: 'PATCH', body: JSON.stringify({ name, phone, workPhone }) });
       await refreshUser();
       if (role === 'owner' && activeStore.id) {
@@ -144,7 +153,7 @@ function PhoneNumberField({ label, value, onChange }: { label: string; value: st
 // 2. SCHEDULE FORM (3D Glass Action Orbs + Hover/Tap Tooltips)
 // ==========================================
 export function ScheduleForm({ role }: { role: UserRole }) {
-  const { user } = useAuth();
+  const user = useWorkspaceUser();
   const { activeStoreId, activeStoreDataKey, activeStore } = useStoreAppearance();
 
   type DailyShift = { start: string; end: string };
@@ -162,12 +171,12 @@ export function ScheduleForm({ role }: { role: UserRole }) {
 
   const [scheduleState, setScheduleState] = useState<WeeklySchedule>(() => {
     if (user?.weeklySchedule) return { ...defaultSchedule, ...user.weeklySchedule };
-    const saved = user ? null : localStorage.getItem('eveo_user_schedule');
+    const saved = user ? null : demoStorage.getItem('eveo_user_schedule');
     return saved ? JSON.parse(saved) : defaultSchedule;
   });
 
   const [hasSubmittedSchedule, setHasSubmittedSchedule] = useState(() => {
-    return user ? Boolean(user.weeklySchedule && Object.keys(user.weeklySchedule).length) : localStorage.getItem('eveo_user_schedule') !== null;
+    return user ? Boolean(user.weeklySchedule && Object.keys(user.weeklySchedule).length) : demoStorage.getItem('eveo_user_schedule') !== null;
   });
 
   const [isRequestingChange, setIsRequestingChange] = useState(false);
@@ -242,7 +251,7 @@ export function ScheduleForm({ role }: { role: UserRole }) {
         await apiRequest('/users/me/schedule', { method: 'PATCH', body: JSON.stringify({ schedule: scheduleState }) });
         await refreshUser();
       } else {
-        localStorage.setItem('eveo_user_schedule', JSON.stringify(scheduleState));
+        demoStorage.setItem('eveo_user_schedule', JSON.stringify(scheduleState));
       }
       setHasSubmittedSchedule(true);
       setIsRequestingChange(false);
@@ -256,14 +265,14 @@ export function ScheduleForm({ role }: { role: UserRole }) {
   const handleManagerResetSchedule = (targetAgentName: string) => {
     if (!isManager) return;
     if (targetAgentName === 'manager_self') {
-      localStorage.removeItem('eveo_user_schedule');
+      demoStorage.removeItem('eveo_user_schedule');
       setScheduleState(defaultSchedule);
       setHasSubmittedSchedule(false);
       setIsRequestingChange(false);
       setEditingAgent(null);
     } else {
-      localStorage.removeItem(`eveo_cal_v3_${activeStoreDataKey}_${targetAgentName}`);
-      localStorage.removeItem(`eveo_calendar_v2_${targetAgentName}`);
+      demoStorage.removeItem(`eveo_cal_v3_${activeStoreDataKey}_${targetAgentName}`);
+      demoStorage.removeItem(`eveo_calendar_v2_${targetAgentName}`);
       setEditingAgent(null);
     }
   };
@@ -683,7 +692,7 @@ export function ScheduleForm({ role }: { role: UserRole }) {
 // 3. PAYROLL FORM (Owner Only for Disbursements; BDC/Sales for Personal Commission Tracker)
 // ==========================================
 export function PayrollForm({ role }: { role: UserRole }) {
-  const { user } = useAuth();
+  const user = useWorkspaceUser();
   const isOwner = role === 'owner' || role === 'super_admin';
   const { activeStoreId, activeStore } = useStoreAppearance();
   const navigate = useNavigate();
@@ -905,6 +914,7 @@ export function PayrollForm({ role }: { role: UserRole }) {
 // 4. SECURITY FORM
 // ==========================================
 export function SecurityForm() {
+  const { isDemoWorkspace } = useStoreAppearance();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -917,6 +927,11 @@ export function SecurityForm() {
     if (newPassword !== confirmPassword) { setError('The new passwords do not match.'); return; }
     setIsSaving(true);
     try {
+      if (isDemoWorkspace) {
+        setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+        setFeedback('Demo password change simulated.');
+        return;
+      }
       await apiRequest('/users/me/password', { method: 'PATCH', body: JSON.stringify({ currentPassword, newPassword }) });
       setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
       setFeedback('Password updated. Use it the next time you sign in.');

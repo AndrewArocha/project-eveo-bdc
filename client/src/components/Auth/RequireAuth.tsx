@@ -5,7 +5,7 @@ import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 
 export default function RequireAuth({ children }: { children: JSX.Element }) {
   const location = useLocation();
-  const { user, role, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
   const { storesLoading, storesError, refreshStores } = useStoreAppearance();
 
   if (isLoading) {
@@ -24,7 +24,7 @@ export default function RequireAuth({ children }: { children: JSX.Element }) {
     return <div className="min-h-screen grid place-items-center bg-[#05080c] px-6 text-center text-sm text-gray-300"><div><p role="alert">{storesError}</p><button type="button" onClick={() => void refreshStores()} className="mt-4 min-h-11 rounded-xl bg-orange-500 px-4 font-semibold text-white">Retry</button></div></div>;
   }
 
-  if (location.pathname.startsWith('/admin') && role !== 'owner') {
+  if (location.pathname.startsWith('/admin') && user.role !== 'owner') {
     return <Navigate to="/app/hub" replace />;
   }
 

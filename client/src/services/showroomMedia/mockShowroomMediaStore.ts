@@ -1,9 +1,8 @@
+import { demoMedia, demoSessionVersion } from '../demo/demoSession';
 // src/services/showroomMedia/mockShowroomMediaStore.ts
 import type { ShowroomMediaAsset } from '../../types';
 import { apiBaseUrl, authHeaders } from '../apiClient';
 
-const DATABASE_NAME = 'eveo-showroom-media-demo';
-const STORE_NAME = 'assets';
 const MAX_VIDEO_SIZE_BYTES = 25 * 1024 * 1024;
 const MAX_IMAGE_INPUT_BYTES = 50 * 1024 * 1024; // Accept up to 50MB raw 4K/8K camera photos and downscale them!
 const MAX_IMAGE_DIMENSION = 1600;
@@ -13,25 +12,6 @@ function createId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `media_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-}
-
-function openDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') {
-      reject(new Error('This browser does not support local media storage.'));
-      return;
-    }
-
-    const request = indexedDB.open(DATABASE_NAME, 1);
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        database.createObjectStore(STORE_NAME);
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Could not open media storage.'));
-  });
 }
 
 /**
@@ -96,7 +76,8 @@ async function compressImageFile(file: File): Promise<{ blob: Blob; fileName: st
 }
 
 /** Demo adapter with automatic 4K photo optimization. Replace with backend S3/GCS upload in Phase 2. */
-export async function saveMockShowroomMedia(file: File, storeId?: string): Promise<ShowroomMediaAsset> {
+export async function saveShowroomMedia(file: File, storeId: string, isDemo: boolean): Promise<ShowroomMediaAsset> {
+  const session = demoSessionVersion;
   const isImage = file.type.startsWith('image/');
   const isVideo = file.type.startsWith('video/');
 
@@ -122,8 +103,7 @@ export async function saveMockShowroomMedia(file: File, storeId?: string): Promi
     throw new Error('This image is still larger than the 25 MB upload limit. Choose a smaller photo.');
   }
 
-  const token = localStorage.getItem('eveo_token');
-  if (token) {
+  if (!isDemo) {
     if (!storeId) throw new Error('Choose a store before uploading showroom media.');
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime'].includes(targetMime)) {
       throw new Error('Use a JPEG, PNG, WebP, GIF, MP4, WebM, or QuickTime file.');
@@ -145,36 +125,16 @@ export async function saveMockShowroomMedia(file: File, storeId?: string): Promi
     uploadedAt: new Date().toISOString(),
   };
 
-  const database = await openDatabase();
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(STORE_NAME, 'readwrite');
-      transaction.objectStore(STORE_NAME).put(targetBlob, asset.id);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error('Could not save media.'));
-      transaction.onabort = () => reject(transaction.error ?? new Error('Media save was cancelled.'));
-    });
-  } finally {
-    database.close();
-  }
-
+  if (session !== demoSessionVersion) throw new Error('The demo session ended before the media was saved.');
+  demoMedia.set(asset.id, targetBlob);
   return asset;
 }
 
-export async function getMockShowroomMedia(assetId: string): Promise<Blob | null> {
-  if (/^[a-f\d]{24}$/i.test(assetId) && localStorage.getItem('eveo_token')) {
+export async function getShowroomMedia(assetId: string, isDemo: boolean): Promise<Blob | null> {
+  if (!isDemo) {
     const response = await fetch(`${apiBaseUrl}/showroom/media/${encodeURIComponent(assetId)}/content`, { headers: authHeaders() });
     if (!response.ok) return null;
     return response.blob();
   }
-  const database = await openDatabase();
-  try {
-    return await new Promise<Blob | null>((resolve, reject) => {
-      const request = database.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(assetId);
-      request.onsuccess = () => resolve(request.result instanceof Blob ? request.result : null);
-      request.onerror = () => reject(request.error ?? new Error('Could not retrieve media.'));
-    });
-  } finally {
-    database.close();
-  }
+  return demoMedia.get(assetId) ?? null;
 }

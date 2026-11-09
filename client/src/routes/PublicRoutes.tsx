@@ -12,11 +12,11 @@ import VerifyEmail from '../pages/Auth/VerifyEmail';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function PublicRoutes() {
-  const { user, role, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
 
   // Logged-in users should never see unauthenticated public pages
   if (user && !isLoading) {
-    return <Navigate to={role === 'owner' ? '/admin/portal' : '/app/hub'} replace />;
+    return <Navigate to={user.role === 'owner' ? '/admin/portal' : '/app/hub'} replace />;
   }
 
   return (

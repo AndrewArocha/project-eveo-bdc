@@ -24,6 +24,7 @@ export interface ShowroomVisitRecord {
   id: string;
   storeId: string;
   customerName: string;
+  leadId?: string;
   greetedPerson: string;
   customerPhone: string | null;
   notes: string | null;

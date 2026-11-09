@@ -15,7 +15,7 @@ function requireOwner(request: Parameters<RequestHandler>[0]) {
 export const getCurrentUser: RequestHandler = asyncHandler(async (request, response) => {
   const user = await User.findOne({ _id: request.auth?.userId, active: true });
   if (!user) throw new AppError(401, 'The account is no longer active.', 'UNAUTHORIZED');
-  response.json({ data: toSafeUser(user) });
+  response.json({ data: toSafeUser(user, request.auth!.demoMode) });
 });
 
 export const updateCurrentUser: RequestHandler = asyncHandler(async (request, response) => {
@@ -25,7 +25,7 @@ export const updateCurrentUser: RequestHandler = asyncHandler(async (request, re
     { new: true, runValidators: true },
   );
   if (!user) throw new AppError(401, 'The account is no longer active.', 'UNAUTHORIZED');
-  response.json({ data: toSafeUser(user) });
+  response.json({ data: toSafeUser(user, request.auth!.demoMode) });
 });
 
 export const updateCurrentUserSchedule: RequestHandler = asyncHandler(async (request, response) => {
@@ -35,7 +35,7 @@ export const updateCurrentUserSchedule: RequestHandler = asyncHandler(async (req
     { new: true, runValidators: true },
   );
   if (!user) throw new AppError(401, 'The account is no longer active.', 'UNAUTHORIZED');
-  response.json({ data: toSafeUser(user) });
+  response.json({ data: toSafeUser(user, request.auth!.demoMode) });
 });
 
 export const changeCurrentUserPassword: RequestHandler = asyncHandler(async (request, response) => {

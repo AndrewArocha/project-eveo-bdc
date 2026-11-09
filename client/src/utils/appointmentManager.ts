@@ -1,3 +1,4 @@
+import { demoStorage } from '../services/demo/demoSession';
 // src/utils/appointmentManager.ts
 import { getStoreDataOrEmpty } from '../data/mockDatabase';
 
@@ -11,6 +12,7 @@ export interface Appointment {
   rep: string;
   status: ApptStatus;
   name?: string;
+  leadSource?: string;
 }
 
 // 1. Get today's dynamic date string (e.g., "2026-9-12")
@@ -22,12 +24,12 @@ export const getTodayDateKey = (): string => {
 // 2. Fetch all appointments for a specific store and date
 export const getAppointmentsByDate = (storeId: string, dateKey: string): Appointment[] => {
   const dbKey = `eveo_appointments_${storeId}`;
-  const saved = localStorage.getItem(dbKey);
+  const saved = demoStorage.getItem(dbKey);
 
 if (saved) {
     try {
       const parsed = JSON.parse(saved);
-      if (parsed[dateKey] && parsed[dateKey].length > 0) {
+      if (Array.isArray(parsed[dateKey])) {
         return parsed[dateKey];
       }
     } catch (e) {
@@ -36,7 +38,7 @@ if (saved) {
   }
 
   // Dynamic Multi-Tenant Fallback: Pull from whichever storeId is active (njx, dk, kia)!
-  const storeAppts = getStoreDataOrEmpty(storeId).appointments;
+  const storeAppts = dateKey === getTodayDateKey() ? getStoreDataOrEmpty(storeId).appointments : [];
   if (storeAppts && storeAppts.length > 0) {
     return storeAppts.map((appt) => ({
       id: appt.id.toString(),
@@ -44,6 +46,7 @@ if (saved) {
       customer: appt.customer || appt.name || 'Unknown Customer',
       vehicle: appt.vehicle,
       rep: appt.rep,
+      leadSource: appt.leadSource,
       status: (appt.status.toUpperCase() === 'PENDING CONFIRM' ? 'PENDING CONFIRM' : 'CONFIRMED') as ApptStatus,
     }));
   }
@@ -63,13 +66,19 @@ export const getNextAppointment = (storeId: string): Appointment | null => {
   return validAppts.length > 0 ? validAppts[0] : null;
 };
 
+export function listDemoAppointments(storeId: string): Appointment[] {
+  const today = getTodayDateKey();
+  const saved = JSON.parse(demoStorage.getItem(`eveo_appointments_${storeId}`) || '{}') as Record<string, Appointment[]>;
+  return [...getAppointmentsByDate(storeId, today), ...Object.entries(saved).flatMap(([date, appointments]) => date === today ? [] : appointments)];
+}
+
 // 4. Handler to update new appointment created
 
 export const saveAppointments = (storeId: string, dateKey: string, appointments: Appointment[]) => {
   const dbKey = `eveo_appointments_${storeId}`;
-  const saved = localStorage.getItem(dbKey);
+  const saved = demoStorage.getItem(dbKey);
   const db = saved ? JSON.parse(saved) : {};
   db[dateKey] = appointments;
-  localStorage.setItem(dbKey, JSON.stringify(db));
+  demoStorage.setItem(dbKey, JSON.stringify(db));
   window.dispatchEvent(new Event('appointmentsUpdated'));
 };

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, RefreshCw, Search, ExternalLink, Car, Plus } from 'lucide-react';
 import SwipeableModal from './SwipeableModal';
-import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
+import { useStoreAppearance, useWorkspaceUser } from '../../contexts/StoreAppereanceContext';
 import {
   getStoreInventory,
   saveStoreInventory,
@@ -12,7 +12,6 @@ import {
   type InventoryUnitStatus,
 } from '../../services/inventory/storeInventorySync';
 import type { StoreInventorySummary } from '../../data/stores/njx/inventory';
-import { useAuth } from '../../contexts/AuthContext';
 import { apiInventoryRepository, type ApiInventoryVehicle } from '../../services/inventory/apiInventoryRepository';
 
 interface StoreInventoryModalProps {
@@ -46,7 +45,7 @@ export default function StoreInventoryModal({
   onClose,
 }: StoreInventoryModalProps) {
   const { activeStoreId, activeStore } = useStoreAppearance();
-  const { user } = useAuth();
+  const user = useWorkspaceUser();
   const [summary, setSummary] = useState<StoreInventorySummary>(() =>
     user ? { storeId: activeStoreId, carsReadyForSale: 0, carsDeliveredMtd: 0, dealsDeliveredToday: 0, averageRatioBenchmark: 0, units: [] } : getStoreInventory(activeStoreId)
   );
@@ -63,6 +62,7 @@ export default function StoreInventoryModal({
   const [newPrice, setNewPrice] = useState('');
 
   useEffect(() => {
+    if (!isOpen || !activeStoreId) return;
     let active = true;
     const refresh = () => {
       if (user) {

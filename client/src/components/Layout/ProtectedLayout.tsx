@@ -5,10 +5,10 @@ import { AnimatePresence, motion } from 'framer-motion';
 import StartupAnimation from '../UI/StartupAnimation';
 import Navbar from '../Navigation/Navbar';
 import { startAmbient } from '../../utils/soundEngine';
-import { useAuth } from '../../contexts/AuthContext';
+import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 
 export default function ProtectedLayout() {
-  const { user } = useAuth();
+  const { isDemoWorkspace } = useStoreAppearance();
   const [isStartupDone, setIsStartupDone] = useState(false);
 
   useEffect(() => {
@@ -41,9 +41,9 @@ export default function ProtectedLayout() {
           >
             <main
               id="app-scroll-container"
-              className={`flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden relative scroll-smooth bg-gray-50 dark:bg-[#05080c] ${user ? '' : 'eveo-demo-view'}`}
+              className={`flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden relative scroll-smooth bg-gray-50 dark:bg-[#05080c] ${isDemoWorkspace ? 'eveo-demo-view' : ''}`}
             >
-              {!user && <div className="sticky top-0 z-40 border-b border-orange-400/20 bg-[#111923]/95 px-4 py-2 text-center text-xs text-gray-300 backdrop-blur-xl select-none">Demo workspace · Illustrative data only. Changes stay in this browser and do not reach a dealership. AI intelligence and live connections require the full product. Screenshots and copying can’t be technically blocked in a browser.</div>}
+              {isDemoWorkspace && <div className="sticky top-0 z-40 border-b border-orange-400/20 bg-[#111923]/95 px-4 py-2 text-center text-xs text-gray-300 backdrop-blur-xl select-none">Demo workspace · Sample data and changes are cleared when you leave the demo or close this tab.</div>}
               <Outlet />
             </main>
 

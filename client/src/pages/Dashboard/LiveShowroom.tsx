@@ -7,9 +7,10 @@ import {
   MessageSquareText, Radio, ScanBarcode, Send, Sparkles, Trash2,
   UserCheck, Users, Video, X
 } from 'lucide-react';
+import { demoStorage } from '../../services/demo/demoSession';
 import { CURRENT_USER, getStoreDataOrEmpty, getVisibleStoreRoster } from '../../data/mockDatabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
+import { useStoreAppearance, useWorkspaceUser } from '../../contexts/StoreAppereanceContext';
 import type {
   AppendShowroomEventInput,
   ShowroomEvent,
@@ -24,19 +25,23 @@ import GlobalLoader from '../../components/UI/GlobalLoader';
 import ShowroomVehicleDetails from '../../components/showroom/ShowroomVehicleDetails';
 import VehicleVinLookupField from '../../components/showroom/VehicleVinLookupField';
 import LiveShowroomDeck, { type FloorAppointmentBubble } from '../../components/showroom/LiveShowroomDeck';
+import WalkInCustomerSearch, { type WalkInCustomer } from '../../components/showroom/WalkInCustomerSearch';
 import LiveActivityDeck from '../../components/showroom/LiveActivityDeck';
-import { showroomRepository } from '../../services/showroom';
+import { getShowroomRepository } from '../../services/showroom';
 import { apiLiveActivityRepository } from '../../services/liveActivity/apiLiveActivityRepository';
 import { apiOperationalRepository } from '../../services/operational/apiOperationalRepository';
 import { apiInventoryRepository, type ApiInventoryVehicle } from '../../services/inventory/apiInventoryRepository';
 import { teamRepository } from '../../services/team/teamRepository';
 import eveoSymbol from '../../images/logo/eveo-symbol.svg';
-import type { ApiTeamMember } from '../../services/apiClient';
-import { getMockShowroomMedia, saveMockShowroomMedia } from '../../services/showroomMedia/mockShowroomMediaStore';
-import { decodeVin } from '../../utils/nhtsaVinService';
+import { apiRequest, type ApiTeamMember, type CustomerRecord } from '../../services/apiClient';
+import { getShowroomMedia, saveShowroomMedia } from '../../services/showroomMedia/mockShowroomMediaStore';
+import { demoVehicles, lookupDemoVehicle } from '../../services/demo/demoVehicle';
+import { getStoreInventory } from '../../services/inventory/storeInventorySync';
 import { getAppointmentsByDate, getTodayDateKey, type Appointment } from '../../utils/appointmentManager';
 import {
   listLiveFeed,
+  createStoreLeadAsync,
+  getPersistentStoreData,
   publishLiveActivity,
   resolveAgentAvatar,
   getInitials,
@@ -62,11 +67,7 @@ const EVENT_LABELS: Record<ShowroomEventType, string> = {
   visit_completed: 'Visit completed',
 };
 
-const DEMO_SCAN_VINS = [
-  { label: '2024 Kia Telluride SX', vin: '5XYP5DGC0RG412890' },
-  { label: '2023 Honda Civic Type R', vin: 'JHMFL5G40PX000412' },
-  { label: '2024 Ford F-150 Lariat', vin: '1FTFW1E84RFA10294' },
-];
+const DEMO_SCAN_VINS = demoVehicles.vehicle_of_interest;
 
 const glassCardClasses = `
   backdrop-blur-2xl bg-white/5 dark:bg-[#0a0f16]/40
@@ -81,8 +82,8 @@ const inputClasses =
 
 function createActor(role: string, authenticatedUser: { id: string; name: string } | null) {
   if (authenticatedUser) return { actorId: authenticatedUser.id, actorName: authenticatedUser.name };
-  const actorName = localStorage.getItem('eveo_user_name') || CURRENT_USER;
-  const actorId = localStorage.getItem('eveo_user_id') || `demo-${role}-${actorName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  const actorName = CURRENT_USER;
+  const actorId = `demo-${role}-${actorName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   return { actorId, actorName };
 }
 
@@ -100,11 +101,12 @@ function vehicleTitle(vehicle: ShowroomVehicleSelection['vehicleOfInterest']): s
 }
 
 type ExclusiveView = 'portal' | 'showroom' | 'activity' | 'visit';
-type StoreAppointment = Appointment & { appointmentId?: string; customerId?: string; leadId?: string; customerPhone?: string };
+type StoreAppointment = Appointment & { appointmentId?: string; customerId?: string; leadId?: string; customerPhone?: string; scheduledAt?: string };
 
 export default function LiveShowroom() {
-  const { role, user: accountUser } = useAuth();
-  const user = accountUser?.demoMode ? null : accountUser;
+  const { role } = useAuth();
+  const user = useWorkspaceUser();
+  const showroomRepository = getShowroomRepository(!user);
   const { activeStore, activeStoreId, activeStoreDomainId, cycleNextStore, stores, setActiveStoreId } = useStoreAppearance();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -127,9 +129,15 @@ export default function LiveShowroom() {
   });
 
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(visitIdFromUrl);
+  const [clock, setClock] = useState(() => Date.now());
   const [isSwitchingStore, setIsSwitchingStore] = useState(false);
   const actor = useMemo(() => createActor(role, user), [role, user]);
   const [storeTeamMembers, setStoreTeamMembers] = useState<ApiTeamMember[]>([]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!user || !storeId) {
@@ -168,6 +176,9 @@ export default function LiveShowroom() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
 
+  const [selectedCustomer, setSelectedCustomer] = useState<WalkInCustomer | null>(null);
+  const [creatingLead, setCreatingLead] = useState(false);
+  const leadRequest = useRef(false);
   const [customerName, setCustomerName] = useState('');
   const [greetedPerson, setGreetedPerson] = useState('themselves');
   const [checkInStep, setCheckInStep] = useState(0);
@@ -183,7 +194,9 @@ export default function LiveShowroom() {
 
   // Live Activity Feed State
   const [feedPosts, setFeedPosts] = useState<LiveFeedPost[]>(() => user ? [] : listLiveFeed(storeId));
-  const [storePipelineCustomers, setStorePipelineCustomers] = useState<string[]>([]);
+  const [walkInCustomers, setWalkInCustomers] = useState<WalkInCustomer[]>([]);
+  const [leadSources, setLeadSources] = useState<Record<string, string>>({});
+  const storePipelineCustomers = [...new Set(walkInCustomers.map(({ name }) => name))].slice(0, 6);
   const [onlineCursorIdx, setOnlineCursorIdx] = useState(0);
 
   // Smart Actionable "Log Live Activity" Modal State
@@ -191,9 +204,9 @@ export default function LiveShowroom() {
   const [composerType, setComposerType] = useState<'deal_desked' | 'new_inventory' | 'vip_appt' | 'lot_walk'>('deal_desked');
   const [composerStep, setComposerStep] = useState(0);
   const [selectedCustomerPill, setSelectedCustomerPill] = useState('');
-  const [dealGrossAmount, setDealGrossAmount] = useState('$3,850');
+  const [dealGrossAmount, setDealGrossAmount] = useState(user ? '' : '$3,850');
   const [composerVehicleDraft, setComposerVehicleDraft] = useState<ShowroomVehicleDraft | null>(null);
-  const [composerQuickChip, setComposerQuickChip] = useState('Buyer Order Signed & Routed to F&I');
+  const [composerQuickChip, setComposerQuickChip] = useState(user ? '' : 'Buyer Order Signed & Routed to F&I');
   const [postMediaFile, setPostMediaFile] = useState<File | null>(null);
   const [isPostingActivity, setIsPostingActivity] = useState(false);
   const postMediaInputRef = useRef<HTMLInputElement>(null);
@@ -255,8 +268,8 @@ export default function LiveShowroom() {
             id: item._id, time: new Date(item.scheduledAt!).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
             customer: item.customerNameSnapshot, vehicle: item.vehicleSnapshot || 'Vehicle not specified',
             rep: storeTeamMembers.find((member) => member.id === item.assignedStoreUserId || member.id === item.assignedPlatformUserId)?.name || 'Unassigned',
-            status: item.status === 'arrived' || item.status === 'showed' ? 'ARRIVED' : item.status === 'no_show' ? 'NO SHOW' : 'CONFIRMED',
-            appointmentId: item._id, customerId: item.customerId || undefined, leadId: item.leadId || undefined, customerPhone: item.phoneSnapshot,
+            status: item.status === 'pending_confirmation' ? 'PENDING CONFIRM' : item.status === 'arrived' || item.status === 'showed' ? 'ARRIVED' : item.status === 'no_show' ? 'NO SHOW' : 'CONFIRMED',
+            appointmentId: item._id, scheduledAt: item.scheduledAt ?? undefined, customerId: item.customerId || undefined, leadId: item.leadId || undefined, customerPhone: item.phoneSnapshot,
           })));
       } catch {
         setStoreAppts([]);
@@ -292,7 +305,7 @@ export default function LiveShowroom() {
     } catch {
       // Ignore transient mock error
     }
-  }, [storeId]);
+  }, [storeId, showroomRepository]);
 
   useEffect(() => {
     void refresh();
@@ -302,11 +315,11 @@ export default function LiveShowroom() {
       unsubscribe();
       window.clearInterval(timer);
     };
-  }, [storeId, refresh]);
+  }, [storeId, refresh, showroomRepository]);
 
   useEffect(() => {
-    if (!assignedRepId && salespeople.length > 0) {
-      setAssignedRepId(String(salespeople[0].id));
+    if (!salespeople.some((person) => String(person.id) === assignedRepId)) {
+      setAssignedRepId(salespeople[0] ? String(salespeople[0].id) : '');
     }
   }, [assignedRepId, salespeople]);
 
@@ -334,7 +347,7 @@ export default function LiveShowroom() {
   );
 
   const selectedSnapshot = useMemo(
-    () => snapshots.find(({ visit }) => visit.id === selectedVisitId) ?? activeSnapshots[0] ?? null,
+    () => selectedVisitId ? snapshots.find(({ visit }) => visit.id === selectedVisitId) ?? null : activeSnapshots[0] ?? null,
     [snapshots, activeSnapshots, selectedVisitId]
   );
 
@@ -362,14 +375,15 @@ export default function LiveShowroom() {
 
     activeSnapshots.forEach(({ visit }, idx) => {
       if (strikesLog[visit.id]) return;
-      const isOverdue = visit.status === 'handoff_requested' && idx === 0;
+      const isOverdue = visit.status === 'handoff_requested' && (user ? clock - Date.parse(visit.createdAt) > 15 * 60_000 : idx === 0);
       bubbles.push({
         id: visit.id,
         visitId: visit.id,
+        leadSource: visit.leadId ? leadSources[visit.leadId] : undefined,
         customerName: visit.customerName,
         vehicle: vehicleTitle(visit.vehicleOfInterest),
         rep: visit.assignedRepName,
-        timeLabel: isOverdue ? '16m Overdue' : 'On Floor Now',
+        timeLabel: isOverdue ? 'Overdue' : 'On Floor Now',
         slaState: isOverdue ? 'overdue_red' : 'ongoing_orange',
         badgeText: isOverdue ? `Overdue • ${visit.customerName.split(' ')[0]}` : `Active • ${visit.customerName.split(' ')[0]}`,
       });
@@ -378,26 +392,32 @@ export default function LiveShowroom() {
     storeAppts.forEach((appt) => {
       const cName = appt.customer || appt.name || 'Guest';
       if (bubbles.some((b) => b.customerName === cName) || strikesLog[`appt_${appt.id}`]) return;
+      const minutes = appt.scheduledAt ? Math.ceil((Date.parse(appt.scheduledAt) - clock) / 60_000) : 12;
+      const overdue = minutes < -15;
+      const arrived = appt.status === 'ARRIVED';
+      const badge = arrived ? 'Arrived' : overdue ? `Overdue ${-minutes}m` : minutes <= 0 ? 'Due now' : minutes <= 15 ? `Due ${minutes}m` : 'Scheduled';
       bubbles.push({
         id: `appt_${appt.id}`,
         appointmentId: appt.appointmentId,
         customerId: appt.customerId,
         leadId: appt.leadId,
+        leadSource: appt.leadId ? leadSources[appt.leadId] : appt.leadSource,
         customerPhone: appt.customerPhone,
         customerName: cName,
         vehicle: appt.vehicle,
         rep: appt.rep,
-        timeLabel: `${appt.time} (In 12m)`,
-        slaState: 'due_soon_yellow',
-        badgeText: `Due 12m • ${cName.split(' ')[0]}`,
+        timeLabel: appt.time,
+        slaState: arrived ? 'ongoing_orange' : overdue ? 'overdue_red' : minutes <= 15 ? 'due_soon_yellow' : 'scheduled',
+        badgeText: `${badge} • ${cName.split(' ')[0]}`,
       });
     });
 
-    if (completedSnapshots.length > 0 && bubbles.length < 5) {
+    if (completedSnapshots.length > 0 && bubbles.length < 5 && (!user || clock - Date.parse(completedSnapshots[0].visit.updatedAt) < 60 * 60_000)) {
       const comp = completedSnapshots[0].visit;
       bubbles.push({
         id: comp.id,
         visitId: comp.id,
+        leadSource: comp.leadId ? leadSources[comp.leadId] : undefined,
         customerName: comp.customerName,
         vehicle: vehicleTitle(comp.vehicleOfInterest),
         rep: comp.assignedRepName,
@@ -408,7 +428,7 @@ export default function LiveShowroom() {
     }
 
     return bubbles.slice(0, 5);
-  }, [activeSnapshots, storeAppts, completedSnapshots, strikesLog]);
+  }, [activeSnapshots, storeAppts, completedSnapshots, strikesLog, leadSources, user, clock]);
 
   const onlineUsersList = useMemo(() => {
     if (user) {
@@ -451,27 +471,92 @@ export default function LiveShowroom() {
   }, [onlineUsersList.length]);
 
   useEffect(() => {
-    if (!user) {
-      const demoStore = getStoreDataOrEmpty(storeId);
-      const names = new Set<string>();
-      demoStore.handoffs?.forEach((handoff) => names.add(handoff.name));
-      demoStore.leads?.forEach((lead) => names.add(lead.name));
-      demoStore.appointments?.forEach((appointment) => names.add(appointment.name || appointment.customer || ''));
-      setStorePipelineCustomers(Array.from(names).filter(Boolean).slice(0, 6));
-      return;
-    }
+    setWalkInCustomers([]);
+    setLeadSources({});
+    if (!storeId) return;
     let active = true;
-    Promise.all([apiOperationalRepository.listLeads(storeId), apiOperationalRepository.listAppointments(storeId)])
-      .then(([leads, appointments]) => {
+    const refreshCustomers = async () => {
+      if (!user) {
+        const demoStore = getPersistentStoreData(storeId);
+        const names = new Set([
+          ...demoStore.leads.map((lead) => lead.name),
+          ...demoStore.handoffs.map((visit) => visit.name),
+          ...getAppointmentsByDate(storeId, getTodayDateKey()).map((appointment) => appointment.customer),
+        ]);
+        const records = JSON.parse(demoStorage.getItem(`eveo_demo_customer_records_${storeId}`) || '[]') as CustomerRecord[];
+        const customers: WalkInCustomer[] = records.map((record) => ({ id: record._id, name: record.name, phone: record.phone }));
+        const knownNames = new Set(customers.map(({ name }) => name.toLowerCase()));
+        for (const name of names) if (name && !knownNames.has(name.toLowerCase())) customers.push({ id: name, name });
+        setWalkInCustomers(customers);
+        return;
+      }
+      try {
+        const [customers, leads, appointments] = await Promise.all([
+          apiRequest<CustomerRecord[]>(`/customers?${new URLSearchParams({ storeId })}`),
+          apiOperationalRepository.listLeads(storeId),
+          apiOperationalRepository.listAppointments(storeId),
+        ]);
         if (!active) return;
-        const names = new Set<string>();
-        leads.forEach((lead) => names.add(lead.customerNameSnapshot));
-        appointments.forEach((appointment) => names.add(appointment.customerNameSnapshot));
-        setStorePipelineCustomers(Array.from(names).filter(Boolean).slice(0, 6));
-      })
-      .catch(() => { if (active) setStorePipelineCustomers([]); });
-    return () => { active = false; };
+        setLeadSources(Object.fromEntries(leads.map((lead) => [lead._id, lead.source])));
+        const options = new Map<string, WalkInCustomer>();
+        for (const customer of customers) {
+          if (customer.storeId === storeId) options.set(customer._id, { id: customer._id, customerId: customer._id, name: customer.name, phone: customer.phone });
+        }
+        for (const lead of leads) {
+          const id = lead.customerId ?? lead._id;
+          options.set(id, { id, leadId: lead._id, customerId: lead.customerId ?? undefined, name: lead.customerNameSnapshot, phone: lead.phoneSnapshot || options.get(id)?.phone });
+        }
+        for (const appointment of appointments) {
+          const id = appointment.customerId ?? appointment.leadId ?? appointment._id;
+          if (!options.has(id)) options.set(id, { id, customerId: appointment.customerId ?? undefined, leadId: appointment.leadId ?? undefined, name: appointment.customerNameSnapshot, phone: appointment.phoneSnapshot });
+        }
+        setWalkInCustomers([...options.values()]);
+      } catch {
+        if (active) setWalkInCustomers([]);
+      }
+    };
+    const reload = () => { void refreshCustomers(); };
+    reload();
+    window.addEventListener('eveo:pipeline-updated', reload);
+    window.addEventListener('eveo:operational-updated', reload);
+    window.addEventListener('appointmentsUpdated', reload);
+    return () => {
+      active = false;
+      window.removeEventListener('eveo:pipeline-updated', reload);
+      window.removeEventListener('eveo:operational-updated', reload);
+      window.removeEventListener('appointmentsUpdated', reload);
+    };
   }, [storeId, user]);
+
+  const createWalkInLead = async () => {
+    const name = customerName.trim();
+    if (leadRequest.current || name.length < 2 || !storeId) return;
+    leadRequest.current = true;
+    setCreatingLead(true);
+    setMutationError(null);
+    try {
+      let customer: WalkInCustomer;
+      if (user) {
+        const lead = await apiOperationalRepository.createLead({ storeId, customerNameSnapshot: name, source: 'Walk-in' });
+        customer = { id: lead._id, leadId: lead._id, customerId: lead.customerId ?? undefined, name: lead.customerNameSnapshot };
+      } else {
+        const updated = await createStoreLeadAsync(storeId, { name, vehicle: '' });
+        customer = { id: String(updated.leads[0].id), name };
+      }
+      setSelectedCustomer(customer);
+      setCustomerName(customer.name);
+      setCheckInStep(1);
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : 'Could not create the lead.');
+    } finally {
+      leadRequest.current = false;
+      setCreatingLead(false);
+    }
+  };
+
+  const closeCheckIn = () => {
+    if (!leadRequest.current && !isSubmitting) setIsCheckInOpen(false);
+  };
 
   const handleStoreBannerClick = () => {
     if (role === 'bdc' || role === 'bdc_manager' || role === 'owner') {
@@ -530,6 +615,7 @@ export default function LiveShowroom() {
 
   const handleCheckIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (checkInStep !== 3 || isSubmitting || !storeId) return;
     setMutationError(null);
     if (!customerName.trim()) {
       setMutationError('Enter the customer’s name to start the visit.');
@@ -542,6 +628,9 @@ export default function LiveShowroom() {
     try {
       const created = await showroomRepository.createVisit(storeId, {
         customerName,
+        customerId: selectedCustomer?.customerId,
+        leadId: selectedCustomer?.leadId,
+        customerPhone: selectedCustomer?.phone,
         greetedPerson: greetedPerson === 'themselves' ? 'the customer' : `${greetedPerson}: ${relatedCustomerName}`,
         assignedRepId: String(selectedRep.id),
         assignedRepName: selectedRep.name,
@@ -619,7 +708,7 @@ export default function LiveShowroom() {
 
   const handleStageEvent = async (type: ShowroomEventType, message: string, photo?: File, replyToEventId?: string) => {
     try {
-      const media = photo ? await saveMockShowroomMedia(photo, storeId) : undefined;
+      const media = photo ? await saveShowroomMedia(photo, storeId, !user) : undefined;
       return await appendEvent(type, message, { ...(media ? { media } : {}), ...(replyToEventId ? { replyToEventId } : {}) });
     } catch (error) {
       setMutationError(error instanceof Error ? error.message : 'Could not upload the visit photo.');
@@ -637,7 +726,7 @@ export default function LiveShowroom() {
       setBusyAction('media_added');
       setMutationError(null);
       try {
-        const asset = await saveMockShowroomMedia(stagedMediaFile, storeId);
+        const asset = await saveShowroomMedia(stagedMediaFile, storeId, !user);
         const caption = trimmed || `${asset.kind === 'video' ? 'Walkaround video' : 'Showroom photo'} attached (${asset.fileName})`;
         await appendEvent('media_added', caption, { media: asset });
         setStagedMediaFile(null);
@@ -686,10 +775,10 @@ export default function LiveShowroom() {
     try {
       let mediaAsset = undefined;
       if (postMediaFile) {
-        mediaAsset = await saveMockShowroomMedia(postMediaFile, storeId);
+        mediaAsset = await saveShowroomMedia(postMediaFile, storeId, !user);
       }
 
-      const targetCustomer = selectedCustomerPill || storePipelineCustomers[0] || 'Walk-In Client';
+      const targetCustomer = selectedCustomerPill || (!user ? storePipelineCustomers[0] || 'Walk-In Client' : '');
       const decodedTitle = vehicleTitle(composerVehicleDraft);
 
       if (composerType === 'deal_desked') {
@@ -698,7 +787,7 @@ export default function LiveShowroom() {
           role,
           priority: 1,
           category: 'showroom',
-          title: `Deal Desked • ${targetCustomer} (${dealGrossAmount})`,
+          title: `Deal Desked${targetCustomer ? ` • ${targetCustomer}` : ''}${dealGrossAmount ? ` (${dealGrossAmount})` : ''}`,
           detail: `${decodedTitle} • ${composerQuickChip}`,
           dealAmount: dealGrossAmount,
           vehicleVin: composerVehicleDraft?.vin,
@@ -721,7 +810,7 @@ export default function LiveShowroom() {
           role,
           priority: 1,
           category: 'appointment',
-          title: `VIP Appt Locked • ${targetCustomer}`,
+          title: `VIP Appt Locked${targetCustomer ? ` • ${targetCustomer}` : ''}`,
           detail: `${decodedTitle} • ${composerQuickChip}`,
           media: mediaAsset,
         });
@@ -739,6 +828,8 @@ export default function LiveShowroom() {
 
       setPostMediaFile(null);
       setComposerVehicleDraft(null);
+      setSelectedCustomerPill('');
+      if (user) { setDealGrossAmount(''); setComposerQuickChip(''); }
       setIsComposerOpen(false);
     } catch (error) {
       setMutationError(error instanceof Error ? error.message : 'Could not record this activity.');
@@ -762,10 +853,10 @@ export default function LiveShowroom() {
 
       <header className="mx-auto mb-5 mt-4 flex w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 md:mt-6 md:px-8">
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-orange-500">Live workspace</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-orange-500">{user ? 'Live workspace' : 'Demo workspace'}</p>
           <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight text-gray-950 dark:text-white sm:text-3xl">{activeStore.name}</h1>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {activeView === 'portal' ? 'Choose a live operational workspace.' : activeView === 'showroom' ? 'Showroom floor and appointment activity.' : activeView === 'activity' ? 'Recent team activity.' : `Customer visit · ${selectedSnapshot?.visit.customerName || ''}`}
+            {activeView === 'portal' ? 'Choose a showroom workspace.' : activeView === 'showroom' ? 'Showroom floor and appointment activity.' : activeView === 'activity' ? 'Recent team activity.' : `Customer visit · ${selectedSnapshot?.visit.customerName || ''}`}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -838,7 +929,7 @@ export default function LiveShowroom() {
               scheduledCount={storeAppts.length}
               ongoingAppointmentBubbles={ongoingAppointmentBubbles}
               onSwitchToActivity={() => switchView('activity')}
-              onOpenCheckIn={() => { setCheckInStep(0); setIsCheckInOpen(true); setMutationError(null); }}
+              onOpenCheckIn={() => { setCheckInStep(0); setCustomerName(''); setSelectedCustomer(null); setGreetedPerson('themselves'); setRelatedCustomerName(''); setVehicles(EMPTY_VEHICLES); setIsCheckInOpen(true); setMutationError(null); }}
               onExpandOngoingDash={() => setIsLobbyModalOpen(true)}
               onOpenOrStartVisit={(bubble) => void handleOpenOrStartVisit(bubble)}
               onMarkOverdueStrike={handleMarkOverdueStrike}
@@ -965,7 +1056,11 @@ export default function LiveShowroom() {
               </div>}
 
             {composerStep === 2 && <>
-            {composerType === 'deal_desked' && (
+            {composerType === 'deal_desked' && (user ? (
+              <label className="block text-xs font-semibold text-gray-300">Recorded deal gross (optional)
+                <input value={dealGrossAmount} onChange={(event) => setDealGrossAmount(event.target.value)} maxLength={24} inputMode="decimal" className={`mt-2 ${inputClasses}`} />
+              </label>
+            ) : (
               <div>
                 <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 block mb-2">
                   1-Tap Front/Back Deal Gross
@@ -986,7 +1081,7 @@ export default function LiveShowroom() {
                   ))}
                 </div>
               </div>
-            )}
+            ))}
 
             {(composerType === 'deal_desked' || composerType === 'new_inventory') && (
               <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 space-y-2.5">
@@ -1005,15 +1100,7 @@ export default function LiveShowroom() {
                     <button
                       type="button"
                       key={v.vin}
-                      onClick={async () => {
-                        const res = await decodeVin(v.vin);
-                        setComposerVehicleDraft({
-                          ...res.vehicle,
-                          purpose: 'vehicle_of_interest',
-                          source: 'nhtsa-vpic',
-                          decodedAt: new Date().toISOString(),
-                        });
-                      }}
+                      onClick={() => setComposerVehicleDraft(lookupDemoVehicle(storeId, v.vin, 'vehicle_of_interest'))}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${composerVehicleDraft?.vin === v.vin
                           ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
                           : 'bg-white/5 border-white/10 text-gray-300 hover:border-orange-500/40'
@@ -1088,7 +1175,7 @@ export default function LiveShowroom() {
       </SwipeableModal>
 
 {/* --- WALK-IN CHECK-IN MODAL WITH LIVE DATABASE QUERY & PROMINENT CUSTOM VIN BUTTON --- */}
-      <SwipeableModal isOpen={isCheckInOpen} onClose={() => setIsCheckInOpen(false)} maxWidthClass="md:max-w-lg">
+      <SwipeableModal isOpen={isCheckInOpen} onClose={closeCheckIn} maxWidthClass="md:max-w-lg">
         <div className="flex flex-col h-full min-h-0 p-5 sm:p-6 overflow-y-auto overscroll-contain space-y-4">
           <div className="flex items-center justify-between gap-3 pb-3 border-b border-white/10 shrink-0">
             <div>
@@ -1097,59 +1184,16 @@ export default function LiveShowroom() {
                 <UserCheck size={18} className="text-orange-500" /> Add Visit
               </h2>
             </div>
-            <button type="button" onClick={() => setIsCheckInOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white cursor-pointer">
+            <button type="button" onClick={closeCheckIn} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white cursor-pointer">
               <X size={16} />
             </button>
           </div>
 
           <form onSubmit={handleCheckIn} className="flex min-h-[20rem] flex-col justify-between space-y-4" aria-label="Add visit setup">
-            {/* 1. Live Database Customer Query Input + "+ Create" Fallback */}
-            <div hidden={checkInStep !== 0}>
-              <h3 className="mb-3 text-base font-semibold text-white">What’s the name of the customer?</h3>
-              <div>
-                <input
-                  name="customer_name"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  required
-                  maxLength={120}
-                  placeholder="Search customer name"
-                  className={inputClasses}
-                />
-              </div>
-              {/* Live Query Matches from Store Database OR "+ Create" Badge */}
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                {(() => {
-                  const query = customerName.trim().toLowerCase();
-                  const matches = storePipelineCustomers.filter((c) =>
-                    !query ? true : c.toLowerCase().includes(query)
-                  );
-
-                  if (matches.length > 0) {
-                    return matches.slice(0, 10).map((name) => (
-                      <button
-                        type="button"
-                        key={name}
-                        onClick={() => setCustomerName(name)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                          customerName.toLowerCase() === name.toLowerCase()
-                            ? 'bg-orange-500/20 border-orange-500 text-orange-300'
-                            : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'
-                        }`}
-                      >
-                        {name}
-                      </button>
-                    ));
-                  }
-
-                  return (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/35 text-xs font-bold text-emerald-300">
-                      + Create &ldquo;{customerName.trim()}&rdquo; as New Walk-In Record
-                    </span>
-                  );
-                })()}
-              </div>
-            </div>
+            {checkInStep === 0 && <WalkInCustomerSearch value={customerName} customers={walkInCustomers} busy={creatingLead}
+              onChange={(name) => { setCustomerName(name); setSelectedCustomer(null); }}
+              onSelect={(customer) => { setCustomerName(customer.name); setSelectedCustomer(customer); }}
+              onCreate={() => void createWalkInLead()} />}
 
             <div hidden={checkInStep !== 1} className="space-y-3">
               <h3 className="text-base font-semibold text-white">Who’s the car for?</h3>
@@ -1211,18 +1255,7 @@ export default function LiveShowroom() {
                     <button
                       type="button"
                       key={v.vin}
-                      onClick={async () => {
-                        const res = await decodeVin(v.vin);
-                        setVehicles((prev) => ({
-                          ...prev,
-                          vehicleOfInterest: {
-                            ...res.vehicle,
-                            purpose: 'vehicle_of_interest',
-                            source: 'nhtsa-vpic',
-                            decodedAt: new Date().toISOString(),
-                          },
-                        }));
-                      }}
+                      onClick={() => setVehicles((prev) => ({ ...prev, vehicleOfInterest: lookupDemoVehicle(storeId, v.vin, 'vehicle_of_interest') }))}
                       className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                         isMatched
                           ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
@@ -1253,7 +1286,7 @@ export default function LiveShowroom() {
             {mutationError && <p className="text-xs text-red-400" role="alert">{mutationError}</p>}
             <div className="flex gap-2 border-t border-white/10 pt-3">
               {checkInStep > 0 && <button type="button" onClick={() => setCheckInStep((step) => Math.max(0, step - 1))} className="min-h-11 flex-1 rounded-xl border border-white/15 px-4 text-sm font-semibold text-gray-300">Back</button>}
-              {checkInStep < 3 ? <button type="button" disabled={checkInStep === 0 && !customerName.trim() || checkInStep === 1 && greetedPerson !== 'themselves' && !relatedCustomerName.trim()} onClick={() => setCheckInStep((step) => Math.min(3, step + 1))} className="min-h-11 flex-1 rounded-xl bg-orange-500 px-4 text-sm font-bold text-white disabled:opacity-40">Continue</button> : <button type="submit" disabled={isSubmitting || !assignedRepId} className="min-h-11 flex-1 rounded-xl bg-orange-500 px-4 text-sm font-bold text-white disabled:opacity-40">{isSubmitting ? 'Starting visit…' : 'Start visit'}</button>}
+              {checkInStep < 3 ? <button type="button" disabled={creatingLead || checkInStep === 0 && !selectedCustomer || checkInStep === 1 && greetedPerson !== 'themselves' && !relatedCustomerName.trim()} onClick={() => setCheckInStep((step) => Math.min(3, step + 1))} className="min-h-11 flex-1 rounded-xl bg-orange-500 px-4 text-sm font-bold text-white disabled:opacity-40">Continue</button> : <button type="submit" disabled={isSubmitting || !assignedRepId} className="min-h-11 flex-1 rounded-xl bg-orange-500 px-4 text-sm font-bold text-white disabled:opacity-40">{isSubmitting ? 'Starting visit…' : 'Start visit'}</button>}
             </div>
           </form>
         </div>
@@ -1277,15 +1310,9 @@ export default function LiveShowroom() {
               <button
                 type="button"
                 key={v.vin}
-                onClick={async () => {
+                onClick={() => {
                   setIsVinScannerOpen(false);
-                  const res = await decodeVin(v.vin);
-                  setComposerVehicleDraft({
-                    ...res.vehicle,
-                    purpose: 'vehicle_of_interest',
-                    source: 'nhtsa-vpic',
-                    decodedAt: new Date().toISOString(),
-                  });
+                  setComposerVehicleDraft(lookupDemoVehicle(storeId, v.vin, 'vehicle_of_interest'));
                   setComposerType('new_inventory');
                   setComposerStep(0);
                   setIsComposerOpen(true);
@@ -1322,6 +1349,7 @@ const QUICK_CHIPS: Array<{ label: string; type: ShowroomEventType }> = [
 const VISIT_STAGES = ['Greeting', 'Walk around', 'Demo Drive', 'Desking', 'Sold'] as const;
 
 function VisitPostGallery({ snapshot }: { snapshot: ShowroomVisitSnapshot }) {
+  const user = useWorkspaceUser();
   const [slides, setSlides] = useState<Array<{ event: ShowroomEvent; url: string }>>([]);
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -1329,7 +1357,7 @@ function VisitPostGallery({ snapshot }: { snapshot: ShowroomVisitSnapshot }) {
     let cancelled = false;
     const urls: string[] = [];
     void Promise.all(snapshot.events.filter((event) => event.media?.kind === 'image').map(async (event) => {
-      const blob = await getMockShowroomMedia(event.media!.id);
+      const blob = await getShowroomMedia(event.media!.id, !user);
       if (!blob) return null;
       const url = URL.createObjectURL(blob);
       urls.push(url);
@@ -1341,7 +1369,7 @@ function VisitPostGallery({ snapshot }: { snapshot: ShowroomVisitSnapshot }) {
       cancelled = true;
       urls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [snapshot.events]);
+  }, [snapshot.events, user]);
 
   useEffect(() => setActiveIndex((index) => Math.min(index, Math.max(0, slides.length - 1))), [slides.length]);
   const active = slides[activeIndex];
@@ -1388,9 +1416,8 @@ function VisitStageWizard({
   onStageEvent: (type: ShowroomEventType, message: string, photo?: File, replyToEventId?: string) => Promise<boolean>;
 }) {
   const { visit, events } = snapshot;
-  const { user: accountUser } = useAuth();
-  const user = accountUser?.demoMode ? null : accountUser;
-  const [inventory, setInventory] = useState<ApiInventoryVehicle[]>([]);
+  const user = useWorkspaceUser();
+  const [inventory, setInventory] = useState<Array<Pick<ApiInventoryVehicle, '_id' | 'vehicle' | 'stockNumber'>>>([]);
   const [selectedCars, setSelectedCars] = useState<string[]>(() => {
     const initial = vehicleTitle(visit.vehicleOfInterest);
     return initial === 'Vehicle pending VIN' ? [] : [initial];
@@ -1410,7 +1437,10 @@ function VisitStageWizard({
   const completed = [Boolean(greeting?.media), Boolean(events.find((event) => event.type === 'walkaround_started')?.media), Boolean(events.find((event) => event.type === 'test_drive_completed')?.media), Boolean(deskEvent?.media), isComplete];
 
   useEffect(() => {
-    if (!user) { setInventory([]); return; }
+    if (!user) {
+      setInventory(getStoreInventory(visit.storeId).units.filter((unit) => unit.status === 'READY_FOR_SALE').map((unit) => ({ _id: unit.vin, vehicle: unit.vehicle, stockNumber: '' })));
+      return;
+    }
     let active = true;
     apiInventoryRepository.list(visit.storeId, { status: 'READY_FOR_SALE' })
       .then((vehicles) => { if (active) setInventory(vehicles); })
@@ -1493,8 +1523,8 @@ function VisitStageWizard({
         {stage === 1 && <>
           <div>
             <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Cars the customer viewed</p>
-            {inventory.length > 0 && <fieldset className="mt-2 grid max-h-48 gap-2 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2 dark:border-white/10 dark:bg-white/4" aria-label="Choose vehicles from live inventory">
-              <legend className="sr-only">Choose vehicles from live inventory</legend>
+            {inventory.length > 0 && <fieldset className="mt-2 grid max-h-48 gap-2 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2 dark:border-white/10 dark:bg-white/4" aria-label="Choose vehicles from inventory">
+              <legend className="sr-only">Choose vehicles from inventory</legend>
               {inventory.slice(0, 24).map((vehicle) => {
                 const label = `${vehicle.vehicle}${vehicle.stockNumber ? ` · ${vehicle.stockNumber}` : ''}`;
                 const checked = selectedCars.includes(label);
@@ -1808,6 +1838,7 @@ function DedicatedVisitCockpit({
 }
 
 function TimelineEvent({ event, isLast, onReply }: { event: ShowroomEvent; isLast: boolean; onReply: (message: string) => Promise<boolean> }) {
+  const user = useWorkspaceUser();
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [reply, setReply] = useState('');
   const [replyOpen, setReplyOpen] = useState(false);
@@ -1818,7 +1849,7 @@ function TimelineEvent({ event, isLast, onReply }: { event: ShowroomEvent; isLas
     let objectUrl: string | null = null;
     let mounted = true;
     if (mediaId) {
-      void getMockShowroomMedia(mediaId).then((blob) => {
+      void getShowroomMedia(mediaId, !user).then((blob) => {
         if (!mounted || !blob) return;
         objectUrl = URL.createObjectURL(blob);
         setMediaUrl(objectUrl);
@@ -1828,7 +1859,7 @@ function TimelineEvent({ event, isLast, onReply }: { event: ShowroomEvent; isLas
       mounted = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [mediaId]);
+  }, [mediaId, user]);
 
   return (
     <li className="relative flex gap-3 pb-4 last:pb-0">

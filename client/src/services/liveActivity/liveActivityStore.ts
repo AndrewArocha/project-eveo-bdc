@@ -1,5 +1,6 @@
+import { demoStorage } from '../demo/demoSession';
 // src/services/liveActivity/liveActivityStore.ts
-import { STORE_DATA, getStoreDataOrEmpty, readStoreScopedStorage, resolveLegacyStoreDataKey, CURRENT_USER, getVisibleStoreRoster, type StoreData } from '../../data/mockDatabase';
+import { getStoreDataOrEmpty, readStoreScopedStorage, CURRENT_USER, getVisibleStoreRoster, type StoreData } from '../../data/mockDatabase';
 import type { ShowroomMediaAsset } from '../../types';
 import type { ActivityCategory, ActivityPriority, LiveActivityEvent } from '../../components/UI/LiveActivityPulse';
 
@@ -43,7 +44,7 @@ export function getPersistentStoreData(storeId: string): StoreData {
   try {
     const raw = readStoreScopedStorage(PIPELINE_STORAGE_PREFIX, storeId);
     if (!raw) {
-      localStorage.setItem(key, JSON.stringify(fallback));
+      demoStorage.setItem(key, JSON.stringify(fallback));
       return fallback;
     }
     const parsed = JSON.parse(raw) as Partial<StoreData>;
@@ -62,17 +63,9 @@ export function getPersistentStoreData(storeId: string): StoreData {
 
 export function savePersistentStoreData(storeId: string, updated: StoreData): StoreData {
   try {
-    localStorage.setItem(getPipelineStorageKey(storeId), JSON.stringify(updated));
+    demoStorage.setItem(getPipelineStorageKey(storeId), JSON.stringify(updated));
   } catch {
     // Ignore storage quota lock
-  }
-  const legacyStoreKey = resolveLegacyStoreDataKey(storeId);
-  if (STORE_DATA[legacyStoreKey]) {
-    STORE_DATA[legacyStoreKey].leads = updated.leads;
-    STORE_DATA[legacyStoreKey].handoffs = updated.handoffs;
-    STORE_DATA[legacyStoreKey].appointments = updated.appointments;
-    STORE_DATA[legacyStoreKey].sold = updated.sold;
-    STORE_DATA[legacyStoreKey].pending = updated.pending;
   }
   window.dispatchEvent(new CustomEvent('eveo:pipeline-updated', { detail: { storeId } }));
   return updated;
@@ -87,12 +80,11 @@ export async function createStoreLeadAsync(
   storeId: string,
   leadInput: { name: string; vehicle: string; notes?: string; assignee?: string }
 ): Promise<StoreData> {
-  await simulateNetwork();
   const current = getPersistentStoreData(storeId);
   const newLead = {
     id: Date.now(),
     name: leadInput.name.trim(),
-    vehicle: leadInput.vehicle.trim() || '2024 SUV',
+    vehicle: leadInput.vehicle.trim() || 'Vehicle not specified',
     time: 'Just now',
     status: 'New Lead',
     assignee: leadInput.assignee || CURRENT_USER,
@@ -118,7 +110,6 @@ export async function confirmStoreAppointmentAsync(
   storeId: string,
   apptId: number | string
 ): Promise<StoreData> {
-  await simulateNetwork();
   const current = getPersistentStoreData(storeId);
   let confirmedName = 'Customer';
   const updatedAppts = current.appointments.map((a) => {
@@ -144,7 +135,6 @@ export async function claimStoreHandoffAsync(
   storeId: string,
   handoffId: number | string
 ): Promise<StoreData> {
-  await simulateNetwork();
   const current = getPersistentStoreData(storeId);
   const target = current.handoffs.find((h) => String(h.id) === String(handoffId));
   const updatedHandoffs = current.handoffs.filter((h) => String(h.id) !== String(handoffId));
@@ -172,15 +162,15 @@ function safeWriteFeed(storeId: string, posts: LiveFeedPost[]): void {
   const key = getStorageKey(storeId);
 
   try {
-    localStorage.setItem(key, JSON.stringify(lightweight));
+    demoStorage.setItem(key, JSON.stringify(lightweight));
   } catch {
     try {
-      Object.keys(localStorage).forEach((k) => {
+      demoStorage.keys().forEach((k) => {
         if (k.startsWith('eveo_live_feed_v') && k !== key) {
-          localStorage.removeItem(k);
+          demoStorage.removeItem(k);
         }
       });
-      localStorage.setItem(key, JSON.stringify(lightweight.slice(0, 15)));
+      demoStorage.setItem(key, JSON.stringify(lightweight.slice(0, 15)));
     } catch {
       // Ignore storage lock
     }

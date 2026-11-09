@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, LoaderCircle, ScanBarcode, Search, Sparkles, X } from 'lucide-react';
 import type { ShowroomVehicleDraft, VehiclePurpose } from '../../types';
+import { demoVehicles, lookupDemoVehicle } from '../../services/demo/demoVehicle';
+import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 import { decodeVin, normalizeVin, VinLookupError } from '../../utils/nhtsaVinService';
 
 interface VehicleVinLookupFieldProps {
@@ -21,24 +23,12 @@ const FIELD_CONFIG: Record<VehiclePurpose, { title: string; description: string 
   },
 };
 
-// Real NHTSA-verifiable VIN presets for 1-tap mobile/demo testing
-const QUICK_PRESET_VINS: Record<VehiclePurpose, Array<{ label: string; vin: string }>> = {
-  vehicle_of_interest: [
-    { label: '24 Telluride', vin: '5XYP5DGC0RG412890' },
-    { label: '23 Civic Type R', vin: 'JHMFL5G40PX000412' },
-    { label: '24 F-150 Lariat', vin: '1FTFW1E84RFA10294' },
-  ],
-  trade_in: [
-    { label: '20 Accord Sport', vin: '1HGCV1F34LA012845' },
-    { label: '21 RAV4 XLE', vin: '2T3P1RFV8MW148290' },
-  ],
-};
-
 export default function VehicleVinLookupField({
   purpose,
   value,
   onChange,
 }: VehicleVinLookupFieldProps) {
+  const { isDemoWorkspace, activeStoreId } = useStoreAppearance();
   const [vin, setVin] = useState(value?.vin ?? '');
   const [modelYear, setModelYear] = useState(value?.modelYear?.toString() ?? '');
   const [isLoading, setIsLoading] = useState(false);
@@ -88,6 +78,14 @@ export default function VehicleVinLookupField({
     setIsScannerOpen(false);
 
     try {
+      if (isDemoWorkspace) {
+        const record = lookupDemoVehicle(activeStoreId, cleanedVin, purpose);
+        if (!record) throw new Error('VIN not found in demo inventory. Try a sample VIN or add a vehicle to inventory.');
+        setVin(record.vin);
+        setModelYear(record.modelYear?.toString() ?? '');
+        onChange(record);
+        return;
+      }
       const yearStr = targetYearInput !== undefined ? targetYearInput : modelYear;
       const year = yearStr.trim() ? Number(yearStr) : undefined;
       const result = await decodeVin(cleanedVin, year);
@@ -177,11 +175,11 @@ export default function VehicleVinLookupField({
             <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 h-0.5 bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,1)] animate-pulse pointer-events-none" />
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
+          {isDemoWorkspace && <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mr-1 flex items-center gap-1">
               <Sparkles size={11} className="text-orange-400" /> Quick Scan:
             </span>
-            {QUICK_PRESET_VINS[purpose].map((preset) => (
+            {demoVehicles[purpose].map((preset) => (
               <button
                 type="button"
                 key={preset.vin}
@@ -194,7 +192,7 @@ export default function VehicleVinLookupField({
                 {preset.label}
               </button>
             ))}
-          </div>
+          </div>}
         </div>
       )}
 
@@ -224,9 +222,9 @@ export default function VehicleVinLookupField({
           />
           <div className="mt-1 flex items-center justify-between">
             <span className="text-[11px] text-gray-400">{vin.length}/17 characters</span>
-            {!value && !isScannerOpen && (
+            {isDemoWorkspace && !value && !isScannerOpen && (
               <div className="flex items-center gap-1.5">
-                {QUICK_PRESET_VINS[purpose].slice(0, 2).map((preset) => (
+                {demoVehicles[purpose].slice(0, 2).map((preset) => (
                   <button
                     type="button"
                     key={preset.vin}

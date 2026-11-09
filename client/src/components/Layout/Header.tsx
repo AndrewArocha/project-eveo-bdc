@@ -12,6 +12,7 @@ export default function Header() {
   const { scrollY } = useScroll();
   const { user, isLoading, signOut } = useAuth();
   const isAuthenticated = !isLoading && Boolean(user?.emailVerifiedAt);
+  const showDemo = isAuthenticated && user?.role === 'owner' && user.demoMode;
 
   const [hidden, setHidden] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -148,13 +149,13 @@ export default function Header() {
             </>
           ) : (
             <>
-              <button
+              {showDemo && <button
                 type="button"
                 onClick={() => navigate('/app/hub')}
                 className="min-h-10 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 active:scale-95 text-xs font-bold text-white transition-all outline-none cursor-pointer"
               >
-                App <ArrowRight size={14} className="text-orange-500" />
-              </button>
+                Demo <ArrowRight size={14} className="text-orange-500" />
+              </button>}
               <button
                 type="button"
                 onClick={handleLogout}
@@ -263,7 +264,7 @@ export default function Header() {
                   >
                     <UserCircle size={24} className="text-orange-500 shrink-0" /> Profile
                   </NavLink>
-                  <button
+                  {showDemo && <button
                     type="button"
                     onClick={() => {
                       setIsMobileMenuOpen(false);
@@ -271,8 +272,8 @@ export default function Header() {
                     }}
                     className="py-5 text-left text-2xl font-black text-orange-500 transition-colors border-b border-white/5 cursor-pointer"
                   >
-                    App &rarr;
-                  </button>
+                    Demo &rarr;
+                  </button>}
                   <button
                     type="button"
                     onClick={handleLogout}

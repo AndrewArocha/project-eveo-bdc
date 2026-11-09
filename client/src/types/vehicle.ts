@@ -23,7 +23,7 @@ export interface VehicleSpecifications {
  */
 export interface ShowroomVehicleDraft extends VehicleSpecifications {
   purpose: VehiclePurpose;
-  source: 'nhtsa-vpic';
+  source: 'nhtsa-vpic' | 'demo';
   decodedAt: string;
 }
 

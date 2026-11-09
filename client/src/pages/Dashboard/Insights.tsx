@@ -1,23 +1,29 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowUp, Check, RotateCcw, Sparkles } from 'lucide-react';
+import { ArrowUp, Check, History, Plus, Sparkles } from 'lucide-react';
 import Mascot from '../../components/insights/EveoMascot';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useInsightsSuite, type InsightCardSchema } from '../../hooks/useInsightsSuite';
 
 export default function Insights() {
-  const { activeStoreId, activeStore } = useStoreAppearance();
-  const { role, user } = useAuth();
-  const { activeUser, cards, hubDigest, messages, isLoading, loadError, sendPrompt, markPreviewReviewed, clearThread } = useInsightsSuite(activeStoreId, role);
+  const { activeStoreId, isDemoWorkspace } = useStoreAppearance();
+  const { user } = useAuth();
+  return <StoreInsights key={`${user?.id}:${activeStoreId}:${isDemoWorkspace}`} />;
+}
+
+function StoreInsights() {
+  const { activeStoreId, activeStore, isDemoWorkspace } = useStoreAppearance();
+  const { role } = useAuth();
+  const { activeUser, cards, hubDigest, messages, isLoading, loadError, sendPrompt, markPreviewReviewed, pendingId, conversations, activeConversation, selectConversation } = useInsightsSuite(activeStoreId, role);
   const [chatInput, setChatInput] = useState('');
   const [flashKey, setFlashKey] = useState('');
   const [showDemoActions, setShowDemoActions] = useState(false);
-  const isDemoWorkspace = !user || user.demoMode;
+  const [historyOpen, setHistoryOpen] = useState(false);
   const flashSequence = useRef(0);
   const endOfThreadRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { endOfThreadRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
+  useEffect(() => { endOfThreadRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [activeConversation, messages.length]);
 
   const askAbout = (card: InsightCardSchema) => {
     flashSequence.current += 1;
@@ -27,14 +33,14 @@ export default function Insights() {
 
   const submitChat = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!chatInput.trim()) return;
+    if (!chatInput.trim() || pendingId) return;
     void sendPrompt(chatInput);
     setChatInput('');
   };
 
   const priorityCard = cards.find((card) => card.hasWarningPoint) || cards[0];
   const demoActionCards = <div className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-3 sm:grid-cols-3">
-    {cards.map((card) => <button type="button" key={card.id} onClick={() => askAbout(card)} disabled={isLoading} className="group min-h-32 rounded-2xl border border-gray-200 bg-white/80 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-orange-500/40 hover:shadow-md disabled:cursor-wait disabled:opacity-70 dark:border-white/10 dark:bg-white/[0.035] dark:hover:bg-white/[0.06]">
+    {cards.map((card) => <button type="button" key={card.id} onClick={() => askAbout(card)} disabled={isLoading || Boolean(pendingId)} className="group min-h-32 rounded-2xl border border-gray-200 bg-white/80 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-orange-500/40 hover:shadow-md disabled:cursor-wait disabled:opacity-70 dark:border-white/10 dark:bg-white/[0.035] dark:hover:bg-white/[0.06]">
       <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-gray-900 dark:text-gray-100">{card.title}</span>{card.hasWarningPoint && <span className="h-2 w-2 rounded-full bg-orange-500" aria-label="Needs attention" />}</div>
       <div className="mt-3 flex items-baseline gap-2"><span className="text-2xl font-semibold tracking-tight text-gray-950 dark:text-white">{card.metricValue}</span><span className="text-[11px] text-gray-500 dark:text-gray-400">{card.metricSublabel}</span></div>
       <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-gray-500 dark:text-gray-400">{card.summary}</p>
@@ -60,16 +66,15 @@ export default function Insights() {
             <h1 className="truncate text-lg font-semibold tracking-tight text-gray-950 dark:text-white">E.V.E. Insights</h1>
           </div>
         </div>
-        {messages.length > 0 && (
-          <button type="button" onClick={clearThread} className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-3.5 text-xs font-semibold text-gray-600 transition hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10">
-            <RotateCcw size={13} /> Reset chat
-          </button>
-        )}
+        <button type="button" aria-expanded={historyOpen} aria-controls="eve-conversations" onClick={() => setHistoryOpen((visible) => !visible)} className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-3.5 text-xs font-semibold text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 lg:hidden">
+          <History size={15} /> History
+        </button>
       </header>
 
-      <div className="mx-auto flex w-full max-w-5xl flex-1 min-h-0 flex-col overflow-hidden">
+      <div className="relative mx-auto flex w-full max-w-6xl flex-1 min-h-0 gap-4">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <section className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-4">
-          <div className={`relative mx-auto flex w-full max-w-4xl flex-col items-center gap-2 py-3 sm:py-5 ${isDemoWorkspace ? 'justify-center' : ''}`}>
+          {messages.length === 0 && <div className={`relative mx-auto flex w-full max-w-4xl flex-col items-center gap-2 py-3 sm:py-5 ${isDemoWorkspace ? 'justify-center' : ''}`}>
             {isDemoWorkspace ? <>
               <div className="relative z-20 w-full max-w-xl rounded-2xl border border-gray-200 bg-white/95 p-4 text-center shadow-lg dark:border-white/10 dark:bg-[#0d121a]/95 sm:p-5">
                 <p className="text-sm font-semibold text-gray-900 dark:text-white">Hi! I’m E.V.E. {priorityCard ? `I recommend starting with ${priorityCard.actionLabel.toLowerCase()}.` : 'Choose a demo function to explore.'}</p>
@@ -100,7 +105,7 @@ export default function Insights() {
             <div className="relative z-20 -mt-1 w-full max-w-2xl rounded-3xl border border-gray-200 bg-white/95 p-5 shadow-[0_18px_55px_rgba(15,23,42,0.09)] dark:border-white/10 dark:bg-[#0d121a]/95 dark:shadow-[0_18px_55px_rgba(0,0,0,0.35)] sm:px-7 sm:py-6">
               <div className="mb-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                 <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-500">E.V.E.</span>
-                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">{user ? 'Live store data' : 'Sample workspace'}</span>
+                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Live store data</span>
                 <span className="text-[10px] text-gray-500 dark:text-gray-400">{activeUser.firstName} · {activeUser.roleBadge}</span>
               </div>
               <h2 className="text-center text-xl font-semibold tracking-tight text-gray-950 dark:text-white sm:text-left">{hubDigest.title}</h2>
@@ -110,11 +115,11 @@ export default function Insights() {
               </p>
             </div>
             </>}
-          </div>
+          </div>}
 
           {loadError && <p role="alert" className="mx-auto mb-3 w-full max-w-2xl rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-800 dark:text-amber-200">{loadError}</p>}
 
-          {!isDemoWorkspace && demoActionCards}
+          {!isDemoWorkspace && messages.length === 0 && demoActionCards}
 
           {messages.length > 0 && (
             <div className="mx-auto mt-5 flex w-full max-w-4xl flex-col gap-3">
@@ -131,7 +136,7 @@ export default function Insights() {
                   )}
                 </article>
               ))}
-              {isLoading && <p className="text-xs text-gray-500" role="status">E.V.E. is checking the store records…</p>}
+              {pendingId === activeConversation && pendingId && <p className="text-xs text-gray-500" role="status">E.V.E. is checking the store records…</p>}
               <div ref={endOfThreadRef} />
             </div>
           )}
@@ -147,13 +152,25 @@ export default function Insights() {
             aria-label="Ask E.V.E. about your dealership"
             className="max-h-28 min-h-11 flex-1 resize-y bg-transparent px-3 py-2 text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-white dark:placeholder:text-gray-500"
           />
-          <button type="submit" disabled={!chatInput.trim() || isLoading} aria-label="Send message" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-orange-500 text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-45">
+          <button type="submit" disabled={!chatInput.trim() || isLoading || Boolean(pendingId)} aria-label="Send message" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-orange-500 text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-45">
             <ArrowUp size={18} />
           </button>
         </form>
         <p className="mx-auto mt-2 w-full max-w-4xl px-1 text-[10px] text-gray-500 dark:text-gray-400">
-          {user ? 'Live dealership records · AI analysis is optional.' : 'Preview mode · sign in to use dealership records.'}
+          E.V.E. chat is temporary. Conversations are cleared after 8 hours or when this tab closes.
         </p>
+      </div>
+      <aside id="eve-conversations" aria-label="E.V.E. conversations" className={`${historyOpen ? 'flex' : 'hidden'} absolute inset-y-0 right-0 z-30 w-64 max-w-[85vw] flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg dark:border-white/10 dark:bg-[#0d121a] lg:static lg:flex lg:shrink-0`}>
+        <button type="button" onClick={() => { selectConversation(null); setChatInput(''); setHistoryOpen(false); }} className="flex min-h-10 items-center gap-2 rounded-xl bg-orange-500 px-3 text-left text-sm font-semibold text-white hover:bg-orange-600">
+          <Plus size={16} /> New chat
+        </button>
+        <h2 className="px-1 text-xs font-semibold text-gray-500 dark:text-gray-400">Conversations</h2>
+        <ul className="min-h-0 space-y-1 overflow-y-auto">
+          {conversations.map((thread) => <li key={thread.id}>
+            <button type="button" aria-current={activeConversation === thread.id ? 'true' : undefined} onClick={() => { selectConversation(thread.id); setChatInput(''); setHistoryOpen(false); }} className="w-full truncate rounded-lg px-3 py-2 text-left text-sm hover:bg-orange-500/10 aria-current:bg-orange-500/15">{thread.title}</button>
+          </li>)}
+        </ul>
+      </aside>
       </div>
     </main>
   );
