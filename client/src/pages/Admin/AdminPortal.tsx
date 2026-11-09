@@ -129,7 +129,7 @@ export default function AdminPortal() {
             onClick={() => navigate('/app/hub')}
             className="min-h-11 px-4 sm:px-5 py-2.5 bg-white/10 hover:bg-white/15 active:scale-[0.98] text-white text-xs sm:text-sm font-bold rounded-xl transition-all border border-white/10 flex items-center justify-center gap-2 group outline-none cursor-pointer"
           >
-            <span>Workspace</span>
+            <span>App</span>
             <ExternalLink size={15} className="text-orange-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform shrink-0" />
           </button>
         </div>

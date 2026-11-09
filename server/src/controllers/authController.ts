@@ -1,10 +1,10 @@
 import type { RequestHandler } from 'express';
-import { acceptUserInvitation, signIn, submitSignupApplication } from '../services/authService.js';
+import { acceptUserInvitation, createOwnerAccount, signIn } from '../services/authService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 export const signup: RequestHandler = asyncHandler(async (request, response) => {
-  const application = await submitSignupApplication(request.body);
-  response.status(201).json({ data: application });
+  const session = await createOwnerAccount(request.body);
+  response.status(201).json({ data: session });
 });
 
 export const signin: RequestHandler = asyncHandler(async (request, response) => {

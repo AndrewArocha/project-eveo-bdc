@@ -8,6 +8,7 @@ interface AuthContextType {
   user: ApiUser | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signUp: (input: { name: string; businessName: string; phone: string; email: string; password: string }) => Promise<void>;
   acceptInvitation: (input: { token: string; name: string; password: string }) => Promise<void>;
   refreshUser: () => Promise<ApiUser>;
   signOut: () => void;
@@ -65,6 +66,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     acceptSession(session);
   }, [acceptSession]);
 
+  const signUp = useCallback(async (input: { name: string; businessName: string; phone: string; email: string; password: string }) => {
+    const session = await apiRequest<SessionResponse>('/auth/signup', {
+      method: 'POST', body: JSON.stringify(input),
+    });
+    acceptSession(session);
+  }, [acceptSession]);
+
   const acceptInvitation = useCallback(async (input: { token: string; name: string; password: string }) => {
     const session = await apiRequest<SessionResponse>('/auth/accept-invitation', {
       method: 'POST', body: JSON.stringify(input),
@@ -93,8 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ role, setRole, user, isLoading, signIn, acceptInvitation, refreshUser, signOut }),
-    [role, setRole, user, isLoading, signIn, acceptInvitation, refreshUser, signOut],
+    () => ({ role, setRole, user, isLoading, signIn, signUp, acceptInvitation, refreshUser, signOut }),
+    [role, setRole, user, isLoading, signIn, signUp, acceptInvitation, refreshUser, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

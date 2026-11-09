@@ -12,12 +12,14 @@ export default function Insights() {
   const { activeUser, cards, hubDigest, messages, isLoading, loadError, sendPrompt, markPreviewReviewed, clearThread } = useInsightsSuite(activeStoreId, role);
   const [chatInput, setChatInput] = useState('');
   const [flashKey, setFlashKey] = useState('');
+  const flashSequence = useRef(0);
   const endOfThreadRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { endOfThreadRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
 
   const askAbout = (card: InsightCardSchema) => {
-    setFlashKey(`${card.id}_${Date.now()}`);
+    flashSequence.current += 1;
+    setFlashKey(`${card.id}_${flashSequence.current}`);
     void sendPrompt(card.promptTemplate, card);
   };
 

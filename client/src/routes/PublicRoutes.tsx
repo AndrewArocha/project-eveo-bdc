@@ -11,11 +11,11 @@ import AcceptInvitation from '../pages/Auth/AcceptInvitation';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function PublicRoutes() {
-  const { user, isLoading } = useAuth();
+  const { user, role, isLoading } = useAuth();
 
   // Logged-in users should never see unauthenticated public pages
   if (user && !isLoading) {
-    return <Navigate to="/app/hub" replace />;
+    return <Navigate to={role === 'owner' ? '/admin/portal' : '/app/hub'} replace />;
   }
 
   return (

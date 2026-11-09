@@ -173,7 +173,7 @@ export function useInsightsSuite(storeId: string, roleOverride?: UserRole | stri
       inputPlaceholder: 'Ask about leads, appointments, inventory, or staffing…',
       faqs: ['Which open lead needs attention first?', 'Which appointment needs confirmation?', 'How many vehicles are ready for sale?'],
     };
-  }, [effectiveRole, firstName, fullName, pendingAppointments.length, unassignedLeads.length]);
+  }, [effectiveRole, firstName, fullName]);
 
   const dataAvailable = !user || (hasLoaded && !loadError);
   const cards = useMemo<InsightCardSchema[]>(() => [

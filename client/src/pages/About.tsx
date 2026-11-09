@@ -110,7 +110,7 @@ export default function About() {
               <img
                 src={Andres}
                 alt="Andres Hernandez - Manager and Full-Stack Developer"
-                className={`absolute inset-0 w-full h-full object-cover object-top transition-all duration-1000 ease-out md:grayscale ${hoveredPath === 'andres' ? 'md:scale-105 md:opacity-60' : 'scale-100 opacity-45 md:opacity-20'}`}
+                className={`absolute inset-0 w-full h-full object-cover object-[center_34%] transition-all duration-1000 ease-out md:grayscale ${hoveredPath === 'andres' ? 'md:scale-105 md:opacity-60' : 'scale-100 opacity-45 md:opacity-20'}`}
               />
               <div className={`absolute inset-0 bg-linear-to-t from-[#05080c] via-[#05080c]/55 to-[#05080c]/90 transition-opacity duration-700 ${hoveredPath === 'andres' ? 'md:opacity-30' : 'opacity-65 md:opacity-100'}`} />
 

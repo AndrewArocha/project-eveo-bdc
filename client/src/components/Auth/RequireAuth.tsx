@@ -12,9 +12,13 @@ export default function RequireAuth({ children }: { children: JSX.Element }) {
     return <div className="min-h-screen grid place-items-center bg-[#05080c] text-sm text-gray-300" role="status">Restoring your EVEO session…</div>;
   }
 
-  if (!user) {
+  if (!user && !location.pathname.startsWith('/app/')) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
+
+  // The signed-out workspace is an isolated, sample-data preview. Authenticated
+  // routes continue to use the tenant-scoped repositories below.
+  if (!user) return children;
 
   if (storesLoading) {
     return <div className="min-h-screen grid place-items-center bg-[#05080c] text-sm text-gray-300" role="status">Loading your store registry…</div>;

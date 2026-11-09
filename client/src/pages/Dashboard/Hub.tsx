@@ -29,6 +29,7 @@ interface HomeProps {
 }
 
 export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dealership' }: HomeProps) {
+  const [now, setNow] = useState(0);
   const { role, user } = useAuth();
   const [expanded, setExpanded] = useState<ExpandedCard>(null);
   const [isSwitchingStore, setIsSwitchingStore] = useState(false);
@@ -87,6 +88,12 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
   const liveApptCount = storeData.appointments.length;
 
   const navigate = useNavigate();
+  useEffect(() => {
+    const updateClock = () => setNow(Date.now());
+    updateClock();
+    const timer = window.setInterval(updateClock, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const kpiValue = role === 'bdc' ? 42 : role === 'sales' ? 65 : 82;
   const seenKey = `eveo-seen-priorities:${user?.id || 'demo'}:${activeStore.id}`;
   useEffect(() => {
@@ -99,7 +106,7 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
   const priorityIds = [
     ...storeData.leads.filter((lead) => !lead.assignee).map((lead) => `lead:${lead.id}`),
     ...storeData.leads
-      .filter((lead) => lead.status?.toLowerCase() === 'new' && Number.isFinite(Date.parse(lead.time)) && Date.now() - Date.parse(lead.time) >= 60_000)
+      .filter((lead) => lead.status?.toLowerCase() === 'new' && Number.isFinite(Date.parse(lead.time)) && now - Date.parse(lead.time) >= 60_000)
       .map((lead) => `lead:handle:${lead.id}`),
     ...storeData.appointments.filter((appointment) => appointment.status === 'pending_confirmation' || appointment.status === 'Pending Confirm').map((appointment) => `appointment:${appointment.id}`),
     ...storeData.handoffs.map((visit) => `visit:${visit.id}`),

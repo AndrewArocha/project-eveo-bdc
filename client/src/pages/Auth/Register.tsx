@@ -1,20 +1,16 @@
 import { useState, type FormEvent } from 'react';
 import { motion } from 'framer-motion';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { CheckCircle2 } from 'lucide-react';
 import eveoSymbol from '../../images/logo/eveo-symbol.svg';
-import { apiRequest } from '../../services/apiClient';
-
-interface ApplicationResponse {
-  status: 'submitted';
-  submittedAt: string;
-}
+import { useAuth } from '../../contexts/AuthContext';
+import LegalModal from '../../components/UI/LegalModal';
 
 export default function Register() {
   const navigate = useNavigate();
+  const { signUp } = useAuth();
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [legalType, setLegalType] = useState<'terms' | 'privacy' | null>(null);
 
   const handleRegister = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -22,16 +18,14 @@ export default function Register() {
     setIsSubmitting(true);
     const form = new FormData(event.currentTarget);
     try {
-      await apiRequest<ApplicationResponse>('/auth/signup', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: String(form.get('name')).trim(),
-          businessName: String(form.get('businessName')).trim(),
-          phone: String(form.get('phone')).trim(),
-          email: String(form.get('email')).trim(),
-        }),
+      await signUp({
+        name: String(form.get('name')).trim(),
+        businessName: String(form.get('businessName')).trim(),
+        phone: String(form.get('phone')).trim(),
+        email: String(form.get('email')).trim(),
+        password: String(form.get('password')),
       });
-      setSubmitted(true);
+      navigate('/admin/portal', { replace: true });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'We could not submit your request. Please try again.');
     } finally {
@@ -54,28 +48,13 @@ export default function Register() {
             <img src={eveoSymbol} alt="EVEO" className="w-7 h-7" />
           </div>
           <h1 className="text-center text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-            {submitted ? 'Request received' : 'Bring your dealership to EVEO'}
+            Create your EVEO account
           </h1>
           <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            {submitted
-              ? 'Our team will contact you about membership and secure billing setup.'
-              : <>Already have an account? <NavLink to="/login" className="font-semibold text-orange-500 hover:text-orange-400">Sign in</NavLink></>}
+            <>Set up your dealership workspace. You can complete your profile and billing from the admin portal. Already have an account? <NavLink to="/login" className="font-semibold text-orange-500 hover:text-orange-400">Sign in</NavLink></>
           </p>
         </div>
 
-        {submitted ? (
-          <div className="space-y-5 text-center">
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-500">
-              <CheckCircle2 size={28} />
-            </div>
-            <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300">
-              This request does not create a login, activate a dealership workspace, or start a trial. Workspace access begins after membership and billing are set up.
-            </p>
-            <button type="button" onClick={() => navigate('/')} className="w-full min-h-12 rounded-xl bg-orange-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-orange-600">
-              Return to EVEO
-            </button>
-          </div>
-        ) : (
           <form className="space-y-4" onSubmit={(event) => void handleRegister(event)}>
             {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">{error}</p>}
 
@@ -95,16 +74,27 @@ export default function Register() {
               <label htmlFor="email" className="mb-1.5 ml-1 block text-xs font-semibold text-gray-700 dark:text-gray-300">Work email</label>
               <input id="email" name="email" type="email" autoComplete="email" required maxLength={254} className={inputClasses} />
             </div>
+            <div>
+              <label htmlFor="password" className="mb-1.5 ml-1 block text-xs font-semibold text-gray-700 dark:text-gray-300">Password</label>
+              <input id="password" name="password" type="password" autoComplete="new-password" required minLength={12} maxLength={128} className={inputClasses} />
+              <p className="mt-1 ml-1 text-xs text-gray-500">At least 12 characters.</p>
+            </div>
 
             <p className="px-1 pt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-              Membership activation and any trial terms are confirmed during secure billing setup. Submitting this request does not start a trial.
+              Your workspace opens now. Membership activation and billing are handled separately in the admin portal; creating an account does not start a trial or authorize a charge.
+            </p>
+            <p className="px-1 text-center text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+              By creating an account, you agree to our{' '}
+              <button type="button" onClick={() => setLegalType('terms')} className="font-semibold text-orange-500 hover:text-orange-400">Terms of Service</button>
+              {' '}and{' '}
+              <button type="button" onClick={() => setLegalType('privacy')} className="font-semibold text-orange-500 hover:text-orange-400">Privacy Policy</button>.
             </p>
             <button type="submit" disabled={isSubmitting} className="mt-2 w-full min-h-13 rounded-xl bg-orange-500 py-3.5 text-sm font-bold text-white shadow-lg transition hover:bg-orange-600 hover:shadow-orange-500/25 disabled:cursor-wait disabled:opacity-60">
-              {isSubmitting ? 'Sending request…' : 'Request dealership access'}
+              {isSubmitting ? 'Creating account…' : 'Create account and continue'}
             </button>
           </form>
-        )}
       </motion.div>
+      <LegalModal isOpen={legalType !== null} onClose={() => setLegalType(null)} type={legalType} />
     </div>
   );
 }

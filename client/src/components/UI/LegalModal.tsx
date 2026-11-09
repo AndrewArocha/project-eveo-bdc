@@ -13,7 +13,7 @@ export default function LegalModal({ isOpen, onClose, type }: LegalModalProps) {
 
   return (
     <SwipeableModal isOpen={isOpen} onClose={onClose} layoutId="legal-modal">
-      <div className="flex flex-col h-full bg-[#0a0f16] text-gray-300 relative">
+      <div className="flex flex-col h-full min-h-0 bg-[#0a0f16] text-gray-300 relative">
         <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-orange-500 to-orange-400" />
         
         {/* Header */}
@@ -30,7 +30,7 @@ export default function LegalModal({ isOpen, onClose, type }: LegalModalProps) {
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5 text-sm leading-relaxed">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-6 space-y-5 text-sm leading-relaxed">
           <p className="font-mono text-xs text-orange-400 mb-2">Effective Date: October 9, 2026 | Version 1.0-ENTERPRISE</p>
           
           {type === 'terms' ? (

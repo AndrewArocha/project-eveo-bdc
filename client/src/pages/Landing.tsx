@@ -1,12 +1,12 @@
 // src/pages/Landing.tsx
 import { useState } from 'react';
 import { motion, type Variants } from 'framer-motion';
-import { Activity, Shield, CheckCircle2, PlayCircle, Calendar, X, Sparkles } from 'lucide-react';
+import { Activity, Shield, CheckCircle2, PlayCircle, Calendar, X, Sparkles, ChevronDown } from 'lucide-react';
 
 import SwipeableModal from '../components/UI/SwipeableModal';
 
 // Assets
-import eveoSymbol from '../images/logo/eveo-symbol.svg';
+import eveoWordmark from '../images/logo/eveo-text.svg';
 import bgSunset from '../images/landing/sunset-lot.jpeg';
 import bgBlueSky from '../images/landing/blue-sky-lot.jpeg';
 import bgOffice from '../images/landing/office-desks.jpeg';
@@ -15,6 +15,8 @@ import bgRoster from '../images/landing/agent-roster-view.png';
 
 export default function Landing() {
   const [showcaseOpen, setShowcaseOpen] = useState(false);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [faqOpen, setFaqOpen] = useState(false);
 
   const fadeUp: Variants = {
     hidden: { opacity: 0, y: 24 },
@@ -34,7 +36,7 @@ export default function Landing() {
       <div className="flex-1 flex flex-col z-10 pt-16 sm:pt-10">
 
         {/* Hero Section */}
-        <section className="relative flex flex-col items-center justify-center min-h-[82vh] sm:min-h-[85vh] px-5 sm:px-6 py-12 text-center w-full overflow-hidden">
+        <section className="relative flex flex-col items-center justify-center min-h-[82vh] sm:min-h-[85vh] px-5 sm:px-6 pt-12 pb-[12vh] text-center w-full overflow-hidden">
           <div className="absolute inset-0 z-0 pointer-events-none">
             <img
               src={bgSunset}
@@ -51,18 +53,16 @@ export default function Landing() {
             animate="visible"
             variants={{ visible: { transition: { staggerChildren: 0.15 } } }}
           >
-            {/* Enterprise Dealership OS Badge with EVEO Logo */}
-            <motion.span
+            <motion.div
               variants={fadeUp}
-              className="px-4 py-1.5 rounded-full bg-[#0a0f16]/90 border border-orange-500/35 text-orange-400 text-[11px] sm:text-xs font-bold uppercase tracking-widest mb-5 sm:mb-6 inline-flex items-center gap-2.5 backdrop-blur-md shadow-[0_0_20px_rgba(249,115,22,0.2)]"
+              className="mb-7 sm:mb-9 flex justify-center"
             >
-              <img src={eveoSymbol} alt="EVEO Brand Symbol" className="w-4 h-4 object-contain" />
-              <span>Enterprise Dealership OS</span>
-            </motion.span>
+              <img src={eveoWordmark} alt="EVEO" className="h-10 sm:h-14 w-auto object-contain" />
+            </motion.div>
 
             <motion.h1
               variants={fadeUp}
-              className="text-4xl sm:text-5xl md:text-7xl font-black tracking-tight mb-5 sm:mb-6 leading-[1.1] drop-shadow-2xl"
+                className="text-4xl sm:text-5xl md:text-7xl font-black tracking-tight mb-5 sm:mb-6 leading-[1.1] drop-shadow-2xl"
             >
               Stop losing deals to the <br className="hidden md:block" />
               <span className="text-transparent bg-clip-text bg-linear-to-r from-orange-400 to-orange-600 drop-shadow-none">
@@ -91,7 +91,7 @@ export default function Landing() {
               </button>
               <button
                 type="button"
-                onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+                onClick={() => setDemoOpen(true)}
                 className="w-full sm:w-auto min-h-12 px-6 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-sm sm:text-base transition-all shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 outline-none cursor-pointer"
               >
                 <Calendar size={18} /> Request Live Demo
@@ -290,8 +290,8 @@ export default function Landing() {
           </motion.div>
         </section>
 
-        {/* Demo Request Form - Matching HubModals Form & Card */}
-        <section id="contact" className="px-4 sm:px-6 pb-24 sm:pb-32 pt-6 sm:pt-10 w-full max-w-2xl mx-auto relative">
+        {/* Contact form and FAQ entry */}
+        <section id="contact" className="scroll-mt-24 px-4 sm:px-6 pb-24 sm:pb-32 pt-6 sm:pt-10 w-full max-w-2xl mx-auto relative">
           <motion.div
             initial="hidden"
             whileInView="visible"
@@ -301,21 +301,19 @@ export default function Landing() {
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-bold uppercase tracking-widest text-orange-500">
-                Schedule Walkthrough
+                Contact us
               </span>
               <span className="w-2 h-2 rounded-full bg-orange-500" />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-white mb-2">Ready to scale your floor?</h2>
-            <p className="text-gray-400 mb-6 sm:mb-8 text-xs sm:text-sm">
-              Leave your details below to schedule a Live Demo with our operations team.
-            </p>
+            <h2 className="text-2xl sm:text-3xl font-black text-white mb-2">Have any additional questions?</h2>
+            <button type="button" onClick={() => setFaqOpen(true)} className="text-left text-gray-400 hover:text-orange-300 mb-6 sm:mb-8 text-xs sm:text-sm underline underline-offset-4 decoration-white/20">Check our FAQ</button>
 
             <form className="flex flex-col gap-4 text-left" onSubmit={(e) => e.preventDefault()}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="demo-first-name" className="text-xs font-bold text-gray-400 ml-1">First Name</label>
+                <label htmlFor="contact-first-name" className="text-xs font-bold text-gray-400 ml-1">First Name</label>
                   <input
-                    id="demo-first-name"
+                    id="contact-first-name"
                     type="text"
                     autoComplete="given-name"
                     className="w-full min-h-11 px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 focus:border-orange-500 outline-none transition-colors text-sm text-white"
@@ -323,9 +321,9 @@ export default function Landing() {
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="demo-last-name" className="text-xs font-bold text-gray-400 ml-1">Last Name</label>
+                <label htmlFor="contact-last-name" className="text-xs font-bold text-gray-400 ml-1">Last Name</label>
                   <input
-                    id="demo-last-name"
+                    id="contact-last-name"
                     type="text"
                     autoComplete="family-name"
                     className="w-full min-h-11 px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 focus:border-orange-500 outline-none transition-colors text-sm text-white"
@@ -335,9 +333,9 @@ export default function Landing() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="demo-email" className="text-xs font-bold text-gray-400 ml-1">Work Email</label>
+                <label htmlFor="contact-email" className="text-xs font-bold text-gray-400 ml-1">Work Email</label>
                 <input
-                  id="demo-email"
+                  id="contact-email"
                   type="email"
                   autoComplete="email"
                   className="w-full min-h-11 px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 focus:border-orange-500 outline-none transition-colors text-sm text-white"
@@ -346,22 +344,16 @@ export default function Landing() {
               </div>
 
               <div className="flex flex-col gap-1.5 mb-2">
-                <label htmlFor="demo-volume" className="text-xs font-bold text-gray-400 ml-1">Monthly Lead Volume</label>
-                <select
-                  id="demo-volume"
-                  className="w-full min-h-11 px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 focus:border-orange-500 outline-none transition-colors text-sm text-white appearance-none cursor-pointer"
-                >
-                  <option value="0-500" className="bg-[#0a0f16]">0 - 500 leads</option>
-                  <option value="500-1500" className="bg-[#0a0f16]">500 - 1,500 leads</option>
-                  <option value="1500+" className="bg-[#0a0f16]">1,500+ leads</option>
-                </select>
+                <label htmlFor="contact-message" className="text-xs font-bold text-gray-400 ml-1">Your question</label>
+                <textarea id="contact-message" maxLength={1000} rows={5} placeholder="Tell us a little about what you need… (1000 characters max)" className="w-full px-3.5 py-3 rounded-xl bg-black/40 border border-white/15 focus:border-orange-500 outline-none transition-colors text-sm text-white resize-y" />
+                <span className="text-right text-[11px] text-gray-500">Up to 1000 characters</span>
               </div>
 
               <button
                 type="submit"
                 className="w-full min-h-11 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-bold text-sm transition-all shadow-md shadow-orange-500/20 outline-none flex justify-center items-center gap-2 mt-1 cursor-pointer"
               >
-                <Calendar size={16} /> Request Live Demo
+                Contact us
               </button>
             </form>
           </motion.div>
@@ -369,11 +361,47 @@ export default function Landing() {
 
       </div>
 
+      <SwipeableModal isOpen={demoOpen} onClose={() => setDemoOpen(false)} layoutId="demo-request-modal" maxWidthClass="md:max-w-2xl">
+        <div className="flex flex-col h-full min-h-0">
+          <div className="px-5 py-5 sm:px-8 border-b border-white/10 shrink-0 flex items-start justify-between gap-4">
+            <div><span className="text-[10px] font-bold uppercase tracking-widest text-orange-500">Schedule walkthrough</span><h2 className="mt-1 text-2xl font-black text-white">Ready to scale your floor?</h2><p className="mt-2 text-sm text-gray-400">Leave your details below to schedule a Live Demo with our operations team.</p></div>
+            <button type="button" aria-label="Close demo request" onClick={() => setDemoOpen(false)} className="rounded-lg p-2 text-gray-400 hover:bg-white/10 hover:text-white"><X size={20} /></button>
+          </div>
+          <form className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-8 flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="text-xs font-bold text-gray-400">First Name<input required autoComplete="given-name" className="mt-1.5 w-full min-h-11 px-3.5 rounded-xl bg-black/40 border border-white/15 focus:border-orange-500 outline-none text-sm text-white" /></label>
+              <label className="text-xs font-bold text-gray-400">Last Name<input required autoComplete="family-name" className="mt-1.5 w-full min-h-11 px-3.5 rounded-xl bg-black/40 border border-white/15 focus:border-orange-500 outline-none text-sm text-white" /></label>
+            </div>
+            <label className="text-xs font-bold text-gray-400">Work Email<input required type="email" autoComplete="email" className="mt-1.5 w-full min-h-11 px-3.5 rounded-xl bg-black/40 border border-white/15 focus:border-orange-500 outline-none text-sm text-white" /></label>
+            <label className="text-xs font-bold text-gray-400">Monthly Lead Volume<select required defaultValue="0-500" className="mt-1.5 w-full min-h-11 px-3.5 rounded-xl bg-black/40 border border-white/15 focus:border-orange-500 outline-none text-sm text-white"><option value="0-500" className="bg-[#0a0f16]">0 - 500 leads</option><option value="500-1500" className="bg-[#0a0f16]">500 - 1,500 leads</option><option value="1500+" className="bg-[#0a0f16]">1,500+ leads</option></select></label>
+            <button type="submit" className="w-full min-h-12 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm flex items-center justify-center gap-2"><Calendar size={16} /> Request Live Demo</button>
+          </form>
+        </div>
+      </SwipeableModal>
+
+      <SwipeableModal isOpen={faqOpen} onClose={() => setFaqOpen(false)} layoutId="faq-modal" maxWidthClass="md:max-w-3xl">
+        <div className="flex flex-col h-full min-h-0">
+          <div className="flex items-center justify-between gap-4 px-5 py-5 sm:px-8 border-b border-white/10 shrink-0"><div><span className="text-[10px] font-bold uppercase tracking-widest text-orange-500">EVEO answers</span><h2 className="mt-1 text-2xl font-black text-white">Frequently asked questions</h2></div><button type="button" aria-label="Close FAQ" onClick={() => setFaqOpen(false)} className="rounded-lg p-2 text-gray-400 hover:bg-white/10 hover:text-white"><X size={20} /></button></div>
+          <div className="min-h-0 overflow-y-auto overscroll-contain p-5 sm:p-8 space-y-5">
+            {[
+              ['What does EVEO do?', 'EVEO combines dealership workflow software with BDC operations to organize lead follow-up, showroom activity, appointments, and inventory insights.'],
+              ['Can I explore the app before becoming a customer?', 'Yes. The App preview uses sample dealership data so you can explore the interface. AI features and live dealership integrations require the full product.'],
+              ['Does requesting a demo start a trial or charge me?', 'No. A demo request does not create a subscription, start a trial, or authorize a payment. Plan and billing details are shown during secure setup.'],
+              ['Can EVEO connect to my CRM?', 'CRM and inventory integrations depend on your provider and account access. The EVEO team confirms compatibility during onboarding.'],
+              ['How is dealership data handled?', 'Dealerships retain ownership of their customer and operational data. Review the Privacy Policy for the current data handling details.'],
+              ['Does EVEO include AI?', 'AI-assisted insights are part of the full EVEO product. The public demo contains sample information and does not run live dealership AI operations.'],
+              ['How do I get started?', 'Request a live demo or create an account to begin dealership setup. Membership and billing terms are confirmed before activation.'],
+            ].map(([question, answer]) => <details key={question} className="group rounded-xl border border-white/10 bg-white/[0.03] p-4"><summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-bold text-white">{question}<ChevronDown size={18} className="shrink-0 text-orange-400 transition-transform group-open:rotate-180" /></summary><p className="mt-3 text-sm leading-relaxed text-gray-400">{answer}</p></details>)}
+          </div>
+        </div>
+      </SwipeableModal>
+
       {/* --- SHOWCASE MODAL (Matching HubModals Header + Body inside SwipeableModal) --- */}
       <SwipeableModal
         isOpen={showcaseOpen}
         onClose={() => setShowcaseOpen(false)}
         layoutId="showcase-modal"
+        maxWidthClass="md:max-w-6xl"
       >
         <div className="flex flex-col h-full min-h-0 select-none sm:select-auto">
           {/* HubModals-style Header */}
@@ -400,7 +428,7 @@ export default function Landing() {
 
           {/* HubModals-style Body */}
           <div className="relative z-10 flex-1 min-h-0 p-4 sm:p-6 md:p-8 bg-black/20">
-            <div className="relative w-full aspect-video rounded-2xl bg-[#0a0f16] border border-white/10 flex items-center justify-center overflow-hidden group shadow-lg">
+            <div className="relative w-full h-[70dvh] max-h-[calc(90dvh-8rem)] min-h-60 aspect-video rounded-2xl bg-[#0a0f16] border border-white/10 flex items-center justify-center overflow-hidden group shadow-lg">
               <img
                 src={bgRoster}
                 alt="EVEO platform promotional video preview showing agent roster"

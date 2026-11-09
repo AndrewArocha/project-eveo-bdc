@@ -1643,6 +1643,7 @@ function DedicatedVisitCockpit({
   onClearError: () => void;
   onBackToFloor: () => void;
 }) {
+  const quickTelemetryEnabled = import.meta.env.VITE_SHOW_QUICK_TELEMETRY === 'true';
   const { visit, events } = snapshot;
   const [stage, setStage] = useState(1);
   const isClosed = visit.status === 'completed' || visit.status === 'cancelled';
@@ -1770,7 +1771,7 @@ function DedicatedVisitCockpit({
 
       {/* Lower Split: [Left 1-Tap Chips + Photo/Note Logger] | [Right Visit Timeline] */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {false && !isClosed && (
+        {quickTelemetryEnabled && !isClosed && (
           <div className="lg:col-span-5">
             <div className={`${glassCardClasses} p-6 space-y-4`}>
               <div className="absolute top-0 left-0 w-full h-[40%] bg-linear-to-b from-white/10 to-transparent pointer-events-none" />

@@ -5,32 +5,64 @@ import mongoose from 'mongoose';
 import { env } from '../config/env.js';
 import { User, type UserDocument } from '../models/User.js';
 import { UserInvitation } from '../models/UserInvitation.js';
-import { SignupApplication } from '../models/SignupApplication.js';
+import { DealerAccount } from '../models/DealerAccount.js';
+import { Store } from '../models/Store.js';
 import { API_MESSAGES } from '../constants/api.js';
 import { AppError } from '../utils/AppError.js';
 import { toSafeUser } from '../utils/safeUser.js';
 
 const PASSWORD_SALT_ROUNDS = 12;
 
-export async function submitSignupApplication(input: { name: string; businessName: string; phone: string; email: string }) {
+export async function createOwnerAccount(input: { name: string; businessName: string; phone: string; email: string; password: string }) {
+  if (!env.jwtSecret || env.jwtSecret.length < 32) {
+    throw new AppError(503, 'Authentication is not configured on this server.', 'AUTH_NOT_CONFIGURED');
+  }
   if (await User.exists({ email: input.email })) {
-    throw new AppError(409, 'An account already uses this email address. Please sign in or contact EVEO support.', 'EMAIL_IN_USE');
+    throw new AppError(409, 'An account already uses this email address. Please sign in or reset your password.', 'EMAIL_IN_USE');
   }
-  const existing = await SignupApplication.findOne({ email: input.email });
-  if (existing?.status === 'converted') {
-    throw new AppError(409, 'This dealership request has already been converted. Please contact EVEO support if you need help.', 'APPLICATION_ALREADY_CONVERTED');
+  const passwordHash = await bcrypt.hash(input.password, PASSWORD_SALT_ROUNDS);
+  const session = await mongoose.startSession();
+  let createdUser: UserDocument | null = null;
+  try {
+    await session.withTransaction(async () => {
+      const ownerId = new mongoose.Types.ObjectId();
+      const dealerAccountId = new mongoose.Types.ObjectId();
+      const storeId = new mongoose.Types.ObjectId();
+      const codeBase = input.businessName.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) || 'EVEO';
+      const code = `${codeBase.slice(0, 10 - 4)}${storeId.toHexString().slice(-4).toUpperCase()}`;
+      await DealerAccount.create([{
+        _id: dealerAccountId,
+        businessName: input.businessName,
+        ownerId,
+        status: 'pending',
+        subscriptionStatus: 'pending_payment',
+      }], { session });
+      await Store.create([{
+        _id: storeId,
+        dealerAccountId,
+        name: input.businessName,
+        code,
+        phone: input.phone,
+        timezone: 'America/New_York',
+      }], { session });
+      const [user] = await User.create([{
+        _id: ownerId,
+        name: input.name,
+        email: input.email,
+        phone: input.phone,
+        passwordHash,
+        role: 'owner',
+        dealerAccountId,
+        storeIds: [storeId],
+        active: true,
+      }], { session });
+      createdUser = user as UserDocument;
+    });
+  } finally {
+    await session.endSession();
   }
-  if (existing) {
-    existing.name = input.name;
-    existing.businessName = input.businessName;
-    existing.phone = input.phone;
-    existing.status = 'submitted';
-    existing.submittedAt = new Date();
-    await existing.save();
-    return { status: existing.status, submittedAt: existing.submittedAt };
-  }
-  const application = await SignupApplication.create(input);
-  return { status: application.status, submittedAt: application.submittedAt };
+  if (!createdUser) throw new AppError(500, 'The EVEO account could not be created.', 'SIGNUP_FAILED');
+  return issueSession(createdUser);
 }
 
 export async function signIn(email: string, password: string) {

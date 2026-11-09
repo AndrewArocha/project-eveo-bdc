@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
@@ -11,7 +11,7 @@
     padding: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-family: "Manrope", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+    font-family: "Outfit", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
     background-color: #f4f5f7;
     color: #111827;
     color-scheme: light;
@@ -31,6 +31,11 @@
 
   body {
     overflow-x: hidden;
+  }
+
+  .eveo-demo-view, .eveo-demo-view * {
+    -webkit-user-select: none;
+    user-select: none;
   }
 }
 

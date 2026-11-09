@@ -6,6 +6,7 @@ export const signupSchema = z.object({
   email: z.email().trim().toLowerCase(),
   phone: z.string().trim().min(7).max(40),
   businessName: z.string().trim().min(2).max(120),
+  password: z.string().min(PASSWORD_MIN_LENGTH).max(128),
 });
 
 export const signinSchema = z.object({

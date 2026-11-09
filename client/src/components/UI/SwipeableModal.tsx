@@ -92,7 +92,7 @@ export default function SwipeableModal({
                 onClose();
               }
             }}
-            className={`${glassClasses} w-full ${maxWidthClass} max-h-[90dvh] md:max-h-190 flex flex-col pointer-events-auto z-10 overflow-hidden rounded-t-3xl md:rounded-3xl relative`}
+            className={`${glassClasses} w-full ${maxWidthClass} max-h-[90dvh] md:max-h-[90dvh] flex flex-col pointer-events-auto z-10 overflow-hidden rounded-t-3xl md:rounded-3xl relative`}
           >
             {/* Subtle Specular Glass Top Highlight */}
             <div className="absolute top-0 inset-x-0 h-px bg-linear-to-r from-transparent via-white/30 to-transparent pointer-events-none z-30" />

@@ -60,8 +60,9 @@ export default function Header() {
           onClick={() => navigate(isAuthenticated ? '/admin/portal' : '/')}
           className="flex items-center gap-3 cursor-pointer group outline-none active:scale-95 transition-transform"
         >
-          <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center border border-orange-500/30 backdrop-blur-md transition-colors group-hover:bg-orange-500/20">
-            <img src={eveoSymbol} alt="EVEO Brand Logo" className="w-6 h-6" />
+          <div className="relative w-11 h-11 rounded-full bg-white/[0.035] flex items-center justify-center border border-white/10 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.16),0_0_18px_rgba(249,115,22,0.08)] transition-colors group-hover:border-orange-400/25">
+            <span aria-hidden="true" className="absolute inset-1 rounded-full border border-white/[0.06]" />
+            <img src={eveoSymbol} alt="EVEO Brand Logo" className="relative w-6 h-6" />
           </div>
           <span className="font-black tracking-widest uppercase text-white text-xl drop-shadow-lg">
             EVEO
@@ -133,6 +134,7 @@ export default function Header() {
         <div className="hidden md:flex items-center gap-3">
           {!isAuthenticated ? (
             <>
+              <button type="button" onClick={() => navigate('/app/hub')} className="min-h-10 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-300 hover:text-white active:scale-95 transition-all outline-none cursor-pointer">App</button>
               <button
                 type="button"
                 onClick={() => navigate('/login')}
@@ -155,7 +157,7 @@ export default function Header() {
                 onClick={() => navigate('/app/hub')}
                 className="min-h-10 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 active:scale-95 text-xs font-bold text-white transition-all outline-none cursor-pointer"
               >
-                Workspace <ArrowRight size={14} className="text-orange-500" />
+                App <ArrowRight size={14} className="text-orange-500" />
               </button>
               <button
                 type="button"
@@ -224,6 +226,13 @@ export default function Header() {
                   </NavLink>
                   <button
                     type="button"
+                    onClick={() => { setIsMobileMenuOpen(false); navigate('/app/hub'); }}
+                    className="py-5 text-left text-2xl font-black text-orange-500 transition-colors border-b border-white/5 cursor-pointer"
+                  >
+                    App &rarr;
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => {
                       setIsMobileMenuOpen(false);
                       navigate('/login');
@@ -273,7 +282,7 @@ export default function Header() {
                     }}
                     className="py-5 text-left text-2xl font-black text-orange-500 transition-colors border-b border-white/5 cursor-pointer"
                   >
-                    Launch Workspace &rarr;
+                    App &rarr;
                   </button>
                   <button
                     type="button"

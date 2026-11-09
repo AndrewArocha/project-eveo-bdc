@@ -112,7 +112,7 @@ export const respondToEve: RequestHandler = asyncHandler(async (request, respons
     content = `${store.name} has ${activeTeamMembers} active team members assigned to this store and ${evidence.activityEventsLast30Days} EVEO activity events logged in the last 30 days. EVEO does not yet ingest external call, text, or email activity.`;
   }
 
-  let mode: 'live' | 'preview' = 'live';
+  const mode: 'live' | 'preview' = 'live';
   if (env.openAiApiKey && !identityQuery) {
     try {
       const aiResponse = await fetch('https://api.openai.com/v1/responses', {
