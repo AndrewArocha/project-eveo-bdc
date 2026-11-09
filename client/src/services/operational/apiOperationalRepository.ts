@@ -38,6 +38,7 @@ export interface ApiAppointment {
   inventoryVehicleId: string | null;
   vehicleSnapshot: string;
   scheduledAt: string | null;
+  durationMinutes: 15 | 30 | 45 | 60;
   status: AppointmentStatus;
   assignedPlatformUserId: string | null;
   assignedStoreUserId: string | null;
@@ -53,7 +54,7 @@ function notifyStoreOperationalUpdate(storeId: string) {
 }
 
 export type CreateAppointmentInput = Pick<ApiAppointment, 'storeId' | 'customerNameSnapshot'> & Partial<Pick<ApiAppointment,
-  'customerId' | 'leadId' | 'phoneSnapshot' | 'inventoryVehicleId' | 'vehicleSnapshot' | 'scheduledAt' | 'status' |
+  'customerId' | 'leadId' | 'phoneSnapshot' | 'inventoryVehicleId' | 'vehicleSnapshot' | 'scheduledAt' | 'durationMinutes' | 'status' |
   'assignedPlatformUserId' | 'assignedStoreUserId' | 'notes'>>;
 
 export const apiOperationalRepository = {

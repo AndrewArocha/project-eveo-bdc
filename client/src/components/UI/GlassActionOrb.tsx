@@ -157,12 +157,12 @@ export default function GlassActionOrb({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.92 }}
             transition={{ duration: 0.15 }}
-            className="absolute bottom-[calc(100%+0.5rem)] left-1/2 -translate-x-1/2 z-300 pointer-events-none px-3 py-1.5 rounded-xl bg-[#0a0f16]/95 border border-white/20 backdrop-blur-2xl shadow-[0_10px_25px_rgba(0,0,0,0.8)] whitespace-nowrap text-center"
+            className="absolute bottom-[calc(100%+0.5rem)] left-1/2 -translate-x-1/2 z-300 pointer-events-none min-w-16 px-3.5 py-2 rounded-xl bg-[#101722] border border-white/30 backdrop-blur-2xl shadow-[0_10px_25px_rgba(0,0,0,0.8)] whitespace-nowrap text-center"
           >
-            <p className="text-[11px] font-bold text-white leading-tight">{tooltip}</p>
-            {subTooltip && <p className="text-[9px] font-semibold text-gray-400 mt-0.5">{subTooltip}</p>}
+            <p className="text-[13px] font-semibold text-white leading-tight">{tooltip}</p>
+            {subTooltip && <p className="text-[11px] font-medium text-gray-200 mt-1">{subTooltip}</p>}
             {armedForSecondTap && onClick && (
-              <p className="text-[9px] font-black uppercase tracking-wider text-orange-400 mt-0.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-orange-300 mt-1">
                 Tap again to open &rarr;
               </p>
             )}

@@ -51,7 +51,14 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
     return saved ? JSON.parse(saved) : {};
   });
 
-  const [newAppt, setNewAppt] = useState({ time: '10:00 AM', customer: '', vehicle: '', rep: '' });
+  const [newAppt, setNewAppt] = useState({ time: '10:00 AM', durationMinutes: 30 as 15 | 30 | 45 | 60, customer: '', vehicle: '', rep: '' });
+  const timeOptions = Array.from({ length: 37 }, (_, index) => {
+    const minutes = 9 * 60 + index * 15;
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    const meridiem = hour >= 12 ? 'PM' : 'AM';
+    return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${meridiem}`;
+  });
 
   useEffect(() => {
     if (!user || !isOpen || !storeId) {
@@ -104,11 +111,12 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
           vehicleSnapshot: newAppt.vehicle.trim(),
           scheduledAt: scheduledAt.toISOString(),
           status: 'pending_confirmation',
+          durationMinutes: newAppt.durationMinutes,
           ...(newAppt.rep ? { assignedStoreUserId: newAppt.rep } : {}),
         });
         setApiAppointments(await apiOperationalRepository.listAppointments(storeId));
         setIsAddingMode(false);
-        setNewAppt({ time: '10:00 AM', customer: '', vehicle: '', rep: '' });
+        setNewAppt({ time: '10:00 AM', durationMinutes: 30, customer: '', vehicle: '', rep: '' });
       } catch (cause) {
         setSyncError(cause instanceof Error ? cause.message : 'Appointment could not be saved.');
       } finally {
@@ -135,7 +143,7 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
 
     saveToDatabase(dateKey, updatedAppts);
     setIsAddingMode(false);
-    setNewAppt({ time: '10:00 AM', customer: '', vehicle: '', rep: '' });
+    setNewAppt({ time: '10:00 AM', durationMinutes: 30, customer: '', vehicle: '', rep: '' });
   };
 
   const handlePrevMonth = () => { if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(y => y - 1); } else setCurrentMonth(m => m - 1); setShowMonthPicker(false); };
@@ -201,37 +209,37 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-md" />
 
           <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="w-full max-w-6xl h-[90vh] flex flex-col pointer-events-auto z-10 overflow-hidden shadow-2xl bg-[#0a0f16]/80 backdrop-blur-3xl border border-white/10 rounded-3xl relative"
+            className="w-full max-w-6xl h-[90vh] flex flex-col pointer-events-auto z-10 overflow-hidden shadow-2xl bg-white text-gray-900 dark:bg-[#0a0f16]/95 dark:text-white backdrop-blur-3xl border border-gray-200 dark:border-white/10 rounded-3xl relative"
           >
             <div className="absolute top-0 left-0 w-full h-40 bg-linear-to-b from-white/10 to-transparent pointer-events-none" />
 
             {/* Header */}
-            <div className="relative z-10 shrink-0 flex justify-between items-center p-6 border-b border-white/10 bg-black/20">
-              <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-3">
+            <div className="relative z-10 shrink-0 flex justify-between items-center p-6 border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/20">
+              <h2 className="text-xl md:text-2xl font-semibold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
                 <Calendar className="text-blue-500" /> Master Schedule
               </h2>
-              <button onClick={onClose} className="p-2 rounded-full bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors outline-none"><X size={20} /></button>
+              <button onClick={onClose} className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900 transition-colors outline-none dark:bg-white/5 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"><X size={20} /></button>
             </div>
 
             {/* Split Content Body */}
             <div className="relative z-10 flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
 
               {/* LEFT PANE: The Calendar */}
-              <div className="w-full md:w-85 shrink-0 border-b md:border-b-0 md:border-r border-white/10 bg-black/20 flex flex-col overflow-y-auto">
+              <div className="w-full md:w-85 shrink-0 border-b md:border-b-0 md:border-r border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/20 flex flex-col overflow-y-auto">
                 <div className="p-6">
-                  <div className="flex items-center justify-between text-xl font-black text-white mb-6">
-                    <button onClick={handlePrevMonth} className="p-1 hover:bg-white/10 rounded-lg transition-colors"><ChevronLeft size={20} /></button>
-                    <button onClick={() => setShowMonthPicker(!showMonthPicker)} className="flex items-center gap-2 hover:bg-white/5 px-3 py-1 rounded-xl transition-colors outline-none">
+                  <div className="flex items-center justify-between text-xl font-semibold text-gray-900 dark:text-white mb-6">
+                    <button onClick={handlePrevMonth} className="p-1 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-colors"><ChevronLeft size={20} /></button>
+                    <button onClick={() => setShowMonthPicker(!showMonthPicker)} className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-white/5 px-3 py-1 rounded-xl transition-colors outline-none">
                       {MONTHS[currentMonth]} {currentYear} <ChevronDown size={14} className="text-gray-500" />
                     </button>
-                    <button onClick={handleNextMonth} className="p-1 hover:bg-white/10 rounded-lg transition-colors"><ChevronRight size={20} /></button>
+                    <button onClick={handleNextMonth} className="p-1 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-colors"><ChevronRight size={20} /></button>
                   </div>
 
                   <AnimatePresence mode="wait">
                     {showMonthPicker ? (
                       <motion.div key="picker" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="grid grid-cols-3 gap-2 h-full pb-4">
                         {MONTHS.map((m, idx) => (
-                          <button key={m} onClick={() => { setCurrentMonth(idx); setShowMonthPicker(false); }} className={`py-3 rounded-xl text-xs font-bold transition-colors ${currentMonth === idx ? 'bg-blue-500 text-white shadow-lg' : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'}`}>
+                          <button key={m} onClick={() => { setCurrentMonth(idx); setShowMonthPicker(false); }} className={`py-3 rounded-xl text-xs font-semibold transition-colors ${currentMonth === idx ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white'}`}>
                             {m.slice(0, 3)}
                           </button>
                         ))}
@@ -253,7 +261,7 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
                               <button
                                 key={day}
                                 onClick={() => setSelectedDay(day)}
-                                className={`relative w-10 h-10 mx-auto flex flex-col items-center justify-center rounded-xl text-sm font-bold transition-all outline-none ${isSelected ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'text-gray-400 hover:bg-white/10 hover:text-white'}`}
+                                className={`relative w-10 h-10 mx-auto flex flex-col items-center justify-center rounded-xl text-sm font-semibold transition-all outline-none ${isSelected ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(59,130,246,0.35)]' : 'text-gray-700 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white'}`}
                               >
                                 <span>{day}</span>
                                 {dayAppts.length > 0 && (
@@ -275,11 +283,11 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
               </div>
 
               {/* RIGHT PANE: Appointment Table Container */}
-              <div className="flex-1 flex flex-col bg-[#0a0f16]/40 min-w-0 overflow-hidden relative">
-                <div className="p-6 border-b border-white/5 flex justify-between items-center shrink-0">
+              <div className="flex-1 flex flex-col bg-white dark:bg-[#0a0f16]/40 min-w-0 overflow-hidden relative">
+                <div className="p-6 border-b border-gray-200 dark:border-white/5 flex justify-between items-center shrink-0">
                   <div>
-                    <h3 className="text-lg font-bold text-white">Schedule for {MONTHS[currentMonth]} {selectedDay}, {currentYear}</h3>
-                    <p className="text-xs text-gray-400 mt-1">{todaysAppointments.length} Appointment{todaysAppointments.length !== 1 && 's'} Found</p>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Schedule for {MONTHS[currentMonth]} {selectedDay}, {currentYear}</h3>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{todaysAppointments.length} Appointment{todaysAppointments.length !== 1 && 's'} Found</p>
                   </div>
 
                   <SleekPillButton
@@ -297,17 +305,20 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
                   <AnimatePresence>
                     {isAddingMode && (
                       <motion.div initial={{ height: 0, opacity: 0, marginBottom: 0 }} animate={{ height: 'auto', opacity: 1, marginBottom: 24 }} exit={{ height: 0, opacity: 0, marginBottom: 0 }} className="overflow-hidden shrink-0">
-                        <form onSubmit={(event) => void handleAddAppointment(event)} className="bg-white/5 border border-white/10 p-5 rounded-2xl flex flex-col gap-4">
+                        <form onSubmit={(event) => void handleAddAppointment(event)} className="bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 p-5 rounded-2xl flex flex-col gap-4">
                           <h4 className="text-[10px] font-bold text-orange-500 uppercase tracking-widest flex items-center gap-2">
                             <Clock size={12} /> Schedule New Appointment
                           </h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                            <input type="text" value={newAppt.customer} onChange={e => setNewAppt({ ...newAppt, customer: e.target.value })} placeholder="Customer Name" required className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500 transition-colors" />
-                            <input type="text" value={newAppt.vehicle} onChange={e => setNewAppt({ ...newAppt, vehicle: e.target.value })} placeholder="Vehicle of Interest" required className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500 transition-colors" />
-                            <select value={newAppt.time} onChange={e => setNewAppt({ ...newAppt, time: e.target.value })} className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500 transition-colors">
-                              {['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'].map(t => <option key={t}>{t}</option>)}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+                            <input type="text" value={newAppt.customer} onChange={e => setNewAppt({ ...newAppt, customer: e.target.value })} placeholder="Customer Name" required className="bg-white dark:bg-black/40 border border-gray-300 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:border-orange-500 transition-colors" />
+                            <input type="text" value={newAppt.vehicle} onChange={e => setNewAppt({ ...newAppt, vehicle: e.target.value })} placeholder="Vehicle of Interest" required className="bg-white dark:bg-black/40 border border-gray-300 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:border-orange-500 transition-colors" />
+                            <select value={newAppt.time} onChange={e => setNewAppt({ ...newAppt, time: e.target.value })} className="bg-white dark:bg-black/40 border border-gray-300 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:border-orange-500 transition-colors">
+                              {timeOptions.map(t => <option key={t}>{t}</option>)}
                             </select>
-                            <select value={newAppt.rep} onChange={e => setNewAppt({ ...newAppt, rep: e.target.value })} className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500 transition-colors">
+                            <select aria-label="Appointment duration" value={newAppt.durationMinutes} onChange={(e) => setNewAppt({ ...newAppt, durationMinutes: Number(e.target.value) as 15 | 30 | 45 | 60 })} className="bg-white dark:bg-black/40 border border-gray-300 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:border-orange-500 transition-colors">
+                              {[15, 30, 45, 60].map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}
+                            </select>
+                            <select value={newAppt.rep} onChange={e => setNewAppt({ ...newAppt, rep: e.target.value })} className="bg-white dark:bg-black/40 border border-gray-300 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:border-orange-500 transition-colors">
                               <option value="">Unassigned</option>
                               {teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
                             </select>
@@ -322,19 +333,19 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
                     )}
                   </AnimatePresence>
 
-                  {syncError && <p role="alert" className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">{syncError}</p>}
+                  {syncError && <p role="alert" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">{syncError}</p>}
                   {isLoadingAppointments ? (
-                    <div className="h-full grid place-items-center text-sm text-gray-400">Loading store schedule…</div>
+                    <div className="h-full grid place-items-center text-sm text-gray-600 dark:text-gray-400">Loading store schedule…</div>
                   ) : todaysAppointments.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-500 opacity-50">
+                    <div className="h-full flex flex-col items-center justify-center text-gray-500">
                       <Calendar size={48} className="mb-4" />
                       <p className="font-bold">No appointments scheduled.</p>
                       <p className="text-xs">Select another day or add a new appointment.</p>
                     </div>
                   ) : (
-                    <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl overflow-auto shadow-sm custom-scrollbar">
+                    <div className="flex-1 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl overflow-auto shadow-sm custom-scrollbar">
                       <table className="w-full text-left text-sm whitespace-nowrap min-w-max">
-                        <thead className="bg-black/40 text-gray-400 font-bold uppercase tracking-wider text-[10px] sticky top-0 z-10 backdrop-blur-md">
+                        <thead className="bg-gray-100 dark:bg-black/40 text-gray-600 dark:text-gray-400 font-semibold uppercase tracking-wider text-[10px] sticky top-0 z-10 backdrop-blur-md">
                           <tr>
                             <th className="px-6 py-4"><span className="flex items-center gap-2"><Clock size={12} /> TIME</span></th>
                             <th className="px-6 py-4"><span className="flex items-center gap-2"><User size={12} /> CUSTOMER</span></th>
@@ -343,13 +354,13 @@ export default function AppointmentModal({ isOpen, onClose, storeId }: Appointme
                             <th className="px-6 py-4">STATUS</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-gray-200 dark:divide-white/5">
                           {todaysAppointments.map((appt) => (
-                            <tr key={appt.id} className="hover:bg-white/5 transition-colors group cursor-pointer">
-                              <td className="px-6 py-4 text-orange-500 font-bold">{appt.time}</td>
-                              <td className="px-6 py-4 font-bold text-white">{appt.customer}</td>
-                              <td className="px-6 py-4 text-gray-400">{appt.vehicle}</td>
-                              <td className="px-6 py-4 text-gray-300">{appt.rep}</td>
+                            <tr key={appt.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group cursor-pointer">
+                              <td className="px-6 py-4 text-orange-700 dark:text-orange-400 font-semibold">{appt.time}</td>
+                              <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">{appt.customer}</td>
+                              <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{appt.vehicle}</td>
+                              <td className="px-6 py-4 text-gray-700 dark:text-gray-300">{appt.rep}</td>
                               <td className="px-6 py-4 pr-8">
                                 <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest ${getStatusColors(appt.status)}`}>
                                   {appt.status}

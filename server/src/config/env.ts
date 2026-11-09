@@ -8,9 +8,11 @@ function parseTrustProxy(value: string | undefined): boolean | number {
   return Number.isInteger(hops) && hops >= 0 ? hops : false;
 }
 
+const nodeEnv = process.env.NODE_ENV ?? 'development';
+
 export const env = {
   port: Number(process.env.PORT) || DEFAULT_PORT,
-  nodeEnv: process.env.NODE_ENV ?? 'development',
+  nodeEnv,
   mongoUri: process.env.MONGODB_URI?.trim() ?? '',
   mongoDatabase: process.env.MONGODB_DATABASE?.trim() || 'eveo_bdc',
   jwtSecret: process.env.JWT_SECRET?.trim() ?? '',
@@ -23,5 +25,8 @@ export const env = {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
-  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
+  // Render terminates TLS in front of the Node process. Trust exactly its
+  // single forwarding hop by default in production; allow an explicit env
+  // value to override this for other hosting topologies.
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY ?? (nodeEnv === 'production' ? '1' : undefined)),
 };

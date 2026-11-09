@@ -7,6 +7,8 @@ const userSchema = new Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 100 },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
+    phone: { type: String, trim: true, default: '', maxlength: 40 },
+    weeklySchedule: { type: Schema.Types.Mixed, default: {} },
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: USER_ROLES, default: 'owner', required: true },
     dealerAccountId: { type: Schema.Types.ObjectId, ref: 'DealerAccount', required: true, index: true },

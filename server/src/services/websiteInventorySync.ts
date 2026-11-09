@@ -66,6 +66,9 @@ async function fetchPage(target: URL): Promise<string> {
       method: 'GET', redirect: 'error', signal: controller.signal,
       headers: { accept: 'text/html,application/ld+json;q=0.9', 'user-agent': 'EVEO-Inventory-Importer/1.0' },
     });
+    if (response.status === 401 || response.status === 403) {
+      throw new AppError(502, `The dealership website denied EVEO's automated inventory read (HTTP ${response.status}). EVEO is signed in; the source site blocks automated access. Connect a public inventory feed in Data Integrations or ask the website provider to allow the EVEO importer.`, 'INVENTORY_SOURCE_BLOCKED');
+    }
     if (!response.ok) throw new AppError(502, `The dealership website returned HTTP ${response.status}.`, 'INVENTORY_SOURCE_HTTP_ERROR');
     const type = response.headers.get('content-type') || '';
     if (!type.includes('text/html') && !type.includes('application/ld+json')) {

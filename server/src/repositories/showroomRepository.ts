@@ -79,9 +79,9 @@ export async function createShowroomVisit(input: Record<string, unknown>, userId
   const visit = await ShowroomVisit.create({
     dealerAccountId, storeId, customerId: customer.id, leadId: input.leadId || null, appointmentId: input.appointmentId || null,
     assignedUserId: assignedUser._id, assignedRepName: assignedUser.name, checkedInByUserId: userId, checkedInByName: actor.name,
-    customerNameSnapshot: customerName, phoneSnapshot: phone || customer.phone, notes: input.notes || '',
+    customerNameSnapshot: customerName, greetedPerson: String(input.greetedPerson), phoneSnapshot: phone || customer.phone, notes: input.notes || '',
     vehicleOfInterest: input.vehicleOfInterest || null, tradeIn: input.tradeIn || null,
-    events: [{ type: 'customer_greeted', actorUserId: userId, actorName: actor.name, occurredAt: new Date(), message: 'Customer checked in.' }],
+    events: [{ type: 'customer_greeted', actorUserId: userId, actorName: actor.name, occurredAt: new Date(), message: `Greeted ${String(input.greetedPerson)}.`, media: input.greetingMedia }],
   });
   await ActivityEvent.create({ dealerAccountId, storeId, actorUserId: userId, actorName: actor.name, category: 'showroom', title: `Customer checked in • ${customerName}`, description: 'Showroom visit started.', entityType: 'showroom_visit', entityId: visit.id });
   return visit;
@@ -89,12 +89,24 @@ export async function createShowroomVisit(input: Record<string, unknown>, userId
 
 export async function appendShowroomEvent(id: string, dealerAccountId: string, storeId: string, userId: string, input: Record<string, unknown>) {
   const visit = await findVisit(id, dealerAccountId, storeId);
-  if (visit.status === 'completed' || visit.status === 'cancelled') throw new AppError(409, 'This showroom visit is closed.', 'SHOWROOM_VISIT_CLOSED');
-  const actor = await User.findById(userId).select('name').lean();
+  const actor = await User.findById(userId).select('name role').lean();
   if (!actor) throw new AppError(401, 'User session is no longer valid.', 'UNAUTHORIZED');
   const type = String(input.type);
+  const isFollowUp = type === 'note_added' || type === 'media_added';
+  if (visit.status === 'cancelled' || (visit.status === 'completed' && !isFollowUp)) throw new AppError(409, 'This showroom visit is closed. Add a note or reply to continue the conversation.', 'SHOWROOM_VISIT_CLOSED');
+  if (visit.status === 'completed' && isFollowUp && visit.assignedUserId.toString() !== userId && !['bdc', 'bdc_manager', 'manager', 'owner'].includes(actor.role)) {
+    throw new AppError(403, 'Only the assigned salesperson or store leadership can add follow-up notes to a completed visit.', 'SHOWROOM_VISIT_NOT_OWNED');
+  }
   if (type === 'visit_claimed') throw new AppError(400, 'Use the assignment route to claim a visit.', 'USE_ASSIGNMENT_ROUTE');
-  visit.events.push({ type: type as never, actorUserId: new Types.ObjectId(userId), actorName: actor.name, occurredAt: new Date(), message: String(input.message), ...(input.media ? { media: input.media } : {}) } as never);
+  if (type === 'deal_desked' && (!input.media || typeof input.media !== 'object' || (input.media as { kind?: string }).kind !== 'image')) {
+    throw new AppError(422, 'Attach a photo of the deal screen or printed desk before saving the desk step.', 'DESKING_PHOTO_REQUIRED');
+  }
+  if (type === 'handoff_requested' && (!input.media || typeof input.media !== 'object' || (input.media as { kind?: string }).kind !== 'image')) {
+    throw new AppError(422, 'Attach a photo of the deal screen or printed desk before requesting BDC handoff.', 'DESKING_PHOTO_REQUIRED');
+  }
+  const replyToEventId = typeof input.replyToEventId === 'string' ? input.replyToEventId : null;
+  if (replyToEventId && !visit.events.some((event) => event._id.toString() === replyToEventId)) throw new AppError(404, 'The visit update you are replying to was not found.', 'SHOWROOM_EVENT_NOT_FOUND');
+  visit.events.push({ type: type as never, actorUserId: new Types.ObjectId(userId), actorName: actor.name, occurredAt: new Date(), message: String(input.message), ...(input.media ? { media: input.media } : {}), ...(replyToEventId ? { replyToEventId: new Types.ObjectId(replyToEventId) } : {}) } as never);
   if (type === 'handoff_requested') visit.status = 'handoff_requested';
   if (type === 'visit_completed') visit.status = 'completed';
   await visit.save();

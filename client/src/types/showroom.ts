@@ -13,6 +13,7 @@ export type ShowroomEventType =
   | 'media_added'
   | 'test_drive_started'
   | 'test_drive_completed'
+  | 'deal_desked'
   | 'handoff_requested'
   | 'bdc_contact_logged'
   | 'note_added'
@@ -23,6 +24,7 @@ export interface ShowroomVisitRecord {
   id: string;
   storeId: string;
   customerName: string;
+  greetedPerson: string;
   customerPhone: string | null;
   notes: string | null;
   assignedRepId: string;
@@ -46,6 +48,7 @@ export interface ShowroomEvent {
   occurredAt: string;
   message: string;
   media?: ShowroomMediaAsset;
+  replyToEventId?: string | null;
 }
 
 export interface ShowroomVisitSnapshot {
@@ -56,6 +59,8 @@ export interface ShowroomVisitSnapshot {
 export interface CreateShowroomVisitInput {
   customerName: string;
   customerPhone?: string;
+  greetedPerson: string;
+  greetingMedia: ShowroomMediaAsset;
   /** Link an existing canonical customer instead of resolving by phone. */
   customerId?: string;
   leadId?: string;
@@ -74,6 +79,7 @@ export interface AppendShowroomEventInput {
   actorName: string;
   message: string;
   media?: ShowroomMediaAsset;
+  replyToEventId?: string;
 }
 
 export interface AssignShowroomVisitInput {

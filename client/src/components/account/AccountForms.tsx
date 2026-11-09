@@ -10,6 +10,7 @@ import {
 import SaveButton from './SaveButton';
 import SmartCalendar from './SmartCalendar';
 import GlassActionOrb from '../UI/GlassActionOrb';
+import { apiRequest } from '../../services/apiClient';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
@@ -28,26 +29,92 @@ import {
 // 1. PROFILE FORM (Clean, Uncluttered, Zero DevTools Warnings)
 // ==========================================
 export function ProfileForm() {
-  const { user } = useAuth();
-  const { activeStore } = useStoreAppearance();
+  const { user, refreshUser, role } = useAuth();
+  const { activeStore, registeredStores, refreshStores } = useStoreAppearance();
+  const persistedStore = registeredStores.find((store) => store.id === activeStore.id);
+  const [name, setName] = useState(user?.name || '');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [storeName, setStoreName] = useState(activeStore.name || '');
+  const [storePhone, setStorePhone] = useState(activeStore.phone || '');
+  const [website, setWebsite] = useState(activeStore.websiteUrl || '');
+  const [address, setAddress] = useState(persistedStore?.address || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setName(user?.name || '');
+    setPhone(user?.phone || '');
+  }, [user?.id, user?.name, user?.phone]);
+
+  useEffect(() => {
+    setStoreName(activeStore.name || '');
+    setStorePhone(activeStore.phone || '');
+    setWebsite(activeStore.websiteUrl || '');
+    setAddress(persistedStore?.address || '');
+  }, [activeStore.id, activeStore.name, activeStore.phone, activeStore.websiteUrl, persistedStore?.address]);
+
+  const saveProfile = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError('');
+    setFeedback('');
+    setIsSaving(true);
+    try {
+      await apiRequest('/users/me', { method: 'PATCH', body: JSON.stringify({ name, phone }) });
+      await refreshUser();
+      if (role === 'owner' && activeStore.id) {
+        await apiRequest(`/stores/${encodeURIComponent(activeStore.id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ name: storeName, phone: storePhone, website, address }),
+        });
+        await refreshStores();
+      }
+      setFeedback('Profile saved.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Profile could not be saved.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
-    <div className="relative z-10 flex flex-col gap-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {[
-          ['Full name', user?.name || '—'],
-          ['Email', user?.email || '—'],
-          ['Dealership', activeStore.name || '—'],
-          ['Primary dealership phone', activeStore.phone || 'Not provided'],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-2xl border border-gray-200 bg-white/60 p-4 dark:border-white/10 dark:bg-black/20">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{label}</p>
-            <p className="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-white">{value}</p>
-          </div>
-        ))}
+    <form onSubmit={(event) => void saveProfile(event)} className="relative z-10 flex flex-col gap-5">
+      <div>
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Your profile</h3>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Update the name and contact information attached to your EVEO account.</p>
       </div>
-      <p className="text-xs text-gray-500 dark:text-gray-400">Profile edits are not connected to the account service yet.</p>
-    </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Full name
+          <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-orange-500 dark:border-white/15 dark:bg-[#0a0f16] dark:text-white" />
+        </label>
+        <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Sign-in email
+          <input value={user?.email || ''} readOnly className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-200 bg-gray-100 px-3 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-400" />
+        </label>
+        <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Your phone
+          <input value={phone} onChange={(event) => setPhone(event.target.value)} maxLength={40} autoComplete="tel" className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-orange-500 dark:border-white/15 dark:bg-[#0a0f16] dark:text-white" />
+        </label>
+      </div>
+      {role === 'owner' && <section className="border-t border-gray-200 pt-5 dark:border-white/10">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Store profile</h3>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">These details appear in the Hub and are used by website inventory sync.</p>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Dealership name
+            <input value={storeName} onChange={(event) => setStoreName(event.target.value)} required maxLength={120} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-orange-500 dark:border-white/15 dark:bg-[#0a0f16] dark:text-white" />
+          </label>
+          <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Dealership phone
+            <input value={storePhone} onChange={(event) => setStorePhone(event.target.value)} maxLength={40} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-orange-500 dark:border-white/15 dark:bg-[#0a0f16] dark:text-white" />
+          </label>
+          <label className="text-xs font-semibold text-gray-600 dark:text-gray-300 sm:col-span-2">Dealership website
+            <input type="url" value={website} onChange={(event) => setWebsite(event.target.value)} maxLength={2048} placeholder="https://dealership.example" className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-orange-500 dark:border-white/15 dark:bg-[#0a0f16] dark:text-white" />
+          </label>
+          <label className="text-xs font-semibold text-gray-600 dark:text-gray-300 sm:col-span-2">Address
+            <input value={address} onChange={(event) => setAddress(event.target.value)} maxLength={300} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-orange-500 dark:border-white/15 dark:bg-[#0a0f16] dark:text-white" />
+          </label>
+        </div>
+      </section>}
+      {(error || feedback) && <p role={error ? 'alert' : 'status'} className={`rounded-xl border px-3 py-2.5 text-xs ${error ? 'border-red-400/30 bg-red-500/10 text-red-700 dark:text-red-200' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'}`}>{error || feedback}</p>}
+      <button type="submit" disabled={isSaving} className="min-h-11 w-full rounded-xl bg-orange-500 px-5 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:opacity-60 sm:w-auto">{isSaving ? 'Saving…' : 'Save changes'}</button>
+    </form>
   );
 }
 
@@ -68,15 +135,17 @@ export function ScheduleForm({ role }: { role: UserRole }) {
     Thursday: { start: '9:00 AM', end: '6:00 PM' },
     Friday: { start: '9:00 AM', end: '6:00 PM' },
     Saturday: { start: '10:00 AM', end: '4:00 PM' },
+    Sunday: { start: 'OFF', end: 'OFF' },
   };
 
   const [scheduleState, setScheduleState] = useState<WeeklySchedule>(() => {
-    const saved = localStorage.getItem('eveo_user_schedule');
+    if (user?.weeklySchedule) return { ...defaultSchedule, ...user.weeklySchedule };
+    const saved = user ? null : localStorage.getItem('eveo_user_schedule');
     return saved ? JSON.parse(saved) : defaultSchedule;
   });
 
   const [hasSubmittedSchedule, setHasSubmittedSchedule] = useState(() => {
-    return localStorage.getItem('eveo_user_schedule') !== null;
+    return user ? Boolean(user.weeklySchedule && Object.keys(user.weeklySchedule).length) : localStorage.getItem('eveo_user_schedule') !== null;
   });
 
   const [isRequestingChange, setIsRequestingChange] = useState(false);
@@ -85,12 +154,23 @@ export function ScheduleForm({ role }: { role: UserRole }) {
   const [calendarInitialDay, setCalendarInitialDay] = useState<number | null>(null);
   const [expandShifts, setExpandShifts] = useState(false);
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
+  const [scheduleError, setScheduleError] = useState('');
+  const { refreshUser } = useAuth();
 
   const [teamState, setTeamState] = useState<Array<GlobalUser | StoreStaff>>(() => user ? [] : getVisibleStoreRoster(activeStoreId));
 
   useEffect(() => {
     setTeamState(user ? [] : getVisibleStoreRoster(activeStoreId));
   }, [activeStoreId, user]);
+
+  useEffect(() => {
+    if (user) {
+      setScheduleState({ ...defaultSchedule, ...user.weeklySchedule });
+      setHasSubmittedSchedule(Boolean(user.weeklySchedule && Object.keys(user.weeklySchedule).length));
+    }
+  // defaults are stable for a mounted form; only replace when the server user changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.weeklySchedule]);
 
   const [calendarRecords, setCalendarRecords] = useState<Record<string, ShiftDayRecord>>(() =>
     user ? {} : getOrSeedAgentCalendar(activeStoreDataKey, CURRENT_USER)
@@ -132,14 +212,23 @@ export function ScheduleForm({ role }: { role: UserRole }) {
     }));
   };
 
-  const handleSaveSchedule = () => {
+  const handleSaveSchedule = async () => {
     setIsSaving(true);
-    setTimeout(() => {
-      localStorage.setItem('eveo_user_schedule', JSON.stringify(scheduleState));
+    setScheduleError('');
+    try {
+      if (user) {
+        await apiRequest('/users/me/schedule', { method: 'PATCH', body: JSON.stringify({ schedule: scheduleState }) });
+        await refreshUser();
+      } else {
+        localStorage.setItem('eveo_user_schedule', JSON.stringify(scheduleState));
+      }
       setHasSubmittedSchedule(true);
       setIsRequestingChange(false);
+    } catch (cause) {
+      setScheduleError(cause instanceof Error ? cause.message : 'Schedule could not be saved.');
+    } finally {
       setIsSaving(false);
-    }, 600);
+    }
   };
 
   const handleManagerResetSchedule = (targetAgentName: string) => {
@@ -199,9 +288,12 @@ export function ScheduleForm({ role }: { role: UserRole }) {
 
   if (user) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white/60 p-5 dark:border-white/10 dark:bg-black/20">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Team scheduling</h3>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Shared schedules and attendance are not connected to live dealership records yet, so this page does not show sample shifts or staff.</p>
+      <div className="relative z-10 flex flex-col gap-5">
+        <div><h3 className="text-base font-semibold text-gray-900 dark:text-white">My availability</h3><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Set your regular weekly showroom availability. This is saved to your EVEO account.</p></div>
+        {renderDayGrid()}
+        {scheduleError && <p role="alert" className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2.5 text-xs text-red-700 dark:text-red-200">{scheduleError}</p>}
+        {hasSubmittedSchedule && <p className="text-xs text-emerald-700 dark:text-emerald-300">Your availability is saved.</p>}
+        <SaveButton label={isSaving ? 'Saving…' : 'Save availability'} onClick={() => void handleSaveSchedule()} />
       </div>
     );
   }
@@ -791,10 +883,32 @@ export function PayrollForm({ role }: { role: UserRole }) {
 // 4. SECURITY FORM
 // ==========================================
 export function SecurityForm() {
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white/60 p-5 dark:border-white/10 dark:bg-black/20">
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Account security</h3>
-      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Password changes, recovery email, and two-factor authentication are not connected to the account service yet.</p>
-    </div>
-  );
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [error, setError] = useState('');
+  const changePassword = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(''); setFeedback('');
+    if (newPassword !== confirmPassword) { setError('The new passwords do not match.'); return; }
+    setIsSaving(true);
+    try {
+      await apiRequest('/users/me/password', { method: 'PATCH', body: JSON.stringify({ currentPassword, newPassword }) });
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+      setFeedback('Password updated. Use it the next time you sign in.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Password could not be updated.');
+    } finally { setIsSaving(false); }
+  };
+  const inputClass = 'mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-orange-500 dark:border-white/15 dark:bg-[#0a0f16] dark:text-white';
+  return <form onSubmit={(event) => void changePassword(event)} className="relative z-10 flex max-w-xl flex-col gap-4">
+    <div><h3 className="text-base font-semibold text-gray-900 dark:text-white">Account security</h3><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Change your password. EVEO checks your current password before saving.</p></div>
+    <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Current password<input type="password" autoComplete="current-password" required value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className={inputClass} /></label>
+    <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">New password<input type="password" autoComplete="new-password" minLength={12} required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className={inputClass} /><span className="mt-1 block font-normal text-gray-500">Use at least 12 characters.</span></label>
+    <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Confirm new password<input type="password" autoComplete="new-password" minLength={12} required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className={inputClass} /></label>
+    {(error || feedback) && <p role={error ? 'alert' : 'status'} className={`rounded-xl border px-3 py-2.5 text-xs ${error ? 'border-red-400/30 bg-red-500/10 text-red-700 dark:text-red-200' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'}`}>{error || feedback}</p>}
+    <button type="submit" disabled={isSaving} className="min-h-11 w-full rounded-xl bg-orange-500 px-5 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:opacity-60 sm:w-auto">{isSaving ? 'Updating…' : 'Update password'}</button>
+  </form>;
 }

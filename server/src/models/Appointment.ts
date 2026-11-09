@@ -19,6 +19,7 @@ const appointmentSchema = new Schema(
     inventoryVehicleId: { type: Schema.Types.ObjectId, ref: 'InventoryVehicle', default: null },
     vehicleSnapshot: { type: String, trim: true, default: '', maxlength: 180 },
     scheduledAt: { type: Date, default: null },
+    durationMinutes: { type: Number, enum: [15, 30, 45, 60], default: 30, required: true },
     status: { type: String, enum: ['pending_confirmation', 'confirmed', 'arrived', 'showed', 'no_show', 'cancelled', 'sold'], default: 'pending_confirmation', required: true },
     assignedPlatformUserId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     assignedStoreUserId: { type: Schema.Types.ObjectId, default: null },

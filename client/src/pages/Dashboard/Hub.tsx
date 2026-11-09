@@ -1,7 +1,7 @@
 // src/pages/Dashboard/Hub.tsx
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Users, Clock, CalendarDays, TrendingUp, DollarSign, AlertTriangle, Database, ChevronRight } from 'lucide-react';
+import { Activity, Users, Clock, CalendarDays, TrendingUp, DollarSign, AlertTriangle, Database } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useStoreAppearance } from '../../contexts/StoreAppereanceContext';
 import defaultBanner from '../../images/defaultBanner.avif';
@@ -18,6 +18,7 @@ import type { StoreData } from '../../types';
 import { apiOperationalRepository } from '../../services/operational/apiOperationalRepository';
 import { showroomRepository } from '../../services/showroom';
 import eveoSymbol from '../../images/logo/eveo-symbol.svg';
+import EveoMascot from '../../components/insights/EveoMascot';
 
 type ExpandedCard = 'leads' | 'handoffs' | 'appts' | 'kpi' | 'followups' | null;
 
@@ -31,8 +32,10 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
   const { role, user } = useAuth();
   const [expanded, setExpanded] = useState<ExpandedCard>(null);
   const [isSwitchingStore, setIsSwitchingStore] = useState(false);
-  const { getBanner, activeStore, activeStoreId, cycleNextStore, stores } = useStoreAppearance();
+  const { getBanner, activeStore, activeStoreId, setActiveStoreId, stores } = useStoreAppearance();
   const activeStoreIdx = Math.max(0, stores.findIndex((store) => store.id === activeStore.id));
+  const [isEveBubbleOpen, setIsEveBubbleOpen] = useState(false);
+  const [seenPriorityIds, setSeenPriorityIds] = useState<string[]>([]);
 
   const [storeData, setStoreData] = useState<StoreData>(() => user
     ? { staff: [], leads: [], handoffs: [], appointments: [], sold: [], pending: [], bannerUrl: '' }
@@ -85,17 +88,35 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
 
   const navigate = useNavigate();
   const kpiValue = role === 'bdc' ? 42 : role === 'sales' ? 65 : 82;
+  const seenKey = `eveo-seen-priorities:${user?.id || 'demo'}:${activeStore.id}`;
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(seenKey);
+      setSeenPriorityIds(stored ? JSON.parse(stored) as string[] : []);
+    } catch { setSeenPriorityIds([]); }
+  }, [seenKey]);
 
-  const handleStoreToggle = () => {
-    if (role === 'bdc' || role === 'bdc_manager' || role === 'owner') {
-      playCardScroll();
-      setIsSwitchingStore(true);
-      cycleNextStore();
-      setTimeout(() => setIsSwitchingStore(false), 450);
-    }
+  const priorityIds = [
+    ...storeData.leads.filter((lead) => !lead.assignee).map((lead) => `lead:${lead.id}`),
+    ...storeData.leads
+      .filter((lead) => lead.status?.toLowerCase() === 'new' && Number.isFinite(Date.parse(lead.time)) && Date.now() - Date.parse(lead.time) >= 60_000)
+      .map((lead) => `lead:handle:${lead.id}`),
+    ...storeData.appointments.filter((appointment) => appointment.status === 'pending_confirmation' || appointment.status === 'Pending Confirm').map((appointment) => `appointment:${appointment.id}`),
+    ...storeData.handoffs.map((visit) => `visit:${visit.id}`),
+  ];
+  const unreadPriorityIds = priorityIds.filter((id) => !seenPriorityIds.includes(id));
+  const unreadLeads = unreadPriorityIds.filter((id) => id.startsWith('lead:') && !id.startsWith('lead:handle:')).length;
+  const overdueHandleLeads = unreadPriorityIds.filter((id) => id.startsWith('lead:handle:')).length;
+  const unreadAppointments = unreadPriorityIds.filter((id) => id.startsWith('appointment:')).length;
+  const unreadHandoffs = unreadPriorityIds.filter((id) => id.startsWith('visit:')).length;
+  const markPrioritiesSeen = (prefix?: string) => {
+    const ids = prefix ? priorityIds.filter((id) => id.startsWith(prefix)) : priorityIds;
+    const next = [...new Set([...seenPriorityIds, ...ids])];
+    setSeenPriorityIds(next);
+    try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch { /* storage may be blocked */ }
   };
 
-  const nextStoreName = stores[(activeStoreIdx + 1) % Math.max(1, stores.length)]?.name || '';
+  const canChooseStore = (role === 'bdc' || role === 'bdc_manager') && stores.length > 1;
 
   return (
     <motion.div
@@ -106,17 +127,14 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
     >
       <AnimatePresence>
         {isSwitchingStore && (
-          <GlobalLoader fullScreen={true} text={`Syncing ${nextStoreName}...`} />
+          <GlobalLoader fullScreen={true} text="Switching stores…" />
         )}
       </AnimatePresence>
 
       <div className="hidden md:block absolute top-0 left-1/2 -translate-x-1/2 w-200 h-75 bg-orange-500/5 blur-[120px] pointer-events-none rounded-full" />
 
       {/* Hero Banner */}
-      <section
-        onClick={handleStoreToggle}
-        className={`relative w-full h-44 sm:h-72 lg:h-80 mb-3 sm:mb-8 rounded-b-3xl md:rounded-4xl overflow-hidden group md:mt-8 md:mx-8 md:w-[calc(100%-4rem)] max-w-6xl xl:mx-auto shadow-2xl dark:shadow-none ${(role === 'bdc' || role === 'bdc_manager' || role === 'owner') ? 'cursor-pointer active:scale-[0.99] transition-transform' : ''}`}
-      >
+      <section className="relative w-full h-44 sm:h-72 lg:h-80 mb-3 sm:mb-8 rounded-b-3xl md:rounded-4xl overflow-hidden group md:mt-8 md:mx-8 md:w-[calc(100%-4rem)] max-w-6xl xl:mx-auto shadow-2xl dark:shadow-none">
         <img
           src={displayBanner}
           alt={`${activeStore.name} Dealership Hero Banner`}
@@ -141,40 +159,42 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
               </h1>
               <p className="text-gray-300 text-[11px] sm:text-sm font-medium drop-shadow-md leading-snug max-w-md line-clamp-2">
                 {role === 'bdc'
-                  ? user ? 'Review incoming leads and activity across your assigned stores.' : 'Your demo lead workspace is ready. Tap the banner to rotate through stores.'
+                  ? user ? 'Review incoming leads and activity across your assigned stores.' : 'Your demo lead workspace is ready. Choose a store from the banner dots.'
                   : user ? 'Review dealership activity, appointments, and pipeline records.' : 'Explore a dealership demo workspace with sample operational metrics.'}
               </p>
             </div>
 
-            <button
-              type="button"
-              className="relative flex items-center p-1 pr-3 sm:p-1.5 sm:pr-4 gap-2 sm:gap-3 rounded-full backdrop-blur-xl bg-white/10 dark:bg-black/40 border border-white/20 dark:border-white/10 shadow-lg hover:bg-white/20 dark:hover:bg-white/10 transition-all outline-none focus-visible:ring-2 focus-visible:ring-orange-500 group/btn cursor-pointer"
-            >
+            <div className="relative flex items-center gap-2.5 sm:gap-3 rounded-2xl bg-black/35 px-3 py-2 backdrop-blur-xl">
               {homeBtnLogo && homeBtnLogo.trim().length > 0 ? (
-                <div className="flex items-center justify-center bg-white rounded-full p-1.5 shrink-0 z-10 shadow-xs h-7 sm:h-10 w-14 sm:w-20">
+                <div className="flex h-8 w-12 shrink-0 items-center justify-center rounded-lg bg-white p-1 shadow-xs sm:h-10 sm:w-16">
                   <img src={homeBtnLogo} alt={`${dealershipName} Logo`} onError={(event) => { event.currentTarget.src = eveoSymbol; }} className="h-full w-full object-contain" />
                 </div>
               ) : (
-                <div className="flex items-center justify-center bg-gray-100 dark:bg-gray-200 text-black px-2.5 py-1 sm:px-3 sm:py-2 rounded-full text-[9px] sm:text-[10px] font-extrabold tracking-tighter shrink-0 z-10 shadow-xs">
-                  <img src={eveoSymbol} alt="" className="h-4 w-4 mr-1" />{activeStore.logoText} <span className="text-orange-600 ml-0.5">/</span> {role.toUpperCase()}
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white p-1 sm:h-10 sm:w-10">
+                  <img src={eveoSymbol} alt="" className="h-full w-full object-contain" />
                 </div>
               )}
-              <span className="text-white font-bold text-xs sm:text-sm z-10 whitespace-nowrap drop-shadow-xs flex items-center gap-1">
-                {activeStore.name}
-                {(role === 'bdc' || role === 'bdc_manager' || role === 'owner') && (
-                  <ChevronRight size={14} className="text-white/50 group-hover/btn:translate-x-0.5 transition-transform" />
-                )}
-              </span>
-            </button>
+              <span className="max-w-40 truncate text-xs font-semibold text-white drop-shadow-xs sm:max-w-56 sm:text-sm">{activeStore.name}</span>
+            </div>
           </div>
         </div>
 
-        {(role === 'bdc' || role === 'bdc_manager' || role === 'owner') && (
+        {canChooseStore && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
-            {stores.map((_, idx) => (
-              <div
-                key={idx}
-                className={`h-1.5 rounded-full transition-all duration-500 ${idx === activeStoreIdx ? 'w-6 bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'w-2 bg-white/30 group-hover:bg-white/50'}`}
+            {stores.map((store, idx) => (
+              <button
+                key={store.id}
+                type="button"
+                aria-label={`Show ${store.name}`}
+                aria-current={idx === activeStoreIdx ? 'true' : undefined}
+                onClick={() => {
+                  if (idx === activeStoreIdx) return;
+                  playCardScroll();
+                  setIsSwitchingStore(true);
+                  setActiveStoreId(store.id);
+                  window.setTimeout(() => setIsSwitchingStore(false), 450);
+                }}
+                className={`h-2.5 rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${idx === activeStoreIdx ? 'w-7 bg-white shadow-[0_0_8px_rgba(255,255,255,0.65)]' : 'w-2.5 bg-white/55 hover:bg-white/85'}`}
               />
             ))}
           </div>
@@ -195,7 +215,9 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
             trend="In Active Pipeline"
             titleColor="text-emerald-500"
             icon={<Activity size={13} />}
-            onClick={() => setExpanded('leads')}
+            dotColor={unreadLeads ? 'bg-emerald-500' : undefined}
+            pingColor={unreadLeads ? 'bg-emerald-400' : undefined}
+            onClick={() => { markPrioritiesSeen('lead:'); setExpanded('leads'); }}
           />
           <DashboardCard
             layoutId="card-handoffs"
@@ -204,33 +226,38 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
             trend={liveHandoffCount > 0 ? 'Waiting for Handoff' : 'Floor is Clear'}
             titleColor="text-orange-500"
             icon={<Users size={13} />}
-            dotColor={liveHandoffCount > 0 ? 'bg-orange-500' : undefined}
-            pingColor={liveHandoffCount > 0 ? 'bg-orange-400' : undefined}
+            dotColor={unreadHandoffs ? 'bg-orange-500' : undefined}
+            pingColor={unreadHandoffs ? 'bg-orange-400' : undefined}
             borderGlow={liveHandoffCount > 0 ? 'bg-orange-500/5 dark:bg-orange-500/10 border-orange-500/30 dark:border-orange-500/20' : undefined}
-            onClick={() => setExpanded('handoffs')}
+            onClick={() => { markPrioritiesSeen('visit:'); setExpanded('handoffs'); }}
           />
-          <DashboardCard
-            layoutId="card-insights"
-            title="AI Assistant"
-            value="Open"
-            trend="E.V.E. insights"
-            titleColor="text-purple-500"
-            icon={<Activity size={13} />}
-            dotColor="bg-red-500"
-            pingColor="bg-purple-400"
-            onClick={() => navigate('/app/insights')}
-          />
+          <section className="relative min-h-28 overflow-visible rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm dark:border-white/10 dark:bg-[#0a0f16]/80 sm:min-h-40 sm:rounded-3xl sm:p-6" aria-label="E.V.E. assistant">
+            {unreadPriorityIds.length > 0 && <span className="absolute right-3.5 top-3.5 flex h-2.5 w-2.5 sm:right-5 sm:top-5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" /></span>}
+            <div className="flex h-full items-center gap-2 sm:gap-4">
+              <EveoMascot size="sm" mood={unreadPriorityIds.length ? 'alert' : 'sleep'} flashAlertKey={unreadPriorityIds.join('|')} allowSleep onClick={() => setIsEveBubbleOpen((open) => !open)} className="shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-purple-600 dark:text-purple-400 sm:text-xs">AI Assistant · E.V.E.</p>
+                <p className="mt-1 text-xl font-semibold tracking-tight text-gray-900 dark:text-white sm:text-3xl">{unreadPriorityIds.length ? `${unreadPriorityIds.length} to review` : 'Resting'}</p>
+                <p className="mt-1 text-[10px] text-gray-600 dark:text-gray-400 sm:text-xs">{unreadPriorityIds.length ? 'New dealership priorities' : 'No priority updates'}</p>
+                {isEveBubbleOpen && <div className="absolute inset-x-3 bottom-full z-40 mb-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-xl dark:border-white/15 dark:bg-[#101722] sm:inset-x-5">
+                  <p className="text-xs font-semibold text-gray-900 dark:text-white">{unreadPriorityIds.length ? 'I found new dealership activity.' : 'Everything important is up to date.'}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-600 dark:text-gray-300">{unreadPriorityIds.length ? `${unreadLeads} unassigned leads · ${overdueHandleLeads} leads waiting over 1 minute · ${unreadAppointments} appointments to confirm · ${unreadHandoffs} showroom handoffs.` : 'I’ll wake when a new lead needs attention, an appointment needs confirmation, or a customer needs a handoff.'}</p>
+                  <button type="button" onClick={() => { markPrioritiesSeen(); setIsEveBubbleOpen(false); navigate('/app/insights'); }} className="mt-2 min-h-9 rounded-xl bg-orange-600 px-3 text-xs font-semibold text-white">Review with E.V.E.</button>
+                </div>}
+              </div>
+            </div>
+          </section>
 
           {role === 'bdc' && (
             <>
-              <DashboardCard layoutId="card-appts" title="Confirmations" value={liveApptCount.toString()} trend="Requires Action" titleColor="text-gray-400" icon={<CalendarDays size={13} />} dotColor={liveApptCount > 0 ? 'bg-red-500' : undefined} pingColor={liveApptCount > 0 ? 'bg-red-400' : undefined} onClick={() => setExpanded('appts')} />
+              <DashboardCard layoutId="card-appts" title="Confirmations" value={liveApptCount.toString()} trend="Requires Action" titleColor="text-gray-400" icon={<CalendarDays size={13} />} dotColor={unreadAppointments ? 'bg-red-500' : undefined} pingColor={unreadAppointments ? 'bg-red-400' : undefined} onClick={() => { markPrioritiesSeen('appointment:'); setExpanded('appts'); }} />
               <ProgressCard layoutId="card-kpi" title="Daily KPI" percentage={user ? null : kpiValue} trend={user ? 'No live KPI target' : 'Demo target: 250'} onClick={() => setExpanded('kpi')} />
-              <DashboardCard layoutId="card-followups" title="Follow-Ups" value={user ? '—' : '14'} trend={user ? 'Follow-up feed' : '> 15m unattended'} titleColor="text-gray-400" icon={<Clock size={13} />} dotColor={user ? undefined : 'bg-red-500'} pingColor={user ? undefined : 'bg-red-400'} onClick={() => setExpanded('followups')} />
+              <DashboardCard layoutId="card-followups" title="Follow-Ups" value={user ? '—' : '14'} trend={user ? 'Follow-up feed' : '> 15m unattended'} titleColor="text-gray-400" icon={<Clock size={13} />} dotColor={undefined} onClick={() => setExpanded('followups')} />
             </>
           )}
           {role === 'sales' && (
             <>
-              <DashboardCard layoutId="card-appts" title="Appointments" value={liveApptCount.toString()} trend="Today's Desk" titleColor="text-gray-400" icon={<CalendarDays size={13} />} dotColor={liveApptCount > 0 ? 'bg-red-500' : undefined} pingColor={liveApptCount > 0 ? 'bg-red-400' : undefined} onClick={() => setExpanded('appts')} />
+              <DashboardCard layoutId="card-appts" title="Appointments" value={liveApptCount.toString()} trend="Today's Desk" titleColor="text-gray-400" icon={<CalendarDays size={13} />} dotColor={unreadAppointments ? 'bg-red-500' : undefined} pingColor={unreadAppointments ? 'bg-red-400' : undefined} onClick={() => { markPrioritiesSeen('appointment:'); setExpanded('appts'); }} />
               <ProgressCard layoutId="card-kpi" title="Monthly Target" percentage={user ? null : kpiValue} trend={user ? 'No live target configured' : 'Demo pacing'} onClick={() => setExpanded('kpi')} />
               <DashboardCard layoutId="none" title="Closing Ratio" value={user ? '—' : '22%'} trend={user ? 'No live sales source' : 'Demo metric'} titleColor="text-gray-400" icon={<TrendingUp size={13} />} onClick={() => {}} />
             </>
@@ -251,8 +278,7 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
                 trend={user ? 'Payroll source not connected' : 'Demo metric'}
                 titleColor="text-orange-500"
                 icon={<DollarSign size={13} />}
-                dotColor="bg-orange-500"
-                pingColor="bg-orange-400"
+                dotColor={undefined}
                 borderGlow="bg-orange-500/5 dark:bg-orange-500/10 border-orange-500/30 dark:border-orange-500/20"
                 onClick={() => navigate('/app/account')}
               />
@@ -263,8 +289,7 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
                 trend={user ? 'Follow-up source not connected' : 'Demo metric'}
                 titleColor="text-red-500"
                 icon={<AlertTriangle size={13} />}
-                dotColor="bg-red-500"
-                pingColor="bg-red-400"
+                dotColor={undefined}
                 borderGlow="bg-red-500/5 dark:bg-red-500/10 border-red-500/30 dark:border-red-500/20"
                 onClick={() => setExpanded('followups')}
               />
@@ -275,8 +300,7 @@ export default function Hub({ bannerImg, homeBtnLogo, dealershipName = 'Auto Dea
                 trend={user ? 'Integration health unavailable' : 'Demo metric'}
                 titleColor="text-emerald-500"
                 icon={<Database size={13} />}
-                dotColor="bg-emerald-500"
-                pingColor="bg-emerald-400"
+                dotColor={undefined}
                 borderGlow="bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/30 dark:border-red-500/20"
                 onClick={() => navigate('/app/settings')}
               />

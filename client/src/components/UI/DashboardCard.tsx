@@ -49,7 +49,7 @@ export default function DashboardCard({
 
       {dotColor && (
         <div className="absolute top-3.5 right-3.5 sm:top-5 sm:right-5 flex h-2 w-2 sm:h-2.5 sm:w-2.5 z-10">
-          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${pingColor || dotColor}`} />
+          {pingColor && <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${pingColor}`} />}
           <span className={`relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 ${dotColor}`} />
         </div>
       )}

@@ -197,7 +197,7 @@ export default function LiveShowroomDeck({
               </div>
               <div>
                 <h3 className="text-xs sm:text-base font-bold text-white">Live Activity</h3>
-                <p className="hidden sm:block text-[10px] font-bold uppercase tracking-widest text-gray-500">Telemetry Deck</p>
+                <p className="hidden sm:block text-[10px] font-bold uppercase tracking-widest text-gray-500">Showroom</p>
               </div>
             </div>
             <ArrowRight size={15} className="relative z-10 text-emerald-400 group-hover:translate-x-1 transition-transform shrink-0" />

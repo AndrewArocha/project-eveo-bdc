@@ -12,6 +12,7 @@ export const createAppointmentSchema = z.object({
   inventoryVehicleId: objectId.optional(),
   vehicleSnapshot: z.string().trim().max(180).optional(),
   scheduledAt: z.iso.datetime().optional(),
+  durationMinutes: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)]).optional(),
   status: z.enum(statuses).optional(),
   assignedPlatformUserId: objectId.optional(),
   assignedStoreUserId: objectId.optional(),
@@ -19,4 +20,4 @@ export const createAppointmentSchema = z.object({
 });
 
 export const updateAppointmentStatusSchema = z.object({ status: z.enum(statuses) });
-export const updateAppointmentDetailsSchema = z.object({ scheduledAt: z.iso.datetime().optional(), assignedPlatformUserId: objectId.nullable().optional(), assignedStoreUserId: objectId.nullable().optional() }).refine((value) => Object.keys(value).length > 0);
+export const updateAppointmentDetailsSchema = z.object({ scheduledAt: z.iso.datetime().optional(), durationMinutes: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)]).optional(), assignedPlatformUserId: objectId.nullable().optional(), assignedStoreUserId: objectId.nullable().optional() }).refine((value) => Object.keys(value).length > 0);

@@ -188,7 +188,7 @@ export default function LiveActivityDeck({
               </div>
               <div className="min-w-0">
                 <h3 className="text-xs sm:text-sm font-bold text-white truncate">Showroom ({activeVisitCount})</h3>
-                <p className="hidden lg:block text-[10px] font-bold uppercase tracking-widest text-gray-500">Floor Radar</p>
+                <p className="hidden lg:block text-[10px] font-bold uppercase tracking-widest text-gray-500">Activity</p>
               </div>
             </div>
             <ArrowRight size={14} className="relative z-10 text-blue-400 shrink-0" />

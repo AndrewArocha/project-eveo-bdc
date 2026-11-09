@@ -9,6 +9,7 @@ interface AuthContextType {
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   acceptInvitation: (input: { token: string; name: string; password: string }) => Promise<void>;
+  refreshUser: () => Promise<ApiUser>;
   signOut: () => void;
 }
 
@@ -71,6 +72,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     acceptSession(session);
   }, [acceptSession]);
 
+  const refreshUser = useCallback(async () => {
+    const profile = await apiRequest<ApiUser>('/users/me');
+    setUser(profile);
+    setRoleState(profile.role);
+    localStorage.setItem('eveo_role', profile.role);
+    return profile;
+  }, []);
+
   const setRole = useCallback((newRole: UserRole) => {
     setRoleState(newRole);
     localStorage.setItem('eveo_role', newRole);
@@ -84,8 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ role, setRole, user, isLoading, signIn, acceptInvitation, signOut }),
-    [role, setRole, user, isLoading, signIn, acceptInvitation, signOut],
+    () => ({ role, setRole, user, isLoading, signIn, acceptInvitation, refreshUser, signOut }),
+    [role, setRole, user, isLoading, signIn, acceptInvitation, refreshUser, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

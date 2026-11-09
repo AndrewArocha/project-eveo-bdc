@@ -6,6 +6,8 @@ export function toSafeUser(user: HydratedDocument<IUser>) {
     id: user.id,
     name: user.name,
     email: user.email,
+    phone: user.phone || '',
+    weeklySchedule: user.weeklySchedule || {},
     role: user.role,
     dealerAccountId: user.dealerAccountId,
     storeIds: user.storeIds.map((storeId) => storeId.toString()),

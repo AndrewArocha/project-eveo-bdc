@@ -1,12 +1,13 @@
 import { model, Schema, type InferSchemaType } from 'mongoose';
 
 const showroomEventSchema = new Schema({
-  type: { type: String, enum: ['customer_greeted', 'visit_claimed', 'walkaround_started', 'media_added', 'test_drive_started', 'test_drive_completed', 'handoff_requested', 'handoff_accepted', 'manager_intervention', 'sla_breached', 'bdc_contact_logged', 'note_added', 'visit_completed'], required: true },
+  type: { type: String, enum: ['customer_greeted', 'visit_claimed', 'walkaround_started', 'media_added', 'test_drive_started', 'test_drive_completed', 'deal_desked', 'handoff_requested', 'handoff_accepted', 'manager_intervention', 'sla_breached', 'bdc_contact_logged', 'note_added', 'visit_completed'], required: true },
   actorUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   actorName: { type: String, required: true, trim: true, maxlength: 100 },
   occurredAt: { type: Date, required: true, default: Date.now },
   message: { type: String, required: true, trim: true, maxlength: 2000 },
   media: { type: Schema.Types.Mixed, default: undefined },
+  replyToEventId: { type: Schema.Types.ObjectId, default: null },
 }, { _id: true });
 
 const showroomVisitSchema = new Schema({
@@ -20,6 +21,7 @@ const showroomVisitSchema = new Schema({
   checkedInByUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   checkedInByName: { type: String, required: true, trim: true, maxlength: 100 },
   customerNameSnapshot: { type: String, required: true, trim: true, maxlength: 160 },
+  greetedPerson: { type: String, required: true, trim: true, maxlength: 80, default: 'customer' },
   phoneSnapshot: { type: String, trim: true, default: '', maxlength: 40 },
   notes: { type: String, trim: true, default: '', maxlength: 4000 },
   status: { type: String, enum: ['active', 'handoff_requested', 'completed', 'cancelled'], default: 'active', required: true },

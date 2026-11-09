@@ -64,6 +64,7 @@ function seedFromStoreHandoffs(storeId: string): PersistedState {
       id: visitId,
       storeId,
       customerName: h.name,
+      greetedPerson: 'customer',
       customerPhone: '(732) 555-019' + idx,
       notes: `Walk-in interested in ${h.vehicle}. Current wait time: ${h.waitTime}.`,
       assignedRepId: repId,
@@ -206,6 +207,7 @@ export const mockShowroomRepository: ShowroomRepository = {
       id: createId('visit'),
       storeId,
       customerName,
+      greetedPerson: input.greetedPerson,
       customerPhone: input.customerPhone?.trim() || null,
       notes: input.notes?.trim() || null,
       assignedRepId: input.assignedRepId,
@@ -227,7 +229,8 @@ export const mockShowroomRepository: ShowroomRepository = {
       actorId: input.checkedInById,
       actorName: input.checkedInByName,
       occurredAt: now,
-      message: 'Customer greeted. Live visit started.',
+      message: `Greeted ${input.greetedPerson}. Live visit started.`,
+      media: input.greetingMedia,
     };
     const initialNoteEvent: ShowroomEvent | null = input.notes?.trim()
       ? {
@@ -257,9 +260,11 @@ export const mockShowroomRepository: ShowroomRepository = {
     if (visitIndex < 0) throw new Error('This showroom visit could not be found.');
 
     const current = state.visits[visitIndex];
-    if (current.status === 'completed' || current.status === 'cancelled') {
+    const isFollowUp = input.type === 'note_added' || input.type === 'media_added';
+    if (current.status === 'cancelled' || (current.status === 'completed' && !isFollowUp)) {
       throw new Error('This visit is closed and cannot receive new events.');
     }
+    if (input.type === 'deal_desked' && input.media?.kind !== 'image') throw new Error('Attach a photo of the deal screen or printed desk before saving the desk step.');
 
     const now = new Date().toISOString();
     const event: ShowroomEvent = {
@@ -272,6 +277,7 @@ export const mockShowroomRepository: ShowroomRepository = {
       occurredAt: now,
       message: input.message.trim() || eventLabel(input.type),
       ...(input.media ? { media: input.media } : {}),
+      ...(input.replyToEventId ? { replyToEventId: input.replyToEventId } : {}),
     };
 
     const updatedVisit: ShowroomVisitRecord = {
@@ -349,6 +355,7 @@ function eventLabel(type: ShowroomEventType): string {
     media_added: 'Media added',
     test_drive_started: 'Test drive started',
     test_drive_completed: 'Test drive completed',
+    deal_desked: 'Deal desked',
     handoff_requested: 'BDC handoff requested',
     bdc_contact_logged: 'BDC contact logged',
     note_added: 'Note added',

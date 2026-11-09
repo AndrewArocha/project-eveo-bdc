@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity, AlertCircle, ArrowLeft, CalendarClock, CalendarDays, CarFront, ChevronRight, DollarSign, ImagePlus, LoaderCircle,
-  MessageSquareText, Radio, ScanBarcode, Send, Sparkles, Trash2,
+  Lock, MessageSquareText, Radio, ScanBarcode, Send, Sparkles, Trash2,
   UserCheck, Users, Video, X, Zap
 } from 'lucide-react';
 import { CURRENT_USER, getStoreDataOrEmpty, getVisibleStoreRoster } from '../../data/mockDatabase';
@@ -28,6 +28,7 @@ import LiveActivityDeck from '../../components/showroom/LiveActivityDeck';
 import { showroomRepository } from '../../services/showroom';
 import { apiLiveActivityRepository } from '../../services/liveActivity/apiLiveActivityRepository';
 import { apiOperationalRepository } from '../../services/operational/apiOperationalRepository';
+import { apiInventoryRepository, type ApiInventoryVehicle } from '../../services/inventory/apiInventoryRepository';
 import { teamRepository } from '../../services/team/teamRepository';
 import type { ApiTeamMember } from '../../services/apiClient';
 import { getMockShowroomMedia, saveMockShowroomMedia } from '../../services/showroomMedia/mockShowroomMediaStore';
@@ -54,6 +55,7 @@ const EVENT_LABELS: Record<ShowroomEventType, string> = {
   media_added: 'Photo or video added',
   test_drive_started: 'Test drive started',
   test_drive_completed: 'Test drive completed',
+  deal_desked: 'Deal desked',
   handoff_requested: 'BDC handoff requested',
   bdc_contact_logged: 'BDC activity logged',
   note_added: 'Visit note added',
@@ -167,6 +169,10 @@ export default function LiveShowroom() {
 
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [greetedPerson, setGreetedPerson] = useState('customer');
+  const [greetingPhotoFile, setGreetingPhotoFile] = useState<File | null>(null);
+  const [greetingPhotoPreview, setGreetingPhotoPreview] = useState<string | null>(null);
+  const [pendingAppointmentLink, setPendingAppointmentLink] = useState<{ appointmentId?: string; customerId?: string; leadId?: string } | null>(null);
   const [assignedRepId, setAssignedRepId] = useState('');
   const [initialNotes, setInitialNotes] = useState('');
   const [vehicles, setVehicles] = useState<ShowroomVehicleSelection>(EMPTY_VEHICLES);
@@ -225,6 +231,16 @@ export default function LiveShowroom() {
     setStagedMediaPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [stagedMediaFile]);
+
+  useEffect(() => {
+    if (!greetingPhotoFile) {
+      setGreetingPhotoPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(greetingPhotoFile);
+    setGreetingPhotoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [greetingPhotoFile]);
 
   const [, setAvatarTick] = useState(0);
   useEffect(() => {
@@ -476,21 +492,14 @@ export default function LiveShowroom() {
       return;
     }
     const repObj = salespeople.find((s) => s.name === bubble.rep) || salespeople[0];
-    const created = await showroomRepository.createVisit(storeId, {
-      customerName: bubble.customerName,
-      customerPhone: bubble.customerPhone,
-      customerId: bubble.customerId,
-      leadId: bubble.leadId,
-      appointmentId: bubble.appointmentId,
-      notes: `Checked in from Master Schedule (${bubble.vehicle}).`,
-      assignedRepId: repObj ? String(repObj.id) : actor.actorId,
-      assignedRepName: bubble.rep || actor.actorName,
-      checkedInById: actor.actorId,
-      checkedInByName: actor.actorName,
-      vehicles: EMPTY_VEHICLES,
-    });
-    setSnapshots((current) => [created, ...current.filter((item) => item.visit.id !== created.visit.id)]);
-    switchView('visit', created.visit.id);
+    setCustomerName(bubble.customerName);
+    setCustomerPhone(bubble.customerPhone || '');
+    setPendingAppointmentLink({ appointmentId: bubble.appointmentId, customerId: bubble.customerId, leadId: bubble.leadId });
+    if (repObj) setAssignedRepId(String(repObj.id));
+    setInitialNotes(`Checked in from appointment (${bubble.vehicle}).`);
+    setGreetingPhotoFile(null);
+    setMutationError(null);
+    setIsCheckInOpen(true);
   };
 
   const handleMarkOverdueStrike = (bubble: FloorAppointmentBubble) => {
@@ -514,14 +523,22 @@ export default function LiveShowroom() {
       setMutationError('Enter the customer’s name to start the visit.');
       return;
     }
+    if (!greetingPhotoFile) {
+      setMutationError('Add a photo of the car to document the greeting before starting this visit.');
+      return;
+    }
     const selectedRep = salespeople.find((person) => String(person.id) === assignedRepId) || salespeople[0];
     if (!selectedRep) return;
 
     setIsSubmitting(true);
     try {
+      const greetingMedia = await saveMockShowroomMedia(greetingPhotoFile, storeId);
       const created = await showroomRepository.createVisit(storeId, {
         customerName,
         customerPhone,
+        greetedPerson,
+        greetingMedia,
+        ...pendingAppointmentLink,
         notes: initialNotes,
         assignedRepId: String(selectedRep.id),
         assignedRepName: selectedRep.name,
@@ -544,6 +561,9 @@ export default function LiveShowroom() {
 
       setCustomerName('');
       setCustomerPhone('');
+      setGreetedPerson('customer');
+      setGreetingPhotoFile(null);
+      setPendingAppointmentLink(null);
       setInitialNotes('');
       setVehicles(EMPTY_VEHICLES);
       setIsCheckInOpen(false);
@@ -559,8 +579,8 @@ export default function LiveShowroom() {
     type: ShowroomEventType,
     message: string,
     extras: Partial<AppendShowroomEventInput> = {}
-  ) => {
-    if (!selectedSnapshot) return;
+  ): Promise<boolean> => {
+    if (!selectedSnapshot) return false;
     setBusyAction(type);
     setMutationError(null);
     try {
@@ -587,10 +607,22 @@ export default function LiveShowroom() {
       if (type === 'visit_completed') {
         switchView('showroom');
       }
+      return true;
     } catch (error) {
       setMutationError(error instanceof Error ? error.message : 'Could not update visit.');
+      return false;
     } finally {
       setBusyAction(null);
+    }
+  };
+
+  const handleStageEvent = async (type: ShowroomEventType, message: string, photo?: File, replyToEventId?: string) => {
+    try {
+      const media = photo ? await saveMockShowroomMedia(photo, storeId) : undefined;
+      return await appendEvent(type, message, { ...(media ? { media } : {}), ...(replyToEventId ? { replyToEventId } : {}) });
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : 'Could not upload the visit photo.');
+      return false;
     }
   };
 
@@ -809,11 +841,9 @@ export default function LiveShowroom() {
                 layoutId="portal-showroom"
                 title="Live Showroom"
                 value={ongoingAppointmentBubbles.length.toString()}
-                trend="Active Floor & SLA Appointment Radar"
+                trend="Customer visits in progress"
                 titleColor="text-orange-500"
                 icon={<Users size={15} />}
-                dotColor="bg-orange-500"
-                pingColor="bg-orange-400"
                 borderGlow="bg-orange-500/5 dark:bg-orange-500/10 border-orange-500/30 dark:border-orange-500/20"
                 onClick={() => switchView('showroom')}
               />
@@ -822,11 +852,9 @@ export default function LiveShowroom() {
                 layoutId="portal-activity"
                 title="Live Activity"
                 value={feedPosts.length.toString()}
-                trend="Real-Time Team & EVEO AI Telemetry Deck"
+                trend="Recent dealership activity"
                 titleColor="text-emerald-500"
                 icon={<Activity size={15} />}
-                dotColor="bg-emerald-500"
-                pingColor="bg-emerald-400"
                 onClick={() => switchView('activity')}
               />
             </motion.div>
@@ -888,6 +916,7 @@ export default function LiveShowroom() {
                 onClearStagedMedia={() => setStagedMediaFile(null)}
                 mediaInputRef={mediaInputRef}
                 onAppendEvent={appendEvent}
+                onStageEvent={handleStageEvent}
                 onNoteOrMediaSubmit={handleNoteOrMediaSubmit}
                 onStageMedia={(e: ChangeEvent<HTMLInputElement>) => {
                   const f = e.target.files?.[0];
@@ -1143,6 +1172,30 @@ export default function LiveShowroom() {
                   className={inputClasses}
                 />
               </div>
+              <label className="mt-3 block text-[10px] font-bold uppercase tracking-widest text-gray-400">Who did you greet?
+                <select value={greetedPerson} onChange={(event) => setGreetedPerson(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-white/10 bg-[#101722] px-3 text-sm text-white outline-none focus:border-orange-500">
+                  <option value="customer">The scheduled customer</option>
+                  <option value="spouse or partner">Their spouse or partner</option>
+                  <option value="friend">Their friend</option>
+                  <option value="family member">Another family member</option>
+                  <option value="other guest">Another guest</option>
+                </select>
+              </label>
+              <div className="mt-3 rounded-2xl border border-orange-500/25 bg-orange-500/5 p-3.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-orange-500">Greeting photo · required</p>
+                    <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-300">Photograph the vehicle, not the customer. You can take a new photo or choose an inventory image.</p>
+                  </div>
+                  <input type="file" accept="image/*" capture="environment" aria-label="Take or choose a greeting vehicle photo" onChange={(event) => setGreetingPhotoFile(event.target.files?.[0] || null)} className="sr-only" id="showroom-greeting-photo" />
+                  <label htmlFor="showroom-greeting-photo" className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-xl bg-orange-500 px-3 text-xs font-bold text-white hover:bg-orange-600"><ImagePlus size={14} />{greetingPhotoFile ? 'Replace' : 'Add photo'}</label>
+                </div>
+                {greetingPhotoFile && <div className="mt-3 flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-2">
+                  {greetingPhotoPreview && <img src={greetingPhotoPreview} alt="Greeting vehicle preview" className="h-14 w-20 rounded-lg object-cover" />}
+                  <span className="min-w-0 flex-1 truncate text-xs text-gray-700 dark:text-gray-200">{greetingPhotoFile.name}</span>
+                  <button type="button" onClick={() => setGreetingPhotoFile(null)} aria-label="Remove greeting photo" className="rounded-lg p-2 text-gray-500 hover:text-red-500"><Trash2 size={15} /></button>
+                </div>}
+              </div>
 
               {/* Live Query Matches from Store Database OR "+ Create" Badge */}
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -1270,11 +1323,11 @@ export default function LiveShowroom() {
             {mutationError && <p className="text-xs text-red-400">{mutationError}</p>}
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !greetingPhotoFile}
               className="w-full min-h-12 inline-flex items-center justify-center gap-2 rounded-2xl bg-orange-500 hover:bg-orange-600 px-5 py-3 text-sm font-black text-white shadow-lg cursor-pointer active:scale-95 transition-all"
             >
-              {isSubmitting ? <LoaderCircle size={16} className="animate-spin" /> : <Zap size={16} />}
-              Start Live Visit
+              {isSubmitting ? <LoaderCircle size={16} className="animate-spin" /> : !greetingPhotoFile ? <Lock size={16} /> : <Zap size={16} />}
+              {isSubmitting ? 'Saving greeting…' : 'Save greeting & start visit'}
             </button>
           </form>
         </div>
@@ -1339,6 +1392,216 @@ const QUICK_CHIPS: Array<{ label: string; type: ShowroomEventType }> = [
   { label: '⚡ Requesting BDC Assist', type: 'handoff_requested' },
 ];
 
+const VISIT_STAGES = ['Greeting', 'Walkaround', 'Test drive', 'Desking', 'Drive-off'] as const;
+
+function VisitPostGallery({ snapshot }: { snapshot: ShowroomVisitSnapshot }) {
+  const [slides, setSlides] = useState<Array<{ event: ShowroomEvent; url: string }>>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const urls: string[] = [];
+    void Promise.all(snapshot.events.filter((event) => event.media?.kind === 'image').map(async (event) => {
+      const blob = await getMockShowroomMedia(event.media!.id);
+      if (!blob) return null;
+      const url = URL.createObjectURL(blob);
+      urls.push(url);
+      return { event, url };
+    })).then((items) => {
+      if (!cancelled) setSlides(items.filter((item): item is { event: ShowroomEvent; url: string } => Boolean(item)));
+    });
+    return () => {
+      cancelled = true;
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [snapshot.events]);
+
+  useEffect(() => setActiveIndex((index) => Math.min(index, Math.max(0, slides.length - 1))), [slides.length]);
+  const active = slides[activeIndex];
+  if (!active) return null;
+
+  return (
+    <section aria-label="Showroom visit photos" className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#0a0f16]">
+      <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-white/10 sm:px-5">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{active.event.actorName}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{EVENT_LABELS[active.event.type]} · {activeIndex + 1} of {slides.length}</p>
+        </div>
+        <div className="flex gap-2">
+          <button type="button" aria-label="Previous visit photo" disabled={activeIndex === 0} onClick={() => setActiveIndex((index) => index - 1)} className="h-10 w-10 rounded-full border border-gray-200 text-gray-700 disabled:opacity-35 dark:border-white/15 dark:text-white">‹</button>
+          <button type="button" aria-label="Next visit photo" disabled={activeIndex >= slides.length - 1} onClick={() => setActiveIndex((index) => index + 1)} className="h-10 w-10 rounded-full border border-gray-200 text-gray-700 disabled:opacity-35 dark:border-white/15 dark:text-white">›</button>
+        </div>
+      </div>
+      <div className="grid md:grid-cols-[minmax(0,1.45fr)_minmax(15rem,0.8fr)]">
+        <div className="flex min-h-64 items-center justify-center bg-gray-950 md:min-h-80">
+          <img src={active.url} alt={`${active.event.type.replaceAll('_', ' ')} by ${active.event.actorName}`} className="max-h-[70dvh] w-full object-contain" />
+        </div>
+        <div className="p-4 sm:p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">{EVENT_LABELS[active.event.type]}</p>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-800 dark:text-gray-200">{active.event.message}</p>
+          <time className="mt-3 block text-xs text-gray-500 dark:text-gray-400">{formatDateTime(active.event.occurredAt)}</time>
+        </div>
+      </div>
+      <div className="flex justify-center gap-1.5 border-t border-gray-200 py-3 dark:border-white/10" aria-label="Choose visit photo">
+        {slides.map((slide, index) => <button key={slide.event.id} type="button" aria-label={`Show photo ${index + 1}`} aria-current={index === activeIndex} onClick={() => setActiveIndex(index)} className={`h-2.5 rounded-full transition-all ${index === activeIndex ? 'w-6 bg-orange-500' : 'w-2.5 bg-gray-300 dark:bg-gray-600'}`} />)}
+      </div>
+    </section>
+  );
+}
+
+function VisitStageWizard({
+  snapshot, stage, setStage, busyAction, mutationError, onClearError, onStageEvent,
+}: {
+  snapshot: ShowroomVisitSnapshot;
+  stage: number;
+  setStage: (stage: number) => void;
+  busyAction: string | null;
+  mutationError: string | null;
+  onClearError: () => void;
+  onStageEvent: (type: ShowroomEventType, message: string, photo?: File, replyToEventId?: string) => Promise<boolean>;
+}) {
+  const { visit, events } = snapshot;
+  const { user } = useAuth();
+  const [inventory, setInventory] = useState<ApiInventoryVehicle[]>([]);
+  const [selectedCars, setSelectedCars] = useState<string[]>(() => {
+    const initial = vehicleTitle(visit.vehicleOfInterest);
+    return initial === 'Vehicle pending VIN' ? [] : [initial];
+  });
+  const [carsSeen, setCarsSeen] = useState('');
+  const [walkaroundImpression, setWalkaroundImpression] = useState('Neutral');
+  const [driveImpression, setDriveImpression] = useState('Neutral');
+  const [note, setNote] = useState('');
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState('');
+  const greeting = events.find((event) => event.type === 'customer_greeted');
+  const hasWalkaround = events.some((event) => event.type === 'walkaround_started');
+  const hasDriveStarted = events.some((event) => event.type === 'test_drive_started');
+  const hasDriveCompleted = events.some((event) => event.type === 'test_drive_completed');
+  const deskEvent = events.find((event) => event.type === 'deal_desked' || event.type === 'handoff_requested');
+  const isComplete = visit.status === 'completed';
+  const completed = [Boolean(greeting), hasWalkaround, hasDriveCompleted, Boolean(deskEvent), isComplete];
+
+  useEffect(() => {
+    if (!user) { setInventory([]); return; }
+    let active = true;
+    apiInventoryRepository.list(visit.storeId, { status: 'READY_FOR_SALE' })
+      .then((vehicles) => { if (active) setInventory(vehicles); })
+      .catch(() => { if (active) setInventory([]); });
+    return () => { active = false; };
+  }, [user, visit.storeId]);
+
+  useEffect(() => {
+    if (!photo) { setPhotoPreview(''); return; }
+    const url = URL.createObjectURL(photo);
+    setPhotoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photo]);
+
+  useEffect(() => {
+    if (isComplete) setStage(4);
+    else if (deskEvent) setStage(4);
+    else if (hasDriveCompleted) setStage(3);
+    else if (hasWalkaround) setStage(2);
+  }, [deskEvent, hasDriveCompleted, hasWalkaround, isComplete, setStage]);
+
+  const clearStep = () => { setNote(''); setPhoto(null); };
+  const impressions = ['Positive', 'Neutral', 'Negative'];
+  const submitStep = async () => {
+    if (stage === 0) {
+      const trimmed = note.trim();
+      if (!trimmed) { setStage(1); return; }
+      if (!greeting) return;
+      if (await onStageEvent('note_added', `Greeting · ${trimmed}`, undefined, greeting.id)) { clearStep(); setStage(1); }
+      return;
+    }
+    if (stage === 1) {
+      const viewedCars = [...new Set([...selectedCars, carsSeen.trim()].filter(Boolean))];
+      const detail = [`Cars viewed: ${viewedCars.join(', ') || 'Not recorded'}`, `Impression: ${walkaroundImpression}`, note.trim() && `Notes: ${note.trim()}`].filter(Boolean).join(' · ');
+      if (await onStageEvent('walkaround_started', detail)) { clearStep(); setStage(2); }
+      return;
+    }
+    if (stage === 2) {
+      if (!hasDriveStarted) {
+        if (await onStageEvent('test_drive_started', `Test drive started.${note.trim() ? ` ${note.trim()}` : ''}`)) { clearStep(); }
+        return;
+      }
+      const detail = [`Customer impression: ${driveImpression}`, note.trim() && `Notes: ${note.trim()}`].filter(Boolean).join(' · ');
+      if (await onStageEvent('test_drive_completed', detail, photo || undefined)) { clearStep(); setStage(3); }
+      return;
+    }
+    if (stage === 3) {
+      if (!deskEvent && !photo) return;
+      const detail = `Deal desked${note.trim() ? ` · ${note.trim()}` : ''}`;
+      const type: ShowroomEventType = deskEvent && !photo ? 'note_added' : 'deal_desked';
+      if (await onStageEvent(type, detail, photo || undefined, deskEvent?.id)) { clearStep(); setStage(4); }
+      return;
+    }
+    const detail = `Customer drive-off${note.trim() ? ` · ${note.trim()}` : ''}`;
+    if (await onStageEvent('visit_completed', detail, photo || undefined)) { clearStep(); }
+  };
+
+  const stepTitle = VISIT_STAGES[stage];
+  const needsPhoto = stage === 3 && !deskEvent;
+  const driveAlreadyStarted = stage === 2 && hasDriveStarted && !hasDriveCompleted;
+  const canAdvance = true;
+
+  return (
+    <section className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0a0f16] sm:p-6" aria-labelledby="visit-step-title">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600 dark:text-orange-400">Sales visit · step {stage + 1} of {VISIT_STAGES.length}</p>
+          <h3 id="visit-step-title" className="mt-1 text-xl font-semibold tracking-tight text-gray-900 dark:text-white">{stepTitle}</h3>
+        </div>
+        <span className="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:bg-white/8 dark:text-gray-200">{visit.greetedPerson} · {visit.assignedRepName}</span>
+      </div>
+      <nav aria-label="Visit progress" className="mt-5 grid grid-cols-5 gap-1.5 sm:gap-2">
+        {VISIT_STAGES.map((label, index) => <button key={label} type="button" onClick={() => setStage(index)} aria-current={index === stage ? 'step' : undefined} className={`min-h-11 rounded-xl border px-1.5 text-center text-[10px] font-semibold transition sm:text-xs ${index === stage ? 'border-orange-500 bg-orange-500/10 text-orange-700 dark:text-orange-300' : completed[index] ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-gray-200 bg-gray-50 text-gray-500 dark:border-white/10 dark:bg-white/4 dark:text-gray-400'}`}><span className="block text-xs">{completed[index] ? '✓' : index + 1}</span><span className="block truncate">{label}</span></button>)}
+      </nav>
+
+      <div className="mt-5 space-y-4">
+        {stage === 0 && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/8 dark:text-emerald-200">Greeting saved for <strong>{visit.greetedPerson}</strong> with the required vehicle photo. Add context or continue.</div>}
+        {stage === 1 && <>
+          <div>
+            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Cars the customer viewed</p>
+            {inventory.length > 0 && <fieldset className="mt-2 grid max-h-48 gap-2 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2 dark:border-white/10 dark:bg-white/4" aria-label="Choose vehicles from live inventory">
+              <legend className="sr-only">Choose vehicles from live inventory</legend>
+              {inventory.slice(0, 24).map((vehicle) => {
+                const label = `${vehicle.vehicle}${vehicle.stockNumber ? ` · ${vehicle.stockNumber}` : ''}`;
+                const checked = selectedCars.includes(label);
+                return <label key={vehicle._id} className="flex min-h-10 items-center gap-3 rounded-lg px-2 text-sm text-gray-800 hover:bg-white dark:text-gray-200 dark:hover:bg-white/6"><input type="checkbox" checked={checked} onChange={() => setSelectedCars((current) => checked ? current.filter((item) => item !== label) : [...current, label])} className="h-4 w-4 accent-orange-500" /><span className="min-w-0 truncate">{label}</span></label>;
+              })}
+            </fieldset>}
+            <label className="mt-2 block text-xs font-medium text-gray-600 dark:text-gray-400">Add another model or stock number<input value={carsSeen} onChange={(event) => setCarsSeen(event.target.value)} placeholder="Optional" className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-base text-gray-900 outline-none focus:border-orange-500 dark:border-white/15 dark:bg-[#101722] dark:text-white" /></label>
+            {user && inventory.length === 0 && <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">No ready inventory is available to select. Add a vehicle or enter the model above.</p>}
+          </div>
+          <fieldset><legend className="text-xs font-semibold text-gray-700 dark:text-gray-300">Walkaround impression</legend><div className="mt-2 grid grid-cols-3 gap-2">{impressions.map((value) => <button key={value} type="button" aria-pressed={walkaroundImpression === value} onClick={() => setWalkaroundImpression(value)} className={`min-h-11 rounded-xl border text-sm font-semibold ${walkaroundImpression === value ? 'border-orange-500 bg-orange-500/10 text-orange-700 dark:text-orange-300' : 'border-gray-200 text-gray-600 dark:border-white/10 dark:text-gray-300'}`}>{value}</button>)}</div></fieldset>
+        </>}
+        {stage === 2 && <>
+          <p className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-500/20 dark:bg-blue-500/8 dark:text-blue-200">{driveAlreadyStarted ? 'Test drive is in progress. Record the customer’s impression when they return.' : 'Start the test drive now. Finish this step after recording how the customer felt.'}</p>
+          {driveAlreadyStarted && <fieldset><legend className="text-xs font-semibold text-gray-700 dark:text-gray-300">Customer driving impression</legend><div className="mt-2 grid grid-cols-3 gap-2">{impressions.map((value) => <button key={value} type="button" aria-pressed={driveImpression === value} onClick={() => setDriveImpression(value)} className={`min-h-11 rounded-xl border text-sm font-semibold ${driveImpression === value ? 'border-orange-500 bg-orange-500/10 text-orange-700 dark:text-orange-300' : 'border-gray-200 text-gray-600 dark:border-white/10 dark:text-gray-300'}`}>{value}</button>)}</div></fieldset>}
+          {driveAlreadyStarted && <PhotoPicker photo={photo} preview={photoPreview} onChange={setPhoto} label="Test-drive photo · optional" />}
+        </>}
+        {stage === 3 && <PhotoPicker photo={photo} preview={photoPreview} onChange={setPhoto} label={`Deal photo · ${needsPhoto ? 'required' : 'optional update'}`} help="Photograph the printed worksheet or deal screen. Do not include customer personal or financial information." />}
+        {stage === 4 && <PhotoPicker photo={photo} preview={photoPreview} onChange={setPhoto} label="Drive-off photo · optional" help="Capture the vehicle or delivery moment only with permission." />}
+        {<label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Visit notes<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} placeholder={stage === 0 ? 'Add context to the greeting (optional)' : 'Add details for BDC or the next team member'} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-base text-gray-900 outline-none focus:border-orange-500 dark:border-white/15 dark:bg-[#101722] dark:text-white" /></label>}
+        {mutationError && <div role="alert" className="flex items-start justify-between gap-3 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200"><span>{mutationError}</span><button type="button" onClick={onClearError} className="font-semibold">Dismiss</button></div>}
+        <div className="flex flex-col-reverse gap-2 border-t border-gray-200 pt-4 dark:border-white/10 sm:flex-row sm:justify-between">
+          <button type="button" disabled={stage === 0 || busyAction !== null} onClick={() => { clearStep(); setStage(stage - 1); }} className="min-h-11 rounded-xl border border-gray-300 px-4 text-sm font-semibold text-gray-700 disabled:opacity-40 dark:border-white/15 dark:text-gray-200">Previous step</button>
+          <button type="button" disabled={busyAction !== null || (!canAdvance && stage === 0) || (needsPhoto && !photo) || (isComplete && stage === 4)} onClick={() => void submitStep()} className="min-h-11 rounded-xl bg-orange-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-45">{busyAction ? 'Saving…' : stage === 2 && !hasDriveStarted ? 'Start test drive' : stage === 4 ? (isComplete ? 'Visit complete' : 'Complete visit') : stage === 0 ? (note.trim() ? 'Save note & continue' : 'Continue') : stage === 1 ? (hasWalkaround ? 'Save walkaround update' : 'Save walkaround & continue') : stage === 2 ? 'Finish test drive & continue' : (deskEvent ? 'Save desk update & continue' : 'Save deal photo & continue')}</button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PhotoPicker({ photo, preview, onChange, label, help }: { photo: File | null; preview: string; onChange: (file: File | null) => void; label: string; help?: string }) {
+  const inputId = `visit-photo-${label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
+  return <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-white/10 dark:bg-white/4">
+    <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold text-gray-900 dark:text-white">{label}</p>{help && <p className="mt-1 max-w-xl text-xs leading-relaxed text-gray-600 dark:text-gray-400">{help}</p>}</div><label htmlFor={inputId} className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-xl bg-orange-600 px-3 text-xs font-semibold text-white"><ImagePlus size={15} />{photo ? 'Replace' : 'Take / choose'}</label><input id={inputId} type="file" accept="image/*" capture="environment" className="sr-only" onChange={(event) => onChange(event.target.files?.[0] || null)} /></div>
+    {photo && <div className="mt-3 flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-black/20"><img src={preview} alt="Selected visit photo" className="h-14 w-20 rounded-lg object-cover" /><span className="min-w-0 flex-1 truncate text-xs text-gray-700 dark:text-gray-200">{photo.name}</span><button type="button" onClick={() => onChange(null)} className="rounded-lg px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-300">Remove</button></div>}
+  </div>;
+}
+
 function DedicatedVisitCockpit({
   snapshot,
   actor,
@@ -1353,6 +1616,7 @@ function DedicatedVisitCockpit({
   onClearStagedMedia,
   mediaInputRef,
   onAppendEvent,
+  onStageEvent,
   onNoteOrMediaSubmit,
   onStageMedia,
   onAssignToMe,
@@ -1371,7 +1635,8 @@ function DedicatedVisitCockpit({
   stagedMediaPreviewUrl: string | null;
   onClearStagedMedia: () => void;
   mediaInputRef: React.RefObject<HTMLInputElement | null>;
-  onAppendEvent: (type: ShowroomEventType, message: string, extras?: Partial<AppendShowroomEventInput>) => Promise<void>;
+  onAppendEvent: (type: ShowroomEventType, message: string, extras?: Partial<AppendShowroomEventInput>) => Promise<boolean>;
+  onStageEvent: (type: ShowroomEventType, message: string, photo?: File, replyToEventId?: string) => Promise<boolean>;
   onNoteOrMediaSubmit: (e: FormEvent<HTMLFormElement>) => Promise<void>;
   onStageMedia: (e: ChangeEvent<HTMLInputElement>) => void;
   onAssignToMe: () => Promise<void>;
@@ -1379,6 +1644,7 @@ function DedicatedVisitCockpit({
   onBackToFloor: () => void;
 }) {
   const { visit, events } = snapshot;
+  const [stage, setStage] = useState(1);
   const isClosed = visit.status === 'completed' || visit.status === 'cancelled';
   const hasWalkaround = events.some((event) => event.type === 'walkaround_started');
   const hasTestDriveStarted = events.some((event) => event.type === 'test_drive_started');
@@ -1457,15 +1723,15 @@ function DedicatedVisitCockpit({
             <button
               type="button"
               onClick={onBackToFloor}
-              className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-xs font-bold cursor-pointer"
+              className="min-h-11 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
             >
-              Floor Radar
+              Showroom
             </button>
           </div>
         </div>
 
         {/* 1-Tap 5-Stage Progress Stepper */}
-        <div className="relative z-10 grid grid-cols-5 gap-2 pt-6">
+        <div className="hidden">
           {steps.map((step, i) => (
             <button
               type="button"
@@ -1499,9 +1765,12 @@ function DedicatedVisitCockpit({
         </div>
       </div>
 
+      <VisitPostGallery snapshot={snapshot} />
+      <VisitStageWizard snapshot={snapshot} stage={stage} setStage={setStage} busyAction={busyAction} mutationError={mutationError} onClearError={onClearError} onStageEvent={onStageEvent} />
+
       {/* Lower Split: [Left 1-Tap Chips + Photo/Note Logger] | [Right Visit Timeline] */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {!isClosed && (
+        {false && !isClosed && (
           <div className="lg:col-span-5">
             <div className={`${glassCardClasses} p-6 space-y-4`}>
               <div className="absolute top-0 left-0 w-full h-[40%] bg-linear-to-b from-white/10 to-transparent pointer-events-none" />
@@ -1534,15 +1803,15 @@ function DedicatedVisitCockpit({
               {stagedMediaFile && (
                 <div className="relative z-10 p-3 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    {stagedMediaPreviewUrl && stagedMediaFile.type.startsWith('image/') ? (
-                      <img src={stagedMediaPreviewUrl} alt="Preview" className="w-11 h-11 rounded-xl object-cover border border-white/15 shrink-0" />
+                    {stagedMediaPreviewUrl && stagedMediaFile?.type.startsWith('image/') ? (
+                      <img src={stagedMediaPreviewUrl || undefined} alt="Preview" className="w-11 h-11 rounded-xl object-cover border border-white/15 shrink-0" />
                     ) : (
                       <div className="w-11 h-11 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-400 shrink-0">
                         <Video size={18} />
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-white truncate">{stagedMediaFile.name}</p>
+                      <p className="text-xs font-bold text-white truncate">{stagedMediaFile?.name}</p>
                       <p className="text-[10px] text-emerald-400 font-semibold">4K Auto-Downscaler Ready</p>
                     </div>
                   </div>
@@ -1583,21 +1852,20 @@ function DedicatedVisitCockpit({
           </div>
         )}
 
-        <div className={isClosed ? 'lg:col-span-12' : 'lg:col-span-7'}>
-          <div className={`${glassCardClasses} p-6`}>
-            <div className="absolute top-0 left-0 w-full h-[40%] bg-linear-to-b from-white/10 to-transparent pointer-events-none" />
+        <div className="lg:col-span-12">
+          <div className="relative overflow-hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#0a0f16] sm:p-6">
             <div className="relative z-10 flex items-center justify-between mb-4">
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+              <h3 className="text-xs font-semibold tracking-tight text-gray-700 dark:text-gray-300 flex items-center gap-2">
                 <MessageSquareText size={14} className="text-orange-500" /> Visit Timeline ({events.length})
               </h3>
-              <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Synced
+              <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Synced
               </span>
             </div>
 
             <ol className="relative z-10 space-y-0 max-h-105 overflow-y-auto pr-1 custom-scrollbar">
               {events.slice().reverse().map((event, index) => (
-                <TimelineEvent key={event.id} event={event} isLast={index === events.length - 1} />
+                <TimelineEvent key={event.id} event={event} isLast={index === events.length - 1} onReply={(message) => onAppendEvent('note_added', message, { replyToEventId: event.id })} />
               ))}
             </ol>
           </div>
@@ -1607,8 +1875,11 @@ function DedicatedVisitCockpit({
   );
 }
 
-function TimelineEvent({ event, isLast }: { event: ShowroomEvent; isLast: boolean }) {
+function TimelineEvent({ event, isLast, onReply }: { event: ShowroomEvent; isLast: boolean; onReply: (message: string) => Promise<boolean> }) {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [reply, setReply] = useState('');
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyBusy, setReplyBusy] = useState(false);
   const mediaId = event.media?.id;
 
   useEffect(() => {
@@ -1630,22 +1901,28 @@ function TimelineEvent({ event, isLast }: { event: ShowroomEvent; isLast: boolea
   return (
     <li className="relative flex gap-3 pb-4 last:pb-0">
       {!isLast && <span aria-hidden="true" className="absolute bottom-0 left-4 top-8 w-px bg-white/10" />}
-      <span className="relative z-10 mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 border border-white/15 text-[10px] font-black text-orange-400">
+      <span className="relative z-10 mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-[10px] font-bold text-orange-700 dark:border-white/15 dark:bg-white/5 dark:text-orange-300">
         {getInitials(event.actorName)}
       </span>
-      <div className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 p-3.5">
+      <div className="min-w-0 flex-1 rounded-2xl border border-gray-200 bg-gray-50 p-3.5 dark:border-white/10 dark:bg-white/5">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-bold text-white">{EVENT_LABELS[event.type]}</p>
-          <time className="text-[10px] text-gray-400">{formatDateTime(event.occurredAt)}</time>
+          <p className="text-xs font-semibold text-gray-900 dark:text-white">{event.replyToEventId ? 'Comment' : EVENT_LABELS[event.type]}</p>
+          <time className="text-[10px] text-gray-500 dark:text-gray-400">{formatDateTime(event.occurredAt)}</time>
         </div>
-        <p className="mt-1 text-xs text-gray-300 leading-relaxed">{event.message}</p>
-        <p className="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-orange-500">{event.actorName}</p>
+        <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-200">{event.message}</p>
+        <p className="mt-1.5 text-[10px] font-semibold uppercase tracking-wider text-orange-700 dark:text-orange-400">{event.actorName}</p>
         {event.media && mediaUrl && (
-          <div className="mt-2.5 overflow-hidden rounded-xl border border-white/10 bg-black/40">
+          <div className="mt-2.5 overflow-hidden rounded-xl border border-gray-200 bg-black/40 dark:border-white/10">
             {event.media.kind === 'image' && <img src={mediaUrl} alt={event.media.fileName} className="max-h-60 w-full object-contain" />}
             {event.media.kind === 'video' && <video src={mediaUrl} controls playsInline className="max-h-60 w-full bg-black" />}
           </div>
         )}
+        <div className="mt-3 border-t border-gray-200 pt-2 dark:border-white/10">
+          {replyOpen ? <form onSubmit={async (formEvent) => { formEvent.preventDefault(); if (!reply.trim() || replyBusy) return; setReplyBusy(true); const saved = await onReply(reply.trim()); setReplyBusy(false); if (saved) { setReply(''); setReplyOpen(false); } }} className="flex gap-2">
+            <input value={reply} onChange={(formEvent) => setReply(formEvent.target.value)} maxLength={1000} aria-label={`Reply to ${EVENT_LABELS[event.type]}`} placeholder="Add a comment or ask for context…" className="min-h-10 min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-orange-500 dark:border-white/15 dark:bg-[#101722] dark:text-white" />
+            <button type="submit" disabled={!reply.trim() || replyBusy} className="min-h-10 rounded-xl bg-orange-600 px-3 text-xs font-semibold text-white disabled:opacity-45">{replyBusy ? '…' : 'Reply'}</button>
+          </form> : <button type="button" onClick={() => setReplyOpen(true)} className="min-h-9 text-xs font-semibold text-orange-700 hover:text-orange-800 dark:text-orange-300 dark:hover:text-orange-200">Reply / add context</button>}
+        </div>
       </div>
     </li>
   );

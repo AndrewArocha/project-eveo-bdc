@@ -21,6 +21,40 @@ async function assertSameStore(model: typeof Customer | typeof Lead | typeof Inv
   }
 }
 
+async function assertRepAvailable(input: {
+  dealerAccountId: string;
+  storeId: string;
+  scheduledAt: Date | null;
+  durationMinutes: number;
+  assignedUserId?: string | null;
+  excludeId?: string;
+}) {
+  if (!input.scheduledAt || !input.assignedUserId) return;
+  const proposedStart = input.scheduledAt.getTime();
+  const proposedEnd = proposedStart + input.durationMinutes * 60_000;
+  const earliestCandidate = new Date(proposedStart - 60 * 60_000);
+  const candidates = await Appointment.find({
+    dealerAccountId: input.dealerAccountId,
+    storeId: input.storeId,
+    scheduledAt: { $gte: earliestCandidate, $lt: new Date(proposedEnd) },
+    status: { $nin: ['cancelled', 'sold', 'no_show'] },
+    ...(input.excludeId ? { _id: { $ne: input.excludeId } } : {}),
+    $or: [
+      { assignedStoreUserId: input.assignedUserId },
+      { assignedPlatformUserId: input.assignedUserId },
+    ],
+  }).select('scheduledAt durationMinutes').lean();
+  const conflict = candidates.some((appointment) => {
+    if (!appointment.scheduledAt) return false;
+    const start = new Date(appointment.scheduledAt).getTime();
+    const end = start + (appointment.durationMinutes || 30) * 60_000;
+    return proposedStart < end && proposedEnd > start;
+  });
+  if (conflict) {
+    throw new AppError(409, 'This rep already has an appointment during that time. Choose another rep or a different 15-minute start time.', 'APPOINTMENT_SLOT_UNAVAILABLE');
+  }
+}
+
 export async function listAppointments(dealerAccountId: string, storeId: string) {
   await assertStore(storeId, dealerAccountId);
   return Appointment.find({ dealerAccountId, storeId }).sort({ scheduledAt: 1, createdAt: -1 }).lean();
@@ -45,6 +79,11 @@ export async function createAppointment(input: Record<string, unknown>, userId: 
       throw new AppError(400, 'The appointment customer must match the linked lead customer.', 'CUSTOMER_LEAD_MISMATCH');
     }
   }
+  const scheduledAt = typeof input.scheduledAt === 'string' ? new Date(input.scheduledAt) : null;
+  const durationMinutes = typeof input.durationMinutes === 'number' ? input.durationMinutes : 30;
+  const assignedUserId = typeof input.assignedStoreUserId === 'string' ? input.assignedStoreUserId
+    : typeof input.assignedPlatformUserId === 'string' ? input.assignedPlatformUserId : null;
+  await assertRepAvailable({ dealerAccountId, storeId, scheduledAt, durationMinutes, assignedUserId });
   const appointment = await Appointment.create({ ...input, dealerAccountId, createdByUserId: userId });
   appointment.statusHistory.push({ kind: 'status', previousValue: '', nextValue: appointment.status, changedByUserId: userId, changedAt: new Date() });
   if (appointment.scheduledAt) appointment.statusHistory.push({ kind: 'schedule', previousValue: '', nextValue: appointment.scheduledAt.toISOString(), changedByUserId: userId, changedAt: new Date() });
@@ -66,6 +105,7 @@ export async function updateAppointmentDetails(id: string, dealerAccountId: stri
     appointment.statusHistory.push({ kind: 'schedule', previousValue: appointment.scheduledAt?.toISOString() || '', nextValue: next.toISOString(), changedByUserId: new Types.ObjectId(userId), changedAt: new Date() });
     appointment.scheduledAt = next;
   }
+  if (typeof input.durationMinutes === 'number') appointment.durationMinutes = input.durationMinutes;
   for (const field of ['assignedPlatformUserId', 'assignedStoreUserId'] as const) {
     if (field in input && input[field] && !await User.exists({ _id: input[field], dealerAccountId, active: true, storeIds: storeId })) throw new AppError(400, 'Assigned employee must be active and belong to this store.', 'INVALID_ASSIGNMENT');
     if (field in input && String(appointment[field] ?? '') !== String(input[field] ?? '')) {
@@ -73,6 +113,11 @@ export async function updateAppointmentDetails(id: string, dealerAccountId: stri
       appointment[field] = input[field] as typeof appointment[typeof field];
     }
   }
+  const assignedUserId = appointment.assignedStoreUserId?.toString() || appointment.assignedPlatformUserId?.toString() || null;
+  await assertRepAvailable({
+    dealerAccountId, storeId, scheduledAt: appointment.scheduledAt || null,
+    durationMinutes: appointment.durationMinutes || 30, assignedUserId, excludeId: id,
+  });
   await appointment.save();
   await recordActivityEventSafely({
     dealerAccountId, storeId, userId, category: 'appointment', title: `Appointment updated • ${appointment.customerNameSnapshot}`,

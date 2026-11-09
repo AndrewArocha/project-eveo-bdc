@@ -104,33 +104,36 @@ export async function saveMockShowroomMedia(file: File, storeId?: string): Promi
     throw new Error('Upload an image or video file.');
   }
   if (isVideo && file.size > MAX_VIDEO_SIZE_BYTES) {
-    throw new Error('For the local demo, videos must be 25 MB or smaller.');
+    throw new Error('Videos must be 25 MB or smaller.');
   }
   if (isImage && file.size > MAX_IMAGE_INPUT_BYTES) {
     throw new Error('Image file exceeds the 50 MB maximum limit.');
   }
 
+  // Compress before both remote and local persistence. Camera photos commonly
+  // exceed the API's 25 MB limit even when the resulting WebP is only a few MB.
+  const compressed = isImage && file.type !== 'image/gif'
+    ? await compressImageFile(file)
+    : { blob: file, fileName: file.name, mimeType: file.type || 'application/octet-stream' };
+  const targetBlob = compressed.blob;
+  const targetFileName = compressed.fileName;
+  const targetMime = compressed.mimeType;
+  if (targetBlob.size > MAX_VIDEO_SIZE_BYTES) {
+    throw new Error('This image is still larger than the 25 MB upload limit. Choose a smaller photo.');
+  }
+
   const token = localStorage.getItem('eveo_token');
   if (token) {
     if (!storeId) throw new Error('Choose a store before uploading showroom media.');
-    if (file.size > MAX_VIDEO_SIZE_BYTES) throw new Error('Showroom media must be 25 MB or smaller.');
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime'].includes(targetMime)) {
+      throw new Error('Use a JPEG, PNG, WebP, GIF, MP4, WebM, or QuickTime file.');
+    }
     const response = await fetch(`${apiBaseUrl}/showroom/media?${new URLSearchParams({ storeId })}`, {
-      method: 'POST', headers: authHeaders({ 'Content-Type': file.type, 'X-File-Name': encodeURIComponent(file.name) }), body: file,
+      method: 'POST', headers: authHeaders({ 'Content-Type': targetMime, 'X-File-Name': encodeURIComponent(targetFileName) }), body: targetBlob,
     });
     const result = await response.json().catch(() => null) as { data?: ShowroomMediaAsset; error?: { message?: string } } | null;
     if (!response.ok || !result?.data) throw new Error(result?.error?.message || 'Could not upload showroom media.');
     return result.data;
-  }
-
-  let targetBlob: Blob = file;
-  let targetFileName = file.name;
-  let targetMime = file.type || 'application/octet-stream';
-
-  if (isImage) {
-    const compressed = await compressImageFile(file);
-    targetBlob = compressed.blob;
-    targetFileName = compressed.fileName;
-    targetMime = compressed.mimeType;
   }
 
   const asset: ShowroomMediaAsset = {

@@ -12,6 +12,8 @@ export interface ApiUser {
   id: string;
   name: string;
   email: string;
+  phone?: string;
+  weeklySchedule?: Record<string, { start: string; end: string }>;
   role: 'owner' | 'manager' | 'bdc' | 'sales';
   dealerAccountId: string;
   storeIds: string[];

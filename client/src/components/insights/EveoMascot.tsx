@@ -303,36 +303,18 @@ export default function EveoMascot({
               <stop offset="100%" stopColor="#000000" />
             </linearGradient>
 
-            <radialGradient id={`${svgId}-glassCore`} cx="38%" cy="30%" r="70%">
-              <stop offset="0%" stopColor="#161b22" stopOpacity="0.95" />
-              <stop offset="60%" stopColor="#0a0f16" stopOpacity="0.98" />
-              <stop offset="100%" stopColor="#05080c" stopOpacity="1" />
-            </radialGradient>
-
             <filter id={`${svgId}-shadow3D`} x="-20%" y="-20%" width="140%" height="140%">
               <feDropShadow dx="0" dy="3" stdDeviation="2.5" floodColor="#000000" floodOpacity="0.6" />
             </filter>
           </defs>
 
-          {/* LAYER 1: INNER CORE SPHERE (Clean Obsidian Surface, Zero Glow) */}
+          {/* LAYER 1: TRANSPARENT FACE AREA */}
           <g
             style={{
               transform: `translate(${ringOffset.x * 0.6}px, ${ringOffset.y * 0.6}px)`,
               transition: 'transform 0.12s ease-out',
             }}
           >
-            <circle
-              cx="120"
-              cy="120"
-              r="84"
-              fill={`url(#${svgId}-glassCore)`}
-              stroke="rgba(255,255,255,0.06)"
-              strokeWidth="1"
-            />
-            <path
-              d="M 58 84 A 74 74 0 0 1 174 68 A 78 78 0 0 0 58 84 Z"
-              fill="rgba(255,255,255,0.04)"
-            />
           </g>
 
           {/* LAYER 2: 3D BEZIER EVEO OUTER RING + 6 SIDE DASHES */}
