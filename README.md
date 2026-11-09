@@ -16,7 +16,7 @@ From the repository root:
 npm run install:all
 ```
 
-Copy `server/.env.example` to `server/.env`, set `MONGODB_URI`, and replace `JWT_SECRET` with a random secret of at least 32 characters. New owner accounts require email verification before a session is issued. Configure `RESEND_API_KEY` and `AUTH_EMAIL_FROM` with a verified sending domain, and set `CLIENT_ORIGIN` to the public client origin so verification links return to the right site. The development client uses `/api` and the Vite proxy, so its API origin is configured by the existing Vite setup. For a separate deployment, set `VITE_API_URL` to the public API base URL and configure `CLIENT_ORIGIN` on the server.
+Copy `server/.env.example` to `server/.env`, set `MONGODB_URI`, and replace `JWT_SECRET` with a random secret of at least 32 characters. Email verification is on by default in production. For a private staging/demo environment only, set `AUTH_EMAIL_VERIFICATION_REQUIRED=false` to allow account creation and sign-in without sending email. Re-enable it before opening registration to the public. To send verification links, configure `RESEND_API_KEY` and `AUTH_EMAIL_FROM` with a verified sending domain, and set `CLIENT_ORIGIN` to the public client origin so links return to the right site. The development client uses `/api` and the Vite proxy, so its API origin is configured by the existing Vite setup. For a separate deployment, set `VITE_API_URL` to the public API base URL and configure `CLIENT_ORIGIN` on the server.
 
 ```bash
 npm run dev:server

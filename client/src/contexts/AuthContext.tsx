@@ -8,7 +8,7 @@ interface AuthContextType {
   user: ApiUser | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (input: { name: string; businessName: string; phone: string; email: string; password: string; promotionalConsent: boolean }) => Promise<void>;
+  signUp: (input: { name: string; businessName: string; phone: string; email: string; password: string; promotionalConsent: boolean }) => Promise<{ verificationRequired: boolean }>;
   verifyEmail: (token: string) => Promise<void>;
   acceptInvitation: (input: { token: string; name: string; password: string }) => Promise<void>;
   refreshUser: () => Promise<ApiUser>;
@@ -68,10 +68,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [acceptSession]);
 
   const signUp = useCallback(async (input: { name: string; businessName: string; phone: string; email: string; password: string; promotionalConsent: boolean }) => {
-    await apiRequest<{ verificationRequired: boolean; email: string }>('/auth/signup', {
+    const response = await apiRequest<{ verificationRequired: boolean; email: string; session?: SessionResponse }>('/auth/signup', {
       method: 'POST', body: JSON.stringify(input),
     });
-  }, []);
+    if (response.session) acceptSession(response.session);
+    return { verificationRequired: response.verificationRequired };
+  }, [acceptSession]);
 
   const verifyEmail = useCallback(async (token: string) => {
     const session = await apiRequest<SessionResponse>('/auth/verify-email', { method: 'POST', body: JSON.stringify({ token }) });

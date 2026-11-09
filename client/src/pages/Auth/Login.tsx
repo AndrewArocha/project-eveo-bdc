@@ -4,6 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import eveoSymbol from '../../images/logo/eveo-symbol.svg';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiRequest } from '../../services/apiClient';
+import { AuthSplitLayout, GoogleSignInButton } from '../../components/Auth/AuthSplitLayout';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -51,12 +52,12 @@ export default function Login() {
   const inputClasses = "w-full min-h-12 px-4 py-3 rounded-xl bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all text-base sm:text-sm text-gray-900 dark:text-white";
 
   return (
-    <div className="flex-1 flex items-center justify-center px-4 pt-24 pb-10 md:pt-32 sm:px-6 lg:px-8">
+    <AuthSplitLayout>
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
-        className="w-full max-w-md space-y-6 sm:space-y-8 bg-white dark:bg-[#0a0f16] p-6 sm:p-10 rounded-3xl sm:rounded-4xl border border-gray-100 dark:border-white/5 shadow-2xl my-auto"
+        className="w-full space-y-6 sm:space-y-8"
       >
         <div className="flex flex-col items-center">
           <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20 mb-4 sm:mb-6">
@@ -66,9 +67,12 @@ export default function Login() {
             Sign in to your account
           </h2>
           <p className="mt-1.5 text-center text-sm text-gray-600 dark:text-gray-400">
-            New to EVEO? <NavLink to="/register" className="font-semibold text-orange-500 hover:text-orange-400 transition-colors">request dealership access</NavLink>
+            New to EVEO? <NavLink to="/register" className="font-semibold text-orange-500 hover:text-orange-400 transition-colors">Create an account</NavLink>
           </p>
         </div>
+
+        <GoogleSignInButton />
+        <div className="flex items-center gap-3 text-xs text-gray-400"><span className="h-px flex-1 bg-gray-200 dark:bg-white/10" />OR EMAIL<span className="h-px flex-1 bg-gray-200 dark:bg-white/10" /></div>
 
         <form className="mt-6 sm:mt-8 space-y-5 sm:space-y-6" onSubmit={handleLogin}>
           {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">{error}</p>}
@@ -100,6 +104,6 @@ export default function Login() {
           {verificationNotice && <p role="status" className="text-xs text-gray-600 dark:text-gray-400">{verificationNotice}</p>}
         </form>
       </motion.div>
-    </div>
+    </AuthSplitLayout>
   );
 }

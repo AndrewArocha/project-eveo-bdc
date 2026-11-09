@@ -1,25 +1,17 @@
 // src/components/Layout/PublicNavbar.tsx
-import { useEffect, useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { LogOut, ArrowRight } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import eveoSymbol from '../../images/logo/eveo-symbol.svg';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function PublicNavbar() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    () => localStorage.getItem('eveo_token') !== null
-  );
-
-  useEffect(() => {
-    setIsAuthenticated(localStorage.getItem('eveo_token') !== null);
-  }, [location.pathname]);
+  const { user, isLoading, signOut } = useAuth();
+  const isAuthenticated = Boolean(user?.emailVerifiedAt);
 
   const handleLogout = () => {
-    localStorage.removeItem('eveo_token');
-    localStorage.removeItem('eveo_role');
-    setIsAuthenticated(false);
+    signOut();
     navigate('/login', { replace: true });
   };
 
@@ -116,7 +108,7 @@ export default function PublicNavbar() {
         <div className="flex items-center gap-4">
           <ThemeToggle />
           <div className="hidden sm:flex items-center gap-3 border-l border-gray-200 dark:border-white/10 pl-4">
-            {!isAuthenticated ? (
+            {!isAuthenticated || isLoading ? (
               <>
                 <NavLink
                   to="/login"

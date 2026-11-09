@@ -80,9 +80,9 @@ export default function About() {
               <img
                 src={bgEntrance}
                 alt="EVEO Corporate Office Entrance"
-                className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-out md:grayscale ${hoveredPath === 'eveo' ? 'md:scale-105 md:opacity-60' : 'scale-100 opacity-45 md:opacity-20'}`}
+                className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-out ${hoveredPath === 'eveo' ? 'scale-105 opacity-60' : 'scale-100 opacity-45'}`}
               />
-              <div className={`absolute inset-0 bg-linear-to-t from-[#05080c] via-[#05080c]/55 to-[#05080c]/90 transition-opacity duration-700 ${hoveredPath === 'eveo' ? 'md:opacity-30' : 'opacity-65 md:opacity-100'}`} />
+              <div className={`absolute inset-0 bg-linear-to-t from-[#05080c]/80 via-[#05080c]/30 to-[#05080c]/35 transition-opacity duration-700 ${hoveredPath === 'eveo' ? 'opacity-25' : 'opacity-55'}`} />
 
               <button
                 type="button"
@@ -95,7 +95,7 @@ export default function About() {
                   <span className={`text-orange-500 font-mono text-[11px] sm:text-xs font-bold tracking-widest uppercase mb-2 sm:mb-4 block transition-opacity duration-300 ${hoveredPath === 'eveo' ? 'md:opacity-100' : 'opacity-100 md:opacity-0'}`}>
                     Company History
                   </span>
-                  <h2 className={`text-3xl sm:text-4xl md:text-5xl font-black drop-shadow-2xl transition-all duration-500 tracking-tight ${hoveredPath === 'eveo' ? 'md:text-white md:scale-110' : 'text-white md:text-gray-700'}`}>
+                  <h2 className={`text-3xl sm:text-4xl md:text-5xl font-black text-white drop-shadow-2xl transition-all duration-500 tracking-tight ${hoveredPath === 'eveo' ? 'scale-110' : ''}`}>
                     ABOUT THE COMPANY
                   </h2>
                   <span className="mt-3 inline-flex md:hidden items-center gap-1.5 px-3.5 py-1 rounded-full bg-white/10 border border-white/15 backdrop-blur-md text-[11px] font-semibold text-gray-200">
@@ -110,9 +110,9 @@ export default function About() {
               <img
                 src={Andres}
                 alt="Andres Hernandez - Manager and Full-Stack Developer"
-                className={`absolute inset-0 w-full h-full object-cover object-[center_34%] transition-all duration-1000 ease-out md:grayscale ${hoveredPath === 'andres' ? 'md:scale-105 md:opacity-60' : 'scale-100 opacity-45 md:opacity-20'}`}
+                className={`absolute inset-0 w-full h-full object-cover object-[center_34%] transition-all duration-1000 ease-out ${hoveredPath === 'andres' ? 'scale-105 opacity-60' : 'scale-100 opacity-45'}`}
               />
-              <div className={`absolute inset-0 bg-linear-to-t from-[#05080c] via-[#05080c]/55 to-[#05080c]/90 transition-opacity duration-700 ${hoveredPath === 'andres' ? 'md:opacity-30' : 'opacity-65 md:opacity-100'}`} />
+              <div className={`absolute inset-0 bg-linear-to-t from-[#05080c]/80 via-[#05080c]/30 to-[#05080c]/35 transition-opacity duration-700 ${hoveredPath === 'andres' ? 'opacity-25' : 'opacity-55'}`} />
 
               <button
                 type="button"
@@ -125,7 +125,7 @@ export default function About() {
                   <span className={`text-orange-500 font-mono text-[11px] sm:text-xs font-bold tracking-widest uppercase mb-2 sm:mb-4 block transition-opacity duration-300 ${hoveredPath === 'andres' ? 'md:opacity-100' : 'opacity-100 md:opacity-0'}`}>
                     Manager / Developer
                   </span>
-                  <h2 className={`text-3xl sm:text-4xl md:text-5xl font-black drop-shadow-2xl transition-all duration-500 tracking-tight ${hoveredPath === 'andres' ? 'md:text-white md:scale-110' : 'text-white md:text-gray-700'}`}>
+                  <h2 className={`text-3xl sm:text-4xl md:text-5xl font-black text-white drop-shadow-2xl transition-all duration-500 tracking-tight ${hoveredPath === 'andres' ? 'scale-110' : ''}`}>
                     ABOUT THE AUTHOR
                   </h2>
                   <span className="mt-3 inline-flex md:hidden items-center gap-1.5 px-3.5 py-1 rounded-full bg-white/10 border border-white/15 backdrop-blur-md text-[11px] font-semibold text-gray-200">

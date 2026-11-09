@@ -20,7 +20,7 @@ export async function createOwnerAccount(input: { name: string; businessName: st
   if (await User.exists({ email: input.email })) {
     throw new AppError(409, 'An account already uses this email address. Please sign in or reset your password.', 'EMAIL_IN_USE');
   }
-  if (!env.resendApiKey || !env.authEmailFrom) {
+  if (env.authEmailVerificationRequired && (!env.resendApiKey || !env.authEmailFrom)) {
     throw new AppError(503, 'Email verification is not configured yet. Please try again later.', 'EMAIL_NOT_CONFIGURED');
   }
   const passwordHash = await bcrypt.hash(input.password, PASSWORD_SALT_ROUNDS);
@@ -60,8 +60,11 @@ export async function createOwnerAccount(input: { name: string; businessName: st
         dealerAccountId,
         storeIds: [storeId],
         active: true,
-        emailVerificationTokenHash: verificationTokenHash,
-        emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        emailVerifiedAt: env.authEmailVerificationRequired ? null : new Date(),
+        ...(env.authEmailVerificationRequired ? {
+          emailVerificationTokenHash: verificationTokenHash,
+          emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        } : {}),
         promotionalConsent: input.promotionalConsent === true,
         demoMode: true,
       }], { session });
@@ -71,6 +74,7 @@ export async function createOwnerAccount(input: { name: string; businessName: st
     await session.endSession();
   }
   if (!createdUser) throw new AppError(500, 'The EVEO account could not be created.', 'SIGNUP_FAILED');
+  if (!env.authEmailVerificationRequired) return { verificationRequired: false, email: input.email, session: issueSession(createdUser) };
   const verifyUrl = new URL('/verify-email', env.clientOrigins[0] || 'http://localhost:3000');
   verifyUrl.searchParams.set('token', verificationToken);
   const emailResponse = await fetch('https://api.resend.com/emails', {
@@ -82,6 +86,7 @@ export async function createOwnerAccount(input: { name: string; businessName: st
       subject: 'Verify your EVEO email address',
       html: `<p>Hi ${escapeHtml(input.name)},</p><p>Verify your email to open the EVEO demo workspace.</p><p><a href="${verifyUrl.toString()}">Verify email</a></p><p>This link expires in 24 hours. If you did not request an account, you can ignore this email.</p>`,
     }),
+    signal: AbortSignal.timeout(10_000),
   }).catch(() => null);
   if (!emailResponse?.ok) {
     throw new AppError(502, 'Your account request was saved, but the verification email could not be sent. Contact EVEO support to finish setup.', 'VERIFICATION_EMAIL_FAILED');
@@ -127,7 +132,13 @@ export async function signIn(email: string, password: string) {
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     throw new AppError(401, API_MESSAGES.invalidCredentials, 'INVALID_CREDENTIALS');
   }
-  if (!user.emailVerifiedAt) throw new AppError(403, 'Verify your email before signing in. Check your inbox for the EVEO verification link.', 'EMAIL_NOT_VERIFIED');
+  if (!user.emailVerifiedAt && env.authEmailVerificationRequired) throw new AppError(403, 'Verify your email before signing in. Check your inbox for the EVEO verification link.', 'EMAIL_NOT_VERIFIED');
+  if (!user.emailVerifiedAt) {
+    user.emailVerifiedAt = new Date();
+    user.emailVerificationTokenHash = undefined;
+    user.emailVerificationExpiresAt = undefined;
+    await user.save();
+  }
 
   return issueSession(user);
 }
